@@ -1,0 +1,55 @@
+services:
+  # ============================================================
+  # 1. PostgreSQL Database Service
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: codecollab-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: codecollab_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d codecollab_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codecollab-network
+
+  # ============================================================
+  # 2. Redis In-Memory Cache & Queue Service
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: codecollab-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codecollab-network
+
+# ============================================================
+# Persistent Storage Volumes
+# ============================================================
+volumes:
+  postgres_data:
+    name: codecollab_postgres_data
+
+# ============================================================
+# Private Container Network
+# ============================================================
+networks:
+  codecollab-network:
+    name: codecollab_dev_network
+    driver: bridge
