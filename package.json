@@ -1,0 +1,16 @@
+{
+  "name": "codecollab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CodeCollab - Advanced Real-Time Developer Platform",
+  "packageManager": "pnpm@12.18.0",
+  "scripts": {
+    "dev": "pnpm --filter \"./apps/*\" --parallel dev",
+    "build": "pnpm --filter \"./packages/*\" build && pnpm --filter \"./apps/*\" build",
+    "lint": "pnpm --filter \"*\" lint",
+    "test": "pnpm --filter \"*\" test"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
