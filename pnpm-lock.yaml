@@ -170,6 +170,14 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/shared:
+    devDependencies:
+      '@codecollab/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/tsconfig: {}
+
 packages:
 
   typescript@5.9.3:
