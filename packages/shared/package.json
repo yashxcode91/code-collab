@@ -6,5 +6,8 @@
   "types": "./src/index.ts",
   "devDependencies": {
     "@codecollab/tsconfig": "workspace:*"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   }
 }
