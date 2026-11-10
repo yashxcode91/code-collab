@@ -2,14 +2,19 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { healthRouter } from './modules/health/health.router';
+import { authRouter } from './modules/auth/auth.router';
 import { csrfProtection, getAllowedOrigin } from './middleware/csrf.middleware';
 import {
   globalErrorHandler,
   notFoundHandler,
 } from './middleware/error.middleware';
+import { validateJwtConfig } from './utils/jwt';
 
-// Fail fast on startup if CLIENT_URL is missing in production or malformed
+// Fail fast on startup if security config is missing or malformed
 getAllowedOrigin();
+if (process.env.NODE_ENV !== 'test') {
+  validateJwtConfig();
+}
 
 export const app: Application = express();
 
@@ -36,6 +41,7 @@ app.use(csrfProtection);
 
 // 4. Feature routes
 app.use('/api/health', healthRouter);
+app.use('/api/auth', authRouter);
 
 // 5. Fallback 404 & centralized error middleware (must stay last)
 app.use(notFoundHandler);
