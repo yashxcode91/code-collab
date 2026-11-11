@@ -16,6 +16,7 @@ export class ApiClientError extends Error {
     public readonly statusCode: number,
     public readonly code: string = 'UNKNOWN_ERROR',
     public readonly fieldErrors: Record<string, string> = {},
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiClientError';
@@ -82,7 +83,13 @@ export async function apiRequest<T>(
       fieldErrors.username = message;
     }
 
-    throw new ApiClientError(message, res.status, code, fieldErrors);
+    throw new ApiClientError(
+      message,
+      res.status,
+      code,
+      fieldErrors,
+      errObj?.details,
+    );
   }
 
   return body.data as T;
