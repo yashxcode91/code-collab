@@ -1,30 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { CursorImageTrail } from '@/components/unlumen-ui/cursor-image-trail';
 
+/**
+ * Single floating syntax token emitted along cursor paths behind the centered auth card.
+ * Uses strictly the single active `--primary` accent for emphasized tokens plus neutral glass
+ * styling for structural tokens to keep the visual language monochrome + Solar Tangerine.
+ */
 function CodeFragmentChip({
   token,
-  tone,
+  emphasized = false,
 }: {
   token: string;
-  tone: 'violet' | 'sky' | 'emerald' | 'amber';
+  emphasized?: boolean;
 }) {
-  const toneClasses: Record<typeof tone, string> = {
-    violet:
-      'border-violet-300/80 bg-white/95 text-violet-700 dark:border-violet-400/30 dark:bg-neutral-950/90 dark:text-violet-200',
-    sky:
-      'border-sky-300/80 bg-white/95 text-sky-700 dark:border-white/20 dark:bg-neutral-950/90 dark:text-neutral-200',
-    emerald:
-      'border-emerald-300/80 bg-white/95 text-emerald-700 dark:border-emerald-400/30 dark:bg-neutral-950/90 dark:text-emerald-200',
-    amber:
-      'border-amber-300/80 bg-white/95 text-amber-700 dark:border-amber-400/30 dark:bg-neutral-950/90 dark:text-amber-200',
-  };
-
   return (
     <span
       className={[
         'inline-flex w-max items-center justify-center whitespace-nowrap rounded-md border px-2 py-1',
         'font-mono text-[11px] font-medium leading-none shadow-sm',
-        toneClasses[tone],
+        emphasized
+          ? 'border-primary/35 bg-white/95 text-primary dark:border-primary/40 dark:bg-neutral-950/90 dark:text-primary'
+          : 'border-slate-300/80 bg-white/95 text-slate-700 dark:border-white/20 dark:bg-neutral-950/90 dark:text-neutral-200',
       ].join(' ')}
     >
       {token}
@@ -33,14 +29,14 @@ function CodeFragmentChip({
 }
 
 const CODE_TRAIL_ITEMS: React.ReactNode[] = [
-  <CodeFragmentChip key="arrow" token="() =>" tone="violet" />,
-  <CodeFragmentChip key="crdt" token="Y.Doc()" tone="sky" />,
-  <CodeFragmentChip key="jsx" token="<Room />" tone="emerald" />,
-  <CodeFragmentChip key="type" token=": Peer" tone="amber" />,
-  <CodeFragmentChip key="sync" token="sync()" tone="violet" />,
-  <CodeFragmentChip key="braces" token="{ ... }" tone="sky" />,
-  <CodeFragmentChip key="async" token="await" tone="emerald" />,
-  <CodeFragmentChip key="ws" token="ws://" tone="amber" />,
+  <CodeFragmentChip key="arrow" token="() =>" emphasized />,
+  <CodeFragmentChip key="crdt" token="Y.Doc()" />,
+  <CodeFragmentChip key="jsx" token="<Room />" emphasized />,
+  <CodeFragmentChip key="type" token=": Peer" />,
+  <CodeFragmentChip key="sync" token="sync()" emphasized />,
+  <CodeFragmentChip key="braces" token="{ ... }" />,
+  <CodeFragmentChip key="async" token="await" emphasized />,
+  <CodeFragmentChip key="ws" token="ws://" />,
 ];
 
 interface CursorCodeTrailProps {
@@ -50,11 +46,10 @@ interface CursorCodeTrailProps {
 }
 
 /**
- * Integrates Unlumen UI's CursorImageTrail with developer code fragments:
- * - Bounded strictly to the auth stage container (`containerRef`)
+ * Integrates Unlumen UI's `CursorImageTrail` with collaborative engineering tokens:
+ * - Bounded strictly inside `containerRef`
  * - Layered behind the centered mirror card (`trailZIndex={10}` vs `z-20`)
- * - Auto-fades fragments after 720ms so they never obstruct form inputs
- * - Respects `prefers-reduced-motion` and skips touch-only devices
+ * - Automatically fades fragments after 720ms and disables itself on reduced motion or touch input
  */
 export function CursorCodeTrail({
   containerRef,
@@ -85,7 +80,7 @@ export function CursorCodeTrail({
   );
 }
 
-/** Subscribes reactively to a CSS media query (e.g., reduced-motion or coarse-pointer touch check). */
+/** Subscribes reactively to a CSS media query (e.g., reduced motion or coarse touch pointer). */
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -102,4 +97,3 @@ function useMediaQuery(query: string): boolean {
 
   return matches;
 }
-

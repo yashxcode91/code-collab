@@ -11,7 +11,11 @@ import {
   PasswordField,
   TextField,
 } from '@/components/auth/AuthFormControls';
-import { ApiClientError, useAuth } from '@/context/AuthContext';
+import {
+  ApiClientError,
+  OAUTH_PROVIDER_STORAGE_KEY,
+  useAuth,
+} from '@/context/AuthContext';
 
 type LoginFieldErrors = Partial<Record<keyof LoginInput, string>>;
 
@@ -50,6 +54,11 @@ export function LoginPage() {
     setGlobalError(null);
     clearOAuthError();
     setPendingProvider(provider);
+    try {
+      window.localStorage.setItem(OAUTH_PROVIDER_STORAGE_KEY, provider);
+    } catch {
+      // Ignore storage access errors in restricted/private environments
+    }
     // Full-page navigation (not fetch) because `/api/auth/:provider` sets a cookie and 302-redirects to Google/GitHub
     window.location.assign(`/api/auth/${provider}`);
   };
@@ -176,7 +185,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting || pendingProvider !== null}
-            className="group mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-violet-600 to-violet-700 px-4 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.32),0_2px_4px_rgba(15,23,42,0.12),0_10px_24px_-6px_rgba(109,40,217,0.45)] transition-all duration-150 hover:from-violet-500 hover:to-violet-700 active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-60 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-400 dark:hover:to-indigo-600 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_6px_rgba(0,0,0,0.4),0_12px_28px_-6px_rgba(99,102,241,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="btn-studio-primary group mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-all duration-150 active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {isSubmitting ? (
               <>

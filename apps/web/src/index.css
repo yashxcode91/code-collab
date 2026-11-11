@@ -2,70 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens stored as raw HSL channels (`H S% L%`) so Tailwind can apply `/opacity` utilities */
+/*
+ * Design tokens are stored as raw HSL channels (`H S% L%`) instead of `hsl(...)`
+ * strings so Tailwind can compose opacity modifiers such as `bg-primary/15` or
+ * `border-border/80` using `hsl(var(--primary) / <alpha-value>)`.
+ */
 @layer base {
-  /* Light theme (default) */
+  /* Light theme: cool architectural alabaster canvas so translucent white glass visibly lifts and refracts */
   :root {
-    --background: 0 0% 99.2%;
-    --foreground: 240 10% 7%;
+    --background: 220 20% 96%;
+    --foreground: 224 24% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 7%;
+    --card-foreground: 224 24% 10%;
 
-    --primary: 258 84% 55%;
+    /* Single active accent palette: Solar Tangerine */
+    --primary: 21 90% 48%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 12%;
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 224 18% 15%;
 
-    --muted: 240 5% 95.5%;
-    --muted-foreground: 240 4.5% 44%;
+    --muted: 220 14% 92%;
+    --muted-foreground: 220 9% 43%;
 
-    --accent: 255 75% 96.5%;
-    --accent-foreground: 258 84% 48%;
+    --accent: 26 95% 93%;
+    --accent-foreground: 20 88% 34%;
 
     --destructive: 0 78% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 6% 89%;
-    --input: 240 6% 86%;
-    --ring: 258 84% 55%;
+    --border: 220 13% 86%;
+    --input: 220 13% 84%;
+    --ring: 21 90% 48%;
 
-    /* Visual panel & code card surfaces */
-    --panel: 240 16% 97%;
+    /* Raw RGB channels and hex stops consumed by Canvas pixels, CSS glow shadows, and primary CTAs */
+    --studio-rgb: 234, 88, 12;
+    --studio-btn-from: #f97316;
+    --studio-btn-to: #c2410c;
+    --studio-btn-text: #ffffff;
+
+    /* Editor / panel surfaces prepared for upcoming IDE steps */
+    --panel: 220 16% 94%;
     --editor: 0 0% 100%;
-    --editor-bar: 240 12% 97.5%;
+    --editor-bar: 220 14% 96%;
   }
 
-  /* Dark theme (true obsidian black) */
+  /* Dark theme: crisp deep-slate graphite stage with luminous grey glass and clean tangerine accents */
   .dark {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 96%;
-    --card: 0 0% 4%;
-    --card-foreground: 0 0% 96%;
+    --background: 222 15% 6%;
+    --foreground: 220 15% 95%;
+    --card: 222 12% 11%;
+    --card-foreground: 220 15% 95%;
 
-    --primary: 252 90% 68%;
+    --primary: 22 94% 56%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 9%;
-    --secondary-foreground: 0 0% 92%;
+    --secondary: 222 10% 15%;
+    --secondary-foreground: 220 12% 92%;
 
-    --muted: 0 0% 8.5%;
-    --muted-foreground: 0 0% 62%;
+    --muted: 222 10% 15%;
+    --muted-foreground: 220 10% 66%;
 
-    --accent: 252 28% 14%;
-    --accent-foreground: 252 90% 78%;
+    --accent: 22 45% 15%;
+    --accent-foreground: 24 95% 74%;
 
-    --destructive: 0 76% 62%;
+    --destructive: 0 72% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 14%;
-    --input: 0 0% 17%;
-    --ring: 252 90% 68%;
+    --border: 222 10% 21%;
+    --input: 222 10% 24%;
+    --ring: 22 94% 56%;
 
-    /* Visual panel & code card surfaces */
-    --panel: 0 0% 2%;
-    --editor: 0 0% 4%;
-    --editor-bar: 0 0% 7%;
+    --studio-rgb: 249, 115, 22;
+    --studio-btn-from: #fb923c;
+    --studio-btn-to: #ea580c;
+    --studio-btn-text: #ffffff;
+
+    --panel: 222 13% 9%;
+    --editor: 222 14% 7%;
+    --editor-bar: 222 11% 12%;
   }
 
   *,
@@ -91,62 +106,87 @@
 }
 
 @layer components {
-  /* Mostly-opaque frosted glass surface with top specular edge highlight */
+  /*
+   * Frosted Studio Glass Card:
+   * Uses two layered `background-image` gradients (top-left diagonal specular sheen + frosted base)
+   * instead of `::before` pseudo-elements so static or `absolute` sibling wrappers (such as the
+   * GithubGraph backdrop) can apply `.glass-surface` without forcing a new CSS containing block
+   * that would trap nested `position: fixed` hover tooltips.
+   */
   .glass-surface {
-    background: linear-gradient(
-      155deg,
-      rgba(255, 255, 255, 0.93) 0%,
-      rgba(255, 255, 255, 0.87) 55%,
-      rgba(248, 250, 252, 0.9) 100%
-    );
-    border: 1px solid rgba(15, 23, 42, 0.085);
+    background-image:
+      linear-gradient(
+        132deg,
+        rgba(255, 255, 255, 0.42) 0%,
+        rgba(255, 255, 255, 0.06) 28%,
+        transparent 56%,
+        rgba(255, 255, 255, 0.14) 100%
+      ),
+      linear-gradient(
+        158deg,
+        rgba(255, 255, 255, 0.68) 0%,
+        rgba(255, 255, 255, 0.44) 55%,
+        rgba(248, 250, 252, 0.56) 100%
+      );
+    border: 1px solid rgba(255, 255, 255, 0.88);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.98),
-      inset 0 -1px 0 0 rgba(15, 23, 42, 0.035),
-      0 1px 2px 0 rgba(15, 23, 42, 0.05),
-      0 16px 40px -12px rgba(15, 23, 42, 0.12);
-    -webkit-backdrop-filter: blur(12px) saturate(165%);
-    backdrop-filter: blur(12px) saturate(165%);
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.96),
+      inset 0 -1px 0 0 rgba(15, 23, 42, 0.045),
+      0 0 0 1px rgba(15, 23, 42, 0.055),
+      0 14px 36px -14px rgba(15, 23, 42, 0.14);
+    -webkit-backdrop-filter: blur(22px) saturate(185%);
+    backdrop-filter: blur(22px) saturate(185%);
   }
 
+  /* Crisp smoked-slate crystal glass in dark mode (clean specular highlight over deep graphite) */
   .dark .glass-surface {
-    background: linear-gradient(
-      155deg,
-      rgba(22, 28, 43, 0.9) 0%,
-      rgba(13, 17, 26, 0.86) 55%,
-      rgba(10, 14, 22, 0.89) 100%
-    );
-    border: 1px solid rgba(255, 255, 255, 0.13);
+    background-image:
+      linear-gradient(
+        132deg,
+        rgba(255, 255, 255, 0.13) 0%,
+        rgba(255, 255, 255, 0.035) 26%,
+        transparent 54%,
+        rgba(255, 255, 255, 0.05) 100%
+      ),
+      linear-gradient(
+        160deg,
+        rgba(44, 49, 59, 0.56) 0%,
+        rgba(24, 27, 34, 0.62) 56%,
+        rgba(34, 38, 47, 0.54) 100%
+      );
+    border: 1px solid rgba(255, 255, 255, 0.17);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
-      inset 0 -1px 0 0 rgba(0, 0, 0, 0.35),
-      0 2px 6px 0 rgba(0, 0, 0, 0.35),
-      0 22px 52px -14px rgba(0, 0, 0, 0.72);
-    -webkit-backdrop-filter: blur(14px) saturate(150%);
-    backdrop-filter: blur(14px) saturate(150%);
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.4),
+      inset 0 0 24px 0 rgba(255, 255, 255, 0.03),
+      0 18px 46px -16px rgba(0, 0, 0, 0.68);
+    -webkit-backdrop-filter: blur(24px) saturate(175%);
+    backdrop-filter: blur(24px) saturate(175%);
   }
 
-  /* Flagship crystal mirror glass card for centered authentication */
+  /*
+   * Flagship Crystal Mirror Glass for focal containers (Auth card, Hero banner, Navbar, Sidebar, Modal):
+   * Employs `::before` for angled glass surface catchlight and `::after` for a 1px horizontal crown glare.
+   */
   .glass-mirror {
     position: relative;
-    background: linear-gradient(
+    background-image: linear-gradient(
       142deg,
-      rgba(255, 255, 255, 0.84) 0%,
-      rgba(255, 255, 255, 0.48) 32%,
-      rgba(255, 255, 255, 0.72) 50%,
-      rgba(244, 246, 252, 0.46) 74%,
-      rgba(255, 255, 255, 0.68) 100%
+      rgba(255, 255, 255, 0.8) 0%,
+      rgba(255, 255, 255, 0.42) 32%,
+      rgba(255, 255, 255, 0.64) 52%,
+      rgba(246, 248, 252, 0.4) 76%,
+      rgba(255, 255, 255, 0.6) 100%
     );
     border: 1px solid rgba(255, 255, 255, 0.94);
     box-shadow:
       inset 0 1px 0 0 rgba(255, 255, 255, 1),
-      inset 0 -1px 0 0 rgba(15, 23, 42, 0.08),
-      inset 0 0 0 1px rgba(15, 23, 42, 0.04),
-      0 2px 6px 0 rgba(15, 23, 42, 0.04),
-      0 32px 80px -18px rgba(15, 23, 42, 0.18),
-      0 14px 36px -12px rgba(109, 40, 217, 0.12);
-    -webkit-backdrop-filter: blur(18px) saturate(195%);
-    backdrop-filter: blur(18px) saturate(195%);
+      inset 0 -1px 0 0 rgba(15, 23, 42, 0.07),
+      0 0 0 1px rgba(15, 23, 42, 0.055),
+      0 28px 72px -18px rgba(15, 23, 42, 0.18),
+      0 14px 36px -14px rgba(var(--studio-rgb), 0.14);
+    -webkit-backdrop-filter: blur(26px) saturate(200%);
+    backdrop-filter: blur(26px) saturate(200%);
   }
 
   .glass-mirror::before {
@@ -158,12 +198,12 @@
     z-index: 1;
     background: linear-gradient(
       126deg,
-      rgba(255, 255, 255, 0.78) 0%,
-      rgba(255, 255, 255, 0.22) 20%,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(255, 255, 255, 0.2) 20%,
       rgba(255, 255, 255, 0.03) 38%,
-      transparent 48%,
-      transparent 82%,
-      rgba(255, 255, 255, 0.3) 100%
+      transparent 50%,
+      transparent 80%,
+      rgba(255, 255, 255, 0.28) 100%
     );
   }
 
@@ -171,8 +211,8 @@
     content: "";
     position: absolute;
     top: 0;
-    left: 7%;
-    right: 7%;
+    left: 6%;
+    right: 6%;
     height: 1px;
     pointer-events: none;
     z-index: 2;
@@ -185,34 +225,34 @@
   }
 
   .dark .glass-mirror {
-    background: linear-gradient(
+    background-image: linear-gradient(
       142deg,
-      rgba(36, 36, 40, 0.62) 0%,
-      rgba(10, 10, 12, 0.56) 34%,
-      rgba(26, 26, 30, 0.6) 50%,
-      rgba(4, 4, 5, 0.72) 76%,
-      rgba(18, 18, 22, 0.6) 100%
+      rgba(56, 62, 74, 0.58) 0%,
+      rgba(25, 28, 35, 0.56) 34%,
+      rgba(42, 47, 57, 0.58) 52%,
+      rgba(19, 22, 28, 0.64) 76%,
+      rgba(36, 40, 49, 0.56) 100%
     );
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.22);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.34),
-      inset 0 -1px 0 0 rgba(0, 0, 0, 0.8),
-      inset 0 0 32px 0 rgba(255, 255, 255, 0.04),
-      0 8px 20px 0 rgba(0, 0, 0, 0.7),
-      0 38px 90px -16px rgba(0, 0, 0, 0.95),
-      0 0 48px -16px rgba(255, 255, 255, 0.08);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    backdrop-filter: blur(20px) saturate(140%);
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.52),
+      inset 0 0 36px 0 rgba(255, 255, 255, 0.045),
+      0 10px 24px 0 rgba(0, 0, 0, 0.48),
+      0 32px 76px -18px rgba(0, 0, 0, 0.72),
+      0 0 36px -22px rgba(var(--studio-rgb), 0.08);
+    -webkit-backdrop-filter: blur(26px) saturate(185%);
+    backdrop-filter: blur(26px) saturate(185%);
   }
 
   .dark .glass-mirror::before {
     background: linear-gradient(
       126deg,
-      rgba(255, 255, 255, 0.18) 0%,
-      rgba(255, 255, 255, 0.045) 24%,
+      rgba(255, 255, 255, 0.2) 0%,
+      rgba(255, 255, 255, 0.05) 24%,
       transparent 44%,
-      transparent 80%,
-      rgba(255, 255, 255, 0.07) 100%
+      transparent 78%,
+      rgba(255, 255, 255, 0.09) 100%
     );
   }
 
@@ -220,13 +260,68 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.68) 50%,
+      rgba(255, 255, 255, 0.72) 50%,
       transparent 100%
     );
   }
+
+  /* Translucent secondary control surface (pills, inputs, status badges, secondary buttons) */
+  .glass-control {
+    background-color: rgba(255, 255, 255, 0.52);
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      0 1px 2px rgba(15, 23, 42, 0.04);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    backdrop-filter: blur(12px) saturate(160%);
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .glass-control:hover {
+    background-color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(15, 23, 42, 0.16);
+  }
+
+  .dark .glass-control {
+    background-color: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 2px 6px rgba(0, 0, 0, 0.26);
+    -webkit-backdrop-filter: blur(14px) saturate(165%);
+    backdrop-filter: blur(14px) saturate(165%);
+  }
+
+  .dark .glass-control:hover {
+    background-color: rgba(255, 255, 255, 0.13);
+    border-color: rgba(255, 255, 255, 0.26);
+  }
+
+  /* Primary Solar Tangerine Studio CTA synced dynamically with `--studio-btn-*` theme variables */
+  .btn-studio-primary {
+    background: linear-gradient(180deg, var(--studio-btn-from), var(--studio-btn-to));
+    color: var(--studio-btn-text);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.36),
+      0 2px 8px rgba(0, 0, 0, 0.2),
+      0 10px 26px -6px rgba(var(--studio-rgb), 0.45);
+    transition: filter 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  }
+
+  .btn-studio-primary:hover {
+    filter: brightness(1.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.42),
+      0 4px 12px rgba(0, 0, 0, 0.25),
+      0 14px 30px -6px rgba(var(--studio-rgb), 0.55);
+  }
 }
 
-/* Smooth theme swap triggered briefly when user toggles theme */
+/* Smooth cross-fade triggered briefly when toggling Light/Dark theme */
 .theme-transitioning,
 .theme-transitioning *,
 .theme-transitioning *::before,

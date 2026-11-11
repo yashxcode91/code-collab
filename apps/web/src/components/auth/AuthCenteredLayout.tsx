@@ -19,7 +19,7 @@ export function AuthCenteredLayout({ children }: AuthCenteredLayoutProps) {
   return (
     <div
       ref={stageRef}
-      className="relative flex min-h-dvh flex-col overflow-hidden bg-slate-50 text-foreground dark:bg-black"
+      className="relative flex min-h-dvh flex-col overflow-hidden bg-background text-foreground"
     >
       <CursorCodeTrail
         containerRef={stageRef as React.RefObject<HTMLElement>}
@@ -50,14 +50,14 @@ export function AuthCenteredLayout({ children }: AuthCenteredLayoutProps) {
           <rect width="100%" height="100%" fill="url(#auth-studio-grid)" />
         </svg>
 
-        {/* 2. Studio Spotlight & Ambient Orbs Behind Mirror Card */}
+        {/* 2. Studio Spotlight & Single-Accent Ambient Halo Behind Mirror Card */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[560px] w-[560px] -translate-x-[68%] -translate-y-[62%] rounded-full bg-violet-400/30 blur-3xl dark:bg-white/[0.06]"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[560px] w-[560px] -translate-x-[68%] -translate-y-[62%] rounded-full bg-primary/20 blur-3xl dark:bg-primary/[0.085]"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[500px] w-[500px] -translate-x-[24%] -translate-y-[30%] rounded-full bg-sky-400/25 blur-3xl dark:bg-violet-500/[0.1]"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[480px] w-[480px] -translate-x-[22%] -translate-y-[28%] rounded-full bg-slate-400/20 blur-3xl dark:bg-slate-400/[0.085]"
         />
 
         {/* 3. Concentric Precision Halo Rings Framing the Center Stage */}

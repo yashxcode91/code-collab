@@ -5,7 +5,7 @@ interface BrandLogoProps {
   size?: 'sm' | 'md';
 }
 
-/** Geometric Studio bracket emblem (`</>`). */
+/** Geometric Studio bracket emblem (`</>`), styled via Solar Tangerine CSS variables. */
 export function BrandMark({
   className,
   size = 'md',
@@ -28,10 +28,15 @@ export function BrandMark({
 
   return (
     <div
+      style={{
+        background:
+          'linear-gradient(180deg, var(--studio-btn-from), var(--studio-btn-to))',
+        color: 'var(--studio-btn-text)',
+        boxShadow:
+          'inset 0 1px 0 rgba(255,255,255,0.36), 0 6px 18px -4px rgba(var(--studio-rgb), 0.48)',
+      }}
       className={cn(
-        'relative flex items-center justify-center bg-gradient-to-b from-violet-500 to-violet-700 text-white',
-        'shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_6px_16px_-4px_rgba(109,40,217,0.45)]',
-        'dark:from-indigo-400 dark:to-indigo-600 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_6px_18px_-4px_rgba(99,102,241,0.5)]',
+        'relative flex items-center justify-center',
         boxSize,
         className,
       )}
@@ -49,7 +54,7 @@ export function BrandMark({
   );
 }
 
-/** Full horizontal CodeCollab Studio wordmark + emblem used in page headers. */
+/** Full horizontal CodeCollab Studio wordmark + frosted studio badge used in headers. */
 export function BrandLogo({ className, size = 'md' }: BrandLogoProps) {
   const textSize = size === 'sm' ? 'text-sm' : 'text-[15px]';
 
@@ -60,11 +65,10 @@ export function BrandLogo({ className, size = 'md' }: BrandLogoProps) {
         <span className={cn('font-semibold tracking-tight text-foreground', textSize)}>
           CodeCollab
         </span>
-        <span className="hidden rounded border border-slate-900/10 bg-white/70 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06] sm:inline-block">
+        <span className="glass-control hidden rounded px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-block">
           studio
         </span>
       </div>
     </div>
   );
 }
-

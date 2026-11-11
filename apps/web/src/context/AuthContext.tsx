@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useState,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type {
   AuthResponse,
   LoginInput,
@@ -12,6 +13,17 @@ import type {
   User,
 } from '@codecollab/shared';
 import { ApiClientError, apiRequest } from '@/lib/api';
+
+/** Persists last clicked OAuth provider across full-page redirects so GitHub logins auto-sync UI panels. */
+export const OAUTH_PROVIDER_STORAGE_KEY = 'codecollab:oauth-provider';
+
+function clearStoredOAuthProvider() {
+  try {
+    window.localStorage.removeItem(OAUTH_PROVIDER_STORAGE_KEY);
+  } catch {
+    // Ignore storage access errors in restricted/private environments
+  }
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -28,6 +40,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  * Rehydrates the current user from the server's HttpOnly cookie on initial app mount via `/api/auth/me`.
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -56,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       body: JSON.stringify(input),
     });
+    clearStoredOAuthProvider();
     setUser(res.user);
   }, []);
 
@@ -64,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: 'POST',
       body: JSON.stringify(input),
     });
+    clearStoredOAuthProvider();
     setUser(res.user);
   }, []);
 
@@ -75,8 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Clear local auth state even if network logout fails
     }
+    clearStoredOAuthProvider();
+    queryClient.clear();
     setUser(null);
-  }, []);
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
