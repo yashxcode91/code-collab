@@ -328,7 +328,7 @@ export function StudioEditorPane({
       className="glass-surface flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl"
     >
       {/* 1. Open File Tabs Strip */}
-      <div className="flex min-h-[40px] items-center gap-1 overflow-x-auto border-b border-border/60 bg-black/[0.02] px-2 py-1 dark:bg-white/[0.02]">
+      <div className="flex min-h-[42px] items-center gap-1.5 overflow-x-auto border-b border-border/60 bg-black/[0.02] px-2.5 py-1.5 dark:bg-white/[0.02]">
         {openTabs.length === 0 ? (
           <span className="px-2 font-mono text-[11px] text-muted-foreground">
             No files open
@@ -453,7 +453,7 @@ export function StudioEditorPane({
 
       {/* 2. Breadcrumb + Version + Checkout Lock Bar */}
       {activeFile && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3 py-1.5 font-mono text-[11px]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-3.5 py-2 font-mono text-[11px]">
           <div className="flex min-w-0 flex-wrap items-center gap-1 text-muted-foreground">
             <GitBranch className="h-3 w-3 text-primary" aria-hidden="true" />
             <span>{branch?.name ?? 'main'}</span>
@@ -668,7 +668,7 @@ export function StudioEditorPane({
                   wordWrap: 'on',
                   automaticLayout: true,
                   renderLineHighlight: 'all',
-                  padding: { top: 14, bottom: 14 },
+                  padding: { top: 18, bottom: 18 },
                 }}
               />
             )}
@@ -687,7 +687,7 @@ export function StudioEditorPane({
       </div>
 
       {/* 7. Bottom IDE Telemetry Status Footer */}
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 bg-[hsl(var(--editor-bar))] px-3 py-1.5 font-mono text-[10.5px] text-muted-foreground">
+      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 bg-[hsl(var(--editor-bar))] px-3.5 py-2 font-mono text-[10.5px] text-muted-foreground">
         <div className="flex items-center gap-3">
           {activeFile && activeDraft ? (
             <>

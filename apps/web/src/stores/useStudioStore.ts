@@ -32,6 +32,7 @@ interface StudioState {
   conflicts: Record<string, FileVersionConflict>;
   rightPanelTab: InspectorTab;
   explorerCollapsed: boolean;
+  isWindowExpanded: boolean;
 
   initProjectSession: (projectId: string, defaultBranchId: string | null) => void;
   selectBranch: (branchId: string) => void;
@@ -56,6 +57,7 @@ interface StudioState {
   removeDeletedNode: (deletedIds: string[]) => void;
   setRightPanelTab: (tab: InspectorTab) => void;
   toggleExplorer: () => void;
+  toggleWindowExpanded: () => void;
   resetStudio: () => void;
 }
 
@@ -70,6 +72,7 @@ const INITIAL_STATE = {
   conflicts: {} as Record<string, FileVersionConflict>,
   rightPanelTab: 'closed' as InspectorTab,
   explorerCollapsed: false,
+  isWindowExpanded: false,
 };
 
 /**
@@ -320,6 +323,9 @@ export const useStudioStore = create<StudioState>((set) => ({
 
   toggleExplorer: () =>
     set((state) => ({ explorerCollapsed: !state.explorerCollapsed })),
+
+  toggleWindowExpanded: () =>
+    set((state) => ({ isWindowExpanded: !state.isWindowExpanded })),
 
   resetStudio: () => set({ ...INITIAL_STATE }),
 }));

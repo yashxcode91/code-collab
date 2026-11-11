@@ -419,16 +419,67 @@ export function StudioInspectorDrawer({
 
       <aside
         aria-label="Studio Inspector"
-        className="glass-surface fixed inset-y-20 right-3 z-30 flex w-80 shrink-0 flex-col overflow-hidden rounded-2xl xl:w-[340px] lg:static lg:inset-auto lg:z-10"
+        className="glass-surface fixed bottom-3 right-3 top-14 z-30 flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl xl:w-[308px] lg:static lg:inset-auto lg:z-10"
       >
-        {/* Drawer Header Tabs */}
-        <div className="flex items-center justify-between gap-1 border-b border-border/60 px-2.5 py-2">
-          <div className="flex items-center gap-1">
+        {/* Drawer Header: Single contextual title on desktop (TopBar switches tabs); mobile switcher `<lg` */}
+        <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3.5 py-2.5">
+          {/* Desktop Contextual Title (no repetition of TopBar Team/Access/Settings buttons) */}
+          <div className="hidden min-w-0 flex-1 items-center justify-between gap-2 lg:flex">
+            <div className="flex min-w-0 items-center gap-2">
+              {resolvedTab === 'members' && (
+                <>
+                  <Users
+                    className="h-3.5 w-3.5 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+                    Collaborators
+                  </span>
+                </>
+              )}
+              {resolvedTab === 'access' && (
+                <>
+                  <Shield
+                    className="h-3.5 w-3.5 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+                    File &amp; Folder ACLs
+                  </span>
+                </>
+              )}
+              {resolvedTab === 'settings' && (
+                <>
+                  <SlidersHorizontal
+                    className="h-3.5 w-3.5 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+                    Workspace Settings
+                  </span>
+                </>
+              )}
+            </div>
+
+            {resolvedTab === 'members' && (
+              <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                {members.length} / {project.maxConcurrentEditors}
+              </span>
+            )}
+            {resolvedTab === 'settings' && (
+              <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-primary">
+                {project.language}
+              </span>
+            )}
+          </div>
+
+          {/* Mobile / Tablet Compact Switcher (`<lg` overlay where TopBar sits underneath) */}
+          <div className="flex items-center gap-1 lg:hidden">
             <button
               type="button"
               onClick={() => onChangeTab('members')}
               className={cn(
-                'inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors',
+                'inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-medium transition-colors',
                 resolvedTab === 'members'
                   ? 'border border-primary/45 bg-primary/15 text-primary'
                   : 'text-muted-foreground hover:text-foreground',
@@ -443,7 +494,7 @@ export function StudioInspectorDrawer({
                 type="button"
                 onClick={() => onChangeTab('access')}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  'inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-medium transition-colors',
                   resolvedTab === 'access'
                     ? 'border border-primary/45 bg-primary/15 text-primary'
                     : 'text-muted-foreground hover:text-foreground',
@@ -458,7 +509,7 @@ export function StudioInspectorDrawer({
               type="button"
               onClick={() => onChangeTab('settings')}
               className={cn(
-                'inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors',
+                'inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-medium transition-colors',
                 resolvedTab === 'settings'
                   ? 'border border-primary/45 bg-primary/15 text-primary'
                   : 'text-muted-foreground hover:text-foreground',
@@ -473,7 +524,8 @@ export function StudioInspectorDrawer({
             type="button"
             onClick={() => onChangeTab('closed')}
             aria-label="Close inspector"
-            className="rounded-lg p-1 text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+            title="Close inspector"
+            className="shrink-0 rounded-lg p-1 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -484,7 +536,7 @@ export function StudioInspectorDrawer({
           {/* ==================== 1. TEAM TAB ==================== */}
           {resolvedTab === 'members' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between lg:hidden">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Collaborators
                 </h2>
@@ -696,10 +748,10 @@ export function StudioInspectorDrawer({
           {resolvedTab === 'access' && isOwner && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:hidden">
                   Fine-Grained File ACLs
                 </h2>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
                   Override workspace permissions per file or folder on{' '}
                   <span className="font-mono text-foreground">
                     {branch?.name ?? 'main'}
@@ -874,7 +926,7 @@ export function StudioInspectorDrawer({
           {/* ==================== 3. SETTINGS TAB ==================== */}
           {resolvedTab === 'settings' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between lg:hidden">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Workspace Settings
                 </h2>

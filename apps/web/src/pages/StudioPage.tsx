@@ -37,6 +37,7 @@ import {
   type FileVersionConflict,
   useStudioStore,
 } from '@/stores/useStudioStore';
+import { cn } from '@/lib/utils';
 
 /**
  * Full Split-Pane Monaco Studio IDE (`/studio/:projectId`):
@@ -64,6 +65,7 @@ export function StudioPage() {
   const conflicts = useStudioStore((s) => s.conflicts);
   const rightPanelTab = useStudioStore((s) => s.rightPanelTab);
   const explorerCollapsed = useStudioStore((s) => s.explorerCollapsed);
+  const isWindowExpanded = useStudioStore((s) => s.isWindowExpanded);
 
   const initProjectSession = useStudioStore((s) => s.initProjectSession);
   const selectBranch = useStudioStore((s) => s.selectBranch);
@@ -81,6 +83,7 @@ export function StudioPage() {
   const removeDeletedNode = useStudioStore((s) => s.removeDeletedNode);
   const setRightPanelTab = useStudioStore((s) => s.setRightPanelTab);
   const toggleExplorer = useStudioStore((s) => s.toggleExplorer);
+  const toggleWindowExpanded = useStudioStore((s) => s.toggleWindowExpanded);
   const resetStudio = useStudioStore((s) => s.resetStudio);
 
   // Reset ephemeral IDE store and dispose stale Monaco models when switching/leaving Studio
@@ -644,6 +647,7 @@ export function StudioPage() {
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <StudioBackdrop />
 
+      {/* Top IDE Bar attached flush to top viewport edge */}
       <StudioTopBar
         project={project}
         branches={branches}
@@ -656,93 +660,107 @@ export function StudioPage() {
         isLockPending={lockMutation.isPending}
         currentUserId={currentUserId}
         explorerCollapsed={explorerCollapsed}
+        isWindowExpanded={isWindowExpanded}
         rightPanelTab={rightPanelTab}
         onToggleExplorer={toggleExplorer}
+        onToggleWindowExpanded={toggleWindowExpanded}
         onSelectBranch={handleSelectBranch}
         onSaveActiveFile={() => void handleSaveFile()}
         onToggleLockActiveFile={handleToggleLockActiveFile}
         onSetRightPanelTab={setRightPanelTab}
       />
 
-      {/* Split-Pane Studio Body */}
-      <main className="relative z-10 flex min-h-0 flex-1 gap-3 p-3 pt-2.5">
-        <FileExplorerPane
-          projectId={project.id}
-          branch={activeBranch}
-          files={files}
-          isLoading={branchFilesQuery.isLoading}
-          isRefreshing={branchFilesQuery.isFetching}
-          userRole={project.currentUserRole}
-          currentUserId={currentUserId}
-          activeFileId={activeFileId}
-          expandedFolderIds={expandedFolderIds}
-          buffers={buffers}
-          collapsed={explorerCollapsed}
-          onCollapseMobile={toggleExplorer}
-          onRefresh={() =>
-            activeBranch?.id &&
-            void queryClient.invalidateQueries({
-              queryKey: queryKeys.projects.files(project.id, activeBranch.id),
-            })
-          }
-          onOpenFile={openFileTab}
-          onToggleFolder={toggleFolder}
-          onSetFolderExpanded={setFolderExpanded}
-          onNodeRenamed={handleNodeRenamed}
-          onNodeDeleted={handleNodeDeleted}
-          onOpenAcl={(nodeId) => {
-            setAclTargetNodeId(nodeId);
-            setRightPanelTab('access');
-          }}
-        />
+      {/* Split-Pane Studio Body with balanced framing below attached top bar */}
+      <div
+        className={cn(
+          'relative z-10 flex min-h-0 flex-1 justify-center',
+          isWindowExpanded ? 'p-2.5 sm:p-3' : 'p-3 sm:p-4',
+        )}
+      >
+        <main
+          className={cn(
+            'flex min-h-0 w-full flex-1 gap-3.5 transition-[max-width] duration-200 ease-out',
+            isWindowExpanded ? 'max-w-none' : 'sm:max-w-[min(95vw,1600px)]',
+          )}
+        >
+          <FileExplorerPane
+            projectId={project.id}
+            branch={activeBranch}
+            files={files}
+            isLoading={branchFilesQuery.isLoading}
+            isRefreshing={branchFilesQuery.isFetching}
+            userRole={project.currentUserRole}
+            currentUserId={currentUserId}
+            activeFileId={activeFileId}
+            expandedFolderIds={expandedFolderIds}
+            buffers={buffers}
+            collapsed={explorerCollapsed}
+            onCollapseMobile={toggleExplorer}
+            onRefresh={() =>
+              activeBranch?.id &&
+              void queryClient.invalidateQueries({
+                queryKey: queryKeys.projects.files(project.id, activeBranch.id),
+              })
+            }
+            onOpenFile={openFileTab}
+            onToggleFolder={toggleFolder}
+            onSetFolderExpanded={setFolderExpanded}
+            onNodeRenamed={handleNodeRenamed}
+            onNodeDeleted={handleNodeDeleted}
+            onOpenAcl={(nodeId) => {
+              setAclTargetNodeId(nodeId);
+              setRightPanelTab('access');
+            }}
+          />
 
-        <StudioEditorPane
-          project={project}
-          branch={activeBranch}
-          files={files}
-          openTabIds={openTabIds}
-          activeFile={activeFile}
-          activeDraft={activeDraft}
-          activeConflict={activeConflict}
-          isFileLoading={activeFileDetailQuery.isLoading}
-          fileLoadError={
-            activeFileDetailQuery.isError
-              ? activeFileDetailQuery.error instanceof Error
-                ? activeFileDetailQuery.error.message
-                : 'Unable to fetch file content'
-              : null
-          }
-          saveError={saveError}
-          isSaving={saveFileMutation.isPending}
-          canEditActiveFile={canEditActiveFile}
-          buffers={buffers}
-          currentUserId={currentUserId}
-          onSelectTab={openFileTab}
-          onCloseTab={closeFileTab}
-          onChangeContent={updateDraftContent}
-          onChangeCursor={setCursorPosition}
-          onSaveFile={handleSaveFile}
-          onDiscardDraft={discardFileDraft}
-          onResolveConflictReload={handleResolveConflictReload}
-          onResolveConflictOverwrite={handleResolveConflictOverwrite}
-          onDismissSaveError={() => setSaveError(null)}
-          onRetryFileLoad={() => void activeFileDetailQuery.refetch()}
-        />
+          <StudioEditorPane
+            project={project}
+            branch={activeBranch}
+            files={files}
+            openTabIds={openTabIds}
+            activeFile={activeFile}
+            activeDraft={activeDraft}
+            activeConflict={activeConflict}
+            isFileLoading={activeFileDetailQuery.isLoading}
+            fileLoadError={
+              activeFileDetailQuery.isError
+                ? activeFileDetailQuery.error instanceof Error
+                  ? activeFileDetailQuery.error.message
+                  : 'Unable to fetch file content'
+                : null
+            }
+            saveError={saveError}
+            isSaving={saveFileMutation.isPending}
+            canEditActiveFile={canEditActiveFile}
+            buffers={buffers}
+            currentUserId={currentUserId}
+            onSelectTab={openFileTab}
+            onCloseTab={closeFileTab}
+            onChangeContent={updateDraftContent}
+            onChangeCursor={setCursorPosition}
+            onSaveFile={handleSaveFile}
+            onDiscardDraft={discardFileDraft}
+            onResolveConflictReload={handleResolveConflictReload}
+            onResolveConflictOverwrite={handleResolveConflictOverwrite}
+            onDismissSaveError={() => setSaveError(null)}
+            onRetryFileLoad={() => void activeFileDetailQuery.refetch()}
+          />
 
-        <StudioInspectorDrawer
-          project={project}
-          branch={activeBranch}
-          members={members}
-          files={files}
-          activeFileId={activeFileId}
-          aclTargetNodeId={aclTargetNodeId}
-          currentUserId={currentUserId}
-          activeTab={rightPanelTab}
-          onChangeTab={setRightPanelTab}
-          onSelectAclTarget={setAclTargetNodeId}
-          onWorkspaceLeftOrDeleted={() => navigate('/', { replace: true })}
-        />
-      </main>
+          <StudioInspectorDrawer
+            project={project}
+            branch={activeBranch}
+            members={members}
+            files={files}
+            activeFileId={activeFileId}
+            aclTargetNodeId={aclTargetNodeId}
+            currentUserId={currentUserId}
+            activeTab={rightPanelTab}
+            onChangeTab={setRightPanelTab}
+            onSelectAclTarget={setAclTargetNodeId}
+            onWorkspaceLeftOrDeleted={() => navigate('/', { replace: true })}
+          />
+        </main>
+      </div>
     </div>
   );
 }
