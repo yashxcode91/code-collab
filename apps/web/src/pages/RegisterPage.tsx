@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { RegisterSchema, type RegisterInput } from '@codecollab/shared';
-import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
+import { BrandMark } from '@/components/BrandLogo';
+import { AuthCenteredLayout } from '@/components/auth/AuthCenteredLayout';
 import {
   OAuthButtons,
   PasswordField,
@@ -86,16 +87,19 @@ export function RegisterPage() {
   };
 
   return (
-    <AuthSplitLayout>
+    <AuthCenteredLayout>
       <div className="space-y-5">
-        {/* Heading */}
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Create your account
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Start collaborating in real time with your engineering team.
-          </p>
+        {/* Centered Header Jewel */}
+        <div className="flex flex-col items-center space-y-3 text-center">
+          <BrandMark size="lg" />
+          <div className="space-y-1">
+            <h1 className="text-[24px] font-semibold tracking-[-0.025em] text-foreground">
+              Create your account
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Start collaborating in real time with your engineering team.
+            </p>
+          </div>
         </div>
 
         {/* OAuth Placeholders (wired in Step 7) */}
@@ -109,12 +113,12 @@ export function RegisterPage() {
         />
 
         {/* Divider */}
-        <div className="relative flex items-center">
-          <div className="w-full border-t border-border" />
-          <span className="shrink-0 bg-background px-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-slate-900/10 dark:bg-white/[0.12]" />
+          <span className="shrink-0 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground/80">
             or register with email
           </span>
-          <div className="w-full border-t border-border" />
+          <div className="h-px flex-1 bg-slate-900/10 dark:bg-white/[0.12]" />
         </div>
 
         {/* Registration Form */}
@@ -122,7 +126,7 @@ export function RegisterPage() {
           {globalError && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive"
+              className="flex items-start gap-2.5 rounded-xl border border-destructive/40 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <span>{globalError}</span>
@@ -180,7 +184,7 @@ export function RegisterPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="group mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-violet-600 to-violet-700 px-4 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.32),0_2px_4px_rgba(15,23,42,0.12),0_10px_24px_-6px_rgba(109,40,217,0.45)] transition-all duration-150 hover:from-violet-500 hover:to-violet-700 active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-60 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-400 dark:hover:to-indigo-600 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_6px_rgba(0,0,0,0.4),0_12px_28px_-6px_rgba(99,102,241,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {isSubmitting ? (
               <>
@@ -190,7 +194,10 @@ export function RegisterPage() {
             ) : (
               <>
                 <span>Create account</span>
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <ArrowRight
+                  className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
               </>
             )}
           </button>
@@ -207,7 +214,7 @@ export function RegisterPage() {
           </Link>
         </p>
       </div>
-    </AuthSplitLayout>
+    </AuthCenteredLayout>
   );
 }
 

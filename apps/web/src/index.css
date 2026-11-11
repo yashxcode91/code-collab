@@ -35,36 +35,36 @@
     --editor-bar: 240 12% 97.5%;
   }
 
-  /* Dark theme */
+  /* Dark theme (true obsidian black) */
   .dark {
-    --background: 230 22% 5.5%;
-    --foreground: 220 20% 96%;
-    --card: 230 20% 8.5%;
-    --card-foreground: 220 20% 96%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 96%;
 
-    --primary: 244 92% 69%;
-    --primary-foreground: 230 25% 7%;
+    --primary: 252 90% 68%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 230 16% 13%;
-    --secondary-foreground: 220 20% 92%;
+    --secondary: 0 0% 9%;
+    --secondary-foreground: 0 0% 92%;
 
-    --muted: 230 15% 12.5%;
-    --muted-foreground: 220 10% 60%;
+    --muted: 0 0% 8.5%;
+    --muted-foreground: 0 0% 62%;
 
-    --accent: 238 35% 16%;
-    --accent-foreground: 244 92% 76%;
+    --accent: 252 28% 14%;
+    --accent-foreground: 252 90% 78%;
 
     --destructive: 0 76% 62%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 228 14% 16%;
-    --input: 228 14% 19%;
-    --ring: 244 92% 69%;
+    --border: 0 0% 14%;
+    --input: 0 0% 17%;
+    --ring: 252 90% 68%;
 
     /* Visual panel & code card surfaces */
-    --panel: 230 24% 6.5%;
-    --editor: 230 22% 8.5%;
-    --editor-bar: 230 20% 10.8%;
+    --panel: 0 0% 2%;
+    --editor: 0 0% 4%;
+    --editor-bar: 0 0% 7%;
   }
 
   *,
@@ -123,6 +123,105 @@
       0 22px 52px -14px rgba(0, 0, 0, 0.72);
     -webkit-backdrop-filter: blur(14px) saturate(150%);
     backdrop-filter: blur(14px) saturate(150%);
+  }
+
+  /* Flagship crystal mirror glass card for centered authentication */
+  .glass-mirror {
+    position: relative;
+    background: linear-gradient(
+      142deg,
+      rgba(255, 255, 255, 0.84) 0%,
+      rgba(255, 255, 255, 0.48) 32%,
+      rgba(255, 255, 255, 0.72) 50%,
+      rgba(244, 246, 252, 0.46) 74%,
+      rgba(255, 255, 255, 0.68) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.94);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 0 rgba(15, 23, 42, 0.08),
+      inset 0 0 0 1px rgba(15, 23, 42, 0.04),
+      0 2px 6px 0 rgba(15, 23, 42, 0.04),
+      0 32px 80px -18px rgba(15, 23, 42, 0.18),
+      0 14px 36px -12px rgba(109, 40, 217, 0.12);
+    -webkit-backdrop-filter: blur(18px) saturate(195%);
+    backdrop-filter: blur(18px) saturate(195%);
+  }
+
+  .glass-mirror::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+    background: linear-gradient(
+      126deg,
+      rgba(255, 255, 255, 0.78) 0%,
+      rgba(255, 255, 255, 0.22) 20%,
+      rgba(255, 255, 255, 0.03) 38%,
+      transparent 48%,
+      transparent 82%,
+      rgba(255, 255, 255, 0.3) 100%
+    );
+  }
+
+  .glass-mirror::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 7%;
+    right: 7%;
+    height: 1px;
+    pointer-events: none;
+    z-index: 2;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 1) 50%,
+      transparent 100%
+    );
+  }
+
+  .dark .glass-mirror {
+    background: linear-gradient(
+      142deg,
+      rgba(36, 36, 40, 0.62) 0%,
+      rgba(10, 10, 12, 0.56) 34%,
+      rgba(26, 26, 30, 0.6) 50%,
+      rgba(4, 4, 5, 0.72) 76%,
+      rgba(18, 18, 22, 0.6) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.34),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.8),
+      inset 0 0 32px 0 rgba(255, 255, 255, 0.04),
+      0 8px 20px 0 rgba(0, 0, 0, 0.7),
+      0 38px 90px -16px rgba(0, 0, 0, 0.95),
+      0 0 48px -16px rgba(255, 255, 255, 0.08);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(20px) saturate(140%);
+  }
+
+  .dark .glass-mirror::before {
+    background: linear-gradient(
+      126deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.045) 24%,
+      transparent 44%,
+      transparent 80%,
+      rgba(255, 255, 255, 0.07) 100%
+    );
+  }
+
+  .dark .glass-mirror::after {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.68) 50%,
+      transparent 100%
+    );
   }
 }
 

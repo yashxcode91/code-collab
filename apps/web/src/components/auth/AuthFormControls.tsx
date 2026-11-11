@@ -3,13 +3,15 @@ import { cn } from '@/lib/utils';
 
 export function inputClassName(hasError: boolean, extra?: string) {
   return cn(
-    'flex h-10 w-full rounded-lg border bg-card px-3.5 text-sm text-foreground',
-    'placeholder:text-muted-foreground/75 shadow-sm',
-    'transition-colors duration-150',
-    'focus:outline-none focus:ring-2 focus:ring-offset-0',
+    'flex h-11 w-full rounded-xl border px-3.5 text-sm text-foreground',
+    'bg-white/60 backdrop-blur-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),0_1px_0_rgba(255,255,255,0.7)]',
+    'dark:bg-white/[0.055] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.28),0_1px_0_rgba(255,255,255,0.05)]',
+    'placeholder:text-muted-foreground/70',
+    'transition-all duration-150',
+    'focus:outline-none focus:ring-[3px] focus:ring-offset-0 focus:bg-white/90 dark:focus:bg-white/[0.1]',
     hasError
       ? 'border-destructive focus:border-destructive focus:ring-destructive/20'
-      : 'border-input hover:border-foreground/25 focus:border-primary focus:ring-primary/20',
+      : 'border-slate-900/15 hover:border-slate-900/25 focus:border-primary focus:ring-primary/15 dark:border-white/[0.15] dark:hover:border-white/30',
     extra,
   );
 }
@@ -158,16 +160,20 @@ interface OAuthButtonsProps {
 export function OAuthButtons({ onSelectProvider, notice }: OAuthButtonsProps) {
   return (
     <div className="space-y-2.5">
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={() => onSelectProvider('Google')}
           className={cn(
-            'inline-flex h-10 items-center justify-center gap-2 rounded-lg',
-            'border border-input bg-card px-3 text-[13px] font-medium text-foreground shadow-sm',
-            'hover:border-foreground/20 hover:bg-muted/60',
+            'inline-flex h-11 items-center justify-center gap-2 rounded-xl',
+            'border border-slate-900/15 bg-white/60 px-3 text-[13px] font-medium text-foreground backdrop-blur-sm',
+            'shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_2px_rgba(15,23,42,0.04)]',
+            'hover:-translate-y-[0.5px] hover:border-slate-900/25 hover:bg-white/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),0_4px_12px_-2px_rgba(15,23,42,0.08)]',
+            'active:translate-y-0',
+            'dark:border-white/[0.15] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]',
+            'dark:hover:border-white/30 dark:hover:bg-white/[0.11]',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            'transition-colors duration-150',
+            'transition-all duration-150',
           )}
         >
           <GoogleIcon />
@@ -178,11 +184,15 @@ export function OAuthButtons({ onSelectProvider, notice }: OAuthButtonsProps) {
           type="button"
           onClick={() => onSelectProvider('GitHub')}
           className={cn(
-            'inline-flex h-10 items-center justify-center gap-2 rounded-lg',
-            'border border-input bg-card px-3 text-[13px] font-medium text-foreground shadow-sm',
-            'hover:border-foreground/20 hover:bg-muted/60',
+            'inline-flex h-11 items-center justify-center gap-2 rounded-xl',
+            'border border-slate-900/15 bg-white/60 px-3 text-[13px] font-medium text-foreground backdrop-blur-sm',
+            'shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_2px_rgba(15,23,42,0.04)]',
+            'hover:-translate-y-[0.5px] hover:border-slate-900/25 hover:bg-white/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),0_4px_12px_-2px_rgba(15,23,42,0.08)]',
+            'active:translate-y-0',
+            'dark:border-white/[0.15] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]',
+            'dark:hover:border-white/30 dark:hover:bg-white/[0.11]',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            'transition-colors duration-150',
+            'transition-all duration-150',
           )}
         >
           <Github className="h-4 w-4" aria-hidden="true" />

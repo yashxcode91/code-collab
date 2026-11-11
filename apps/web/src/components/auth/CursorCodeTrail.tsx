@@ -10,13 +10,13 @@ function CodeFragmentChip({
 }) {
   const toneClasses: Record<typeof tone, string> = {
     violet:
-      'border-violet-300/80 bg-white/95 text-violet-700 dark:border-indigo-400/35 dark:bg-indigo-950/90 dark:text-indigo-200',
+      'border-violet-300/80 bg-white/95 text-violet-700 dark:border-violet-400/30 dark:bg-neutral-950/90 dark:text-violet-200',
     sky:
-      'border-sky-300/80 bg-white/95 text-sky-700 dark:border-sky-400/35 dark:bg-slate-900/90 dark:text-sky-200',
+      'border-sky-300/80 bg-white/95 text-sky-700 dark:border-white/20 dark:bg-neutral-950/90 dark:text-neutral-200',
     emerald:
-      'border-emerald-300/80 bg-white/95 text-emerald-700 dark:border-emerald-400/35 dark:bg-emerald-950/90 dark:text-emerald-200',
+      'border-emerald-300/80 bg-white/95 text-emerald-700 dark:border-emerald-400/30 dark:bg-neutral-950/90 dark:text-emerald-200',
     amber:
-      'border-amber-300/80 bg-white/95 text-amber-700 dark:border-amber-400/35 dark:bg-amber-950/90 dark:text-amber-200',
+      'border-amber-300/80 bg-white/95 text-amber-700 dark:border-amber-400/30 dark:bg-neutral-950/90 dark:text-amber-200',
   };
 
   return (
@@ -51,8 +51,9 @@ interface CursorCodeTrailProps {
 
 /**
  * Integrates Unlumen UI's CursorImageTrail with developer code fragments:
- * - Bounded strictly to the right showcase container (`containerRef`)
- * - Auto-fades fragments after 700ms so they never obstruct static content
+ * - Bounded strictly to the auth stage container (`containerRef`)
+ * - Layered behind the centered mirror card (`trailZIndex={10}` vs `z-20`)
+ * - Auto-fades fragments after 720ms so they never obstruct form inputs
  * - Respects `prefers-reduced-motion` and skips touch-only devices
  */
 export function CursorCodeTrail({

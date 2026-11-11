@@ -18,8 +18,11 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
       className={cn(
         'group relative inline-flex h-9 w-9 items-center justify-center rounded-lg',
-        'border border-border bg-card text-muted-foreground shadow-sm',
-        'hover:border-foreground/20 hover:bg-muted/70 hover:text-foreground',
+        'border border-slate-900/10 bg-white/80 text-muted-foreground backdrop-blur-md',
+        'shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.05)]',
+        'hover:border-slate-900/20 hover:bg-white hover:text-foreground',
+        'dark:border-white/[0.14] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
+        'dark:hover:border-white/25 dark:hover:bg-white/[0.1]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         'transition-colors duration-150',
         className,
