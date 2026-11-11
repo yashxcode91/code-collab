@@ -1,0 +1,92 @@
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
+import type {
+  AuthResponse,
+  LoginInput,
+  RegisterInput,
+  User,
+} from '@codecollab/shared';
+import { ApiClientError, apiRequest } from '@/lib/api';
+
+interface AuthContextValue {
+  user: User | null;
+  isLoading: boolean;
+  login: (input: LoginInput) => Promise<void>;
+  register: (input: RegisterInput) => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    apiRequest<AuthResponse>('/api/auth/me')
+      .then((res) => {
+        if (!cancelled) setUser(res.user);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const login = useCallback(async (input: LoginInput) => {
+    const res = await apiRequest<AuthResponse>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    setUser(res.user);
+  }, []);
+
+  const register = useCallback(async (input: RegisterInput) => {
+    const res = await apiRequest<AuthResponse>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    setUser(res.user);
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await apiRequest<{ message: string }>('/api/auth/logout', {
+        method: 'POST',
+      });
+    } catch {
+      // Clear local auth state even if network logout fails
+    }
+    setUser(null);
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error('useAuth must be used inside <AuthProvider>');
+  }
+  return ctx;
+}
+
+export { ApiClientError };
+

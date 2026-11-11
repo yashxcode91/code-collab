@@ -3,9 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CodeCollab Studio</title>
+    <title>CodeCollab — Real-time Collaborative Coding</title>
+    <meta
+      name="description"
+      content="CodeCollab: Real-time collaborative coding workspaces for modern engineering teams."
+    />
+    <!-- Prevent theme flash on page load; Light theme is default unless 'dark' is stored -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('codecollab-theme');
+          if (saved === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          }
+        } catch (_) {}
+      })();
+    </script>
   </head>
-  <body class="bg-slate-950 text-slate-100 antialiased min-h-screen">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
