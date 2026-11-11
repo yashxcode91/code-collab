@@ -5,7 +5,12 @@ import { prisma } from '@codecollab/database';
 
 export const healthRouter = Router();
 
-// GET /api/health
+/**
+ * GET /api/health
+ * Probes both Redis and PostgreSQL independently.
+ * Always returns HTTP 200 with status `'ok'` or `'degraded'` so load balancers
+ * and the UI dashboard can see which dependency is healthy.
+ */
 healthRouter.get('/', async (_req: Request, res: Response) => {
   // 1. Check Redis connectivity
   let isRedisHealthy = false;

@@ -1,6 +1,7 @@
 import { AlertCircle, Eye, EyeOff, Github, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+/** Shared glassmorphic input classes switching focus/destructive borders cleanly by error state. */
 export function inputClassName(hasError: boolean, extra?: string) {
   return cn(
     'flex h-11 w-full rounded-xl border px-3.5 text-sm text-foreground',
@@ -29,6 +30,7 @@ interface TextFieldProps {
   autoFocus?: boolean;
 }
 
+/** Reusable accessible text/email input paired with label, hint, and `role="alert"` error text. */
 export function TextField({
   id,
   label,
@@ -87,6 +89,7 @@ interface PasswordFieldProps {
   autoComplete?: string;
 }
 
+/** Password input with optional show/hide visibility toggle button. */
 export function PasswordField({
   id,
   label,
@@ -154,6 +157,7 @@ export function PasswordField({
 
 export type OAuthProvider = 'google' | 'github';
 
+/** Maps backend `?error=<code>` OAuth redirect query params into user-friendly banners. */
 export function getOAuthErrorMessage(code: string | null): string | null {
   switch (code) {
     case 'oauth_not_configured':
@@ -179,6 +183,7 @@ interface OAuthButtonsProps {
   onDismissError?: () => void;
 }
 
+/** Google & GitHub SSO button pair with loading/disabled guards and dismissible OAuth alert. */
 export function OAuthButtons({
   onSelectProvider,
   pendingProvider = null,

@@ -5,6 +5,7 @@ import { z } from 'zod';
  * Shared between our React signup form and Express /api/auth/register route.
  */
 export const RegisterSchema = z.object({
+  // Normalize case/whitespace at the validation boundary so lookups never miss "User@Mail.com" vs "user@mail.com"
   email: z
     .string()
     .trim()
@@ -20,6 +21,7 @@ export const RegisterSchema = z.object({
       /^[a-z0-9_]+$/,
       'Username can only contain letters, numbers, and underscores'
     ),
+  // Bcrypt silently truncates UTF-8 inputs beyond 72 bytes, so cap length explicitly at 72 chars
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
@@ -30,6 +32,7 @@ export const RegisterSchema = z.object({
  * Validation rules for login using either email or username.
  */
 export const LoginSchema = z.object({
+  // Single `identifier` field supports signing in with either email or username
   identifier: z
     .string()
     .trim()

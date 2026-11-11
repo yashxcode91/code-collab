@@ -6,6 +6,11 @@ import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 
+/**
+ * Top-level client router & global providers (`ThemeProvider` + `AuthProvider`).
+ * Splits public auth screens (`/login`, `/register`) from authenticated workspace routes (`/`)
+ * using React Router `<Outlet />` guard layouts.
+ */
 export default function App() {
   return (
     <BrowserRouter>

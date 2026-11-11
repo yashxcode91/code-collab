@@ -16,6 +16,10 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
 import { apiRequest } from '@/lib/api';
 
+/**
+ * Authenticated landing dashboard showing current session info, live PostgreSQL/Redis
+ * infrastructure telemetry from `/api/health`, and Studio module cards (upgraded in Step 5).
+ */
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -24,10 +28,12 @@ export function DashboardPage() {
   const [healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
 
+  // Reset image fallback state whenever a user logs in with a different OAuth avatar
   useEffect(() => {
     setAvatarFailed(false);
   }, [user?.avatarUrl]);
 
+  // Poll `/api/health` to show live PostgreSQL + Redis connectivity pills on the dashboard
   const loadHealth = useCallback(async () => {
     setHealthLoading(true);
     setHealthError(null);
@@ -56,6 +62,7 @@ export function DashboardPage() {
     ? user.username.slice(0, 2).toUpperCase()
     : 'CC';
 
+  // Only allow HTTP/HTTPS avatar URLs (defense against javascript:/data: scheme injection)
   const safeAvatarUrl =
     user?.avatarUrl && /^https?:\/\//i.test(user.avatarUrl) && !avatarFailed
       ? user.avatarUrl

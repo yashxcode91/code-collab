@@ -10,10 +10,13 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_password
       POSTGRES_DB: codecollab_dev
+    # Map host 5433 -> container 5432 so local macOS PostgreSQL (5432) never conflicts
     ports:
       - "5433:5432"
+    # Persist database files across `docker compose down/up` restarts
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Lets dependent scripts/containers wait until Postgres actually accepts SQL connections
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d codecollab_dev"]
       interval: 5s

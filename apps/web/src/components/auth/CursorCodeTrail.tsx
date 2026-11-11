@@ -85,6 +85,7 @@ export function CursorCodeTrail({
   );
 }
 
+/** Subscribes reactively to a CSS media query (e.g., reduced-motion or coarse-pointer touch check). */
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() => {
     if (typeof window === 'undefined') return false;

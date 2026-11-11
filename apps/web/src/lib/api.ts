@@ -22,10 +22,17 @@ export class ApiClientError extends Error {
   }
 }
 
+/**
+ * Typed `fetch()` wrapper around our backend `ApiResponse<T>` envelope:
+ * - Always attaches `credentials: 'include'` so HttpOnly auth cookies flow automatically.
+ * - Unwraps `{ success: true, data }` on success or throws `ApiClientError` with parsed
+ *   field-level validation messages on failure.
+ */
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  // Always send credentials so the browser includes our HttpOnly JWT cookie
   const res = await fetch(path, {
     ...options,
     credentials: 'include',
@@ -39,6 +46,7 @@ export async function apiRequest<T>(
     return undefined as T;
   }
 
+  // Safely attempt JSON parsing (reverse proxies or 502s can return HTML/empty bodies)
   let body: ApiResponse<T> | null = null;
   try {
     body = (await res.json()) as ApiResponse<T>;
@@ -46,6 +54,7 @@ export async function apiRequest<T>(
     // Non-JSON or empty response body
   }
 
+  // Normalize HTTP errors or `{ success: false }` API envelopes into a typed ApiClientError
   if (!res.ok || !body?.success) {
     const errObj = body?.error;
     const code = errObj?.code ?? `HTTP_${res.status}`;

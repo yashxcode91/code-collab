@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
+// Node-environment Vitest config pointing at `tests/setup.ts` before every integration suite runs
 export default defineConfig({
   test: {
     environment: 'node',

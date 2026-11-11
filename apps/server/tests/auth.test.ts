@@ -7,12 +7,17 @@ import { redis } from '../src/lib/redis';
 import { AUTH_COOKIE_NAME } from '../src/utils/jwt';
 
 const TRUSTED_ORIGIN = 'http://localhost:5173';
+// Isolated email suffix so cleanup in beforeAll/afterAll never touches real or other suite users
 const TEST_EMAIL_DOMAIN = '@vitest.codecollab.test';
 const runId = String(Date.now()).slice(-5);
 
 const makeTestEmail = (label: string): string =>
   `${label}_${runId}${TEST_EMAIL_DOMAIN}`;
 
+/**
+ * End-to-end auth integration tests covering Zod validation, input normalization,
+ * privilege-escalation stripping, HttpOnly cookie flags, JWT tampering/expiry, and logout.
+ */
 describe('Auth Endpoints & HttpOnly Cookie Lifecycle', () => {
   const email = makeTestEmail('primary');
   const username = `vt_${runId}_1`;

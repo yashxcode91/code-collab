@@ -36,6 +36,10 @@ interface TrailItem {
 let _id = 0;
 const nextId = () => ++_id;
 
+/**
+ * Spawns animated cursor-following trail items spaced by `spawnDistance` px,
+ * capping active elements at `trailLength` and auto-expiring timers cleanly on pause/unmount.
+ */
 export function CursorImageTrail({
   items,
   itemSize = 120,
@@ -75,6 +79,7 @@ export function CursorImageTrail({
       if (itemsRef.current.length === 0) return;
 
       const mouseEvent = e as MouseEvent;
+      // Convert viewport mouse coordinates into coordinates relative to the bounded stage container
       const rect =
         containerRef?.current?.getBoundingClientRect() ??
         containerElRef.current?.getBoundingClientRect();
@@ -82,6 +87,7 @@ export function CursorImageTrail({
       const x = rect ? mouseEvent.clientX - rect.left : mouseEvent.clientX;
       const y = rect ? mouseEvent.clientY - rect.top : mouseEvent.clientY;
 
+      // Throttle particle spawning by pixel distance moved so fast mouse sweeps stay smooth & uncluttered
       if (lastPos.current) {
         const dx = x - lastPos.current.x;
         const dy = y - lastPos.current.y;

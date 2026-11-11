@@ -14,12 +14,17 @@ import { redis } from '../src/lib/redis';
 import { AUTH_COOKIE_NAME, OAUTH_STATE_COOKIE_NAME } from '../src/utils/jwt';
 import { sanitizeOAuthUsernameBase } from '../src/modules/auth/oauth.service';
 
+// Isolated email suffix so OAuth test cleanup stays scoped to this test suite
 const TEST_EMAIL_DOMAIN = '@vitest-oauth.codecollab.test';
 const runId = String(Date.now()).slice(-5);
 
 const makeTestEmail = (label: string): string =>
   `${label}_${runId}${TEST_EMAIL_DOMAIN}`;
 
+/**
+ * Integration tests for Google (PKCE) & GitHub OAuth 2.0 flows:
+ * mocks external provider `fetch()` calls while hitting real Express routes & PostgreSQL.
+ */
 describe('Google & GitHub OAuth 2.0 Flows', () => {
   const savedEnv = {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

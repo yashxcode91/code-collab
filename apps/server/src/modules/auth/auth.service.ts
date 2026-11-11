@@ -29,9 +29,11 @@ export const toPublicUser = (dbUser: DbUser): User => ({
   updatedAt: dbUser.updatedAt.toISOString(),
 });
 
+/** Registers a local password user (`bcrypt` cost 12) and signs an initial session JWT. */
 export const registerUser = async (
   input: RegisterInput
 ): Promise<{ user: User; token: string }> => {
+  // 1. Friendly uniqueness pre-checks before hashing password
   const existingEmail = await prisma.user.findUnique({
     where: { email: input.email },
   });
@@ -54,8 +56,10 @@ export const registerUser = async (
     );
   }
 
+  // 2. Hash password using bcrypt cost 12 (~250ms brute-force resistance per guess)
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_SALT_ROUNDS);
 
+  // 3. Insert User row; Prisma `role` intentionally defaults to USER so body injection cannot elevate privileges
   try {
     const dbUser = await prisma.user.create({
       data: {
@@ -100,13 +104,20 @@ export const registerUser = async (
   }
 };
 
+/**
+ * Authenticates via email or username.
+ * Runs a constant-cost dummy bcrypt check on missing/OAuth-only accounts so attackers
+ * cannot enumerate valid emails/usernames by measuring response latency.
+ */
 export const loginUser = async (
   input: LoginInput
 ): Promise<{ user: User; token: string }> => {
+  // Choose unique index (`email` vs `username`) dynamically based on `@` presence
   const dbUser = input.identifier.includes('@')
     ? await prisma.user.findUnique({ where: { email: input.identifier } })
     : await prisma.user.findUnique({ where: { username: input.identifier } });
 
+  // OAuth-only users have `passwordHash = null`; still burn equal bcrypt CPU time before throwing uniform 401
   if (!dbUser || !dbUser.passwordHash) {
     await bcrypt.compare(input.password, DUMMY_PASSWORD_HASH);
     throw new AppError(
@@ -132,6 +143,7 @@ export const loginUser = async (
   return { user: toPublicUser(dbUser), token };
 };
 
+/** Fetches a user by ID for session rehydration (`GET /api/auth/me` & `requireAuth`). */
 export const getUserById = async (userId: string): Promise<User | null> => {
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },

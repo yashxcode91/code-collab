@@ -8,8 +8,16 @@ import { AUTH_COOKIE_NAME } from '../src/utils/jwt';
 
 const TRUSTED_ORIGIN = 'http://localhost:5173';
 
+/**
+ * Integration tests verifying server-wide security foundations:
+ * - Strict CLIENT_URL origin validation
+ * - Credentialed CORS header isolation
+ * - Defense-in-depth CSRF Origin/Referer checks
+ * - Structured 400 (malformed JSON) & 404 JSON envelopes
+ */
 describe('Backend Security Infrastructure (CORS, CSRF, Errors)', () => {
   afterAll(async () => {
+    // Gracefully close DB + Redis sockets so Vitest exits without open-handle hangs
     await prisma.$disconnect();
 
     if (redis.status === 'ready') {

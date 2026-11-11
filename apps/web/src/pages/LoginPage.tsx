@@ -15,6 +15,10 @@ import { ApiClientError, useAuth } from '@/context/AuthContext';
 
 type LoginFieldErrors = Partial<Record<keyof LoginInput, string>>;
 
+/**
+ * Sign-in page supporting both local email/username credentials and Google/GitHub OAuth.
+ * Validates inputs client-side with shared `LoginSchema` before submitting to `/api/auth/login`.
+ */
 export function LoginPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,8 +34,10 @@ export function LoginPage() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
 
+  // Read `?error=...` injected by OAuth callback redirects (if provider login failed/canceled)
   const oauthError = getOAuthErrorMessage(searchParams.get('error'));
 
+  // Strip `?error=...` from the browser URL as soon as the user retries or dismisses
   const clearOAuthError = () => {
     if (searchParams.has('error')) {
       const next = new URLSearchParams(searchParams);
@@ -44,9 +50,11 @@ export function LoginPage() {
     setGlobalError(null);
     clearOAuthError();
     setPendingProvider(provider);
+    // Full-page navigation (not fetch) because `/api/auth/:provider` sets a cookie and 302-redirects to Google/GitHub
     window.location.assign(`/api/auth/${provider}`);
   };
 
+  // Clear field-specific validation feedback as soon as the user starts typing again
   const updateField = <K extends keyof LoginInput>(key: K, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (fieldErrors[key]) {
@@ -61,6 +69,7 @@ export function LoginPage() {
     clearOAuthError();
     setFieldErrors({});
 
+    // 1. Validate locally with shared LoginSchema before hitting the network
     const parsed = LoginSchema.safeParse(form);
     if (!parsed.success) {
       const nextErrors: LoginFieldErrors = {};
@@ -74,6 +83,7 @@ export function LoginPage() {
       return;
     }
 
+    // 2. Call AuthContext.login() -> POST /api/auth/login -> redirect to workspace hub
     setIsSubmitting(true);
     try {
       await login(parsed.data);

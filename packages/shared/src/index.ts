@@ -8,5 +8,6 @@ export * from './types/user';
 export * from './types/auth';
 export * from './schemas/auth';
 
-// Export all Project models, roles, and supported languages
+// Export all Project models, roles, collaboration limits, and Zod validation schemas
 export * from './types/project';
+export * from './schemas/project';

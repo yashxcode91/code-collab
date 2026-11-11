@@ -1,10 +1,12 @@
 import { fileURLToPath, URL } from 'node:url';
 
+// Resolve paths relative to this config file so Tailwind works whether invoked from repo root or `apps/web`
 const fromWebRoot = (relativePath) =>
   fileURLToPath(new URL(relativePath, import.meta.url));
 
 /** @type {import('tailwindcss').Config} */
 export default {
+  // Toggle dark mode manually by adding `.dark` on <html> instead of relying only on OS media queries
   darkMode: 'class',
   content: [
     fromWebRoot('./index.html'),
@@ -16,6 +18,7 @@ export default {
         sans: ['"Geist Variable"', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"Geist Mono Variable"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
+      // Read HSL channels from `index.css` so Tailwind opacity modifiers (e.g. `bg-primary/20`) work seamlessly
       colors: {
         background: 'hsl(var(--background) / <alpha-value>)',
         foreground: 'hsl(var(--foreground) / <alpha-value>)',

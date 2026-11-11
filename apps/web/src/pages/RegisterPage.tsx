@@ -16,6 +16,10 @@ import { ApiClientError, useAuth } from '@/context/AuthContext';
 type RegisterFormState = RegisterInput & { confirmPassword: string };
 type RegisterFieldErrors = Partial<Record<keyof RegisterFormState, string>>;
 
+/**
+ * Sign-up page supporting local registration and Google/GitHub OAuth.
+ * Validates account fields with shared `RegisterSchema` plus client-only `confirmPassword` match.
+ */
 export function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,6 +51,7 @@ export function RegisterPage() {
     setGlobalError(null);
     clearOAuthError();
     setPendingProvider(provider);
+    // Full browser redirect required so OAuth cookie + 302 consent flow works cleanly
     window.location.assign(`/api/auth/${provider}`);
   };
 
@@ -64,6 +69,7 @@ export function RegisterPage() {
     clearOAuthError();
     setFieldErrors({});
 
+    // Strip frontend-only `confirmPassword` before running shared backend/frontend `RegisterSchema`
     const { confirmPassword, ...payload } = form;
     const parsed = RegisterSchema.safeParse(payload);
     const nextErrors: RegisterFieldErrors = {};
@@ -77,6 +83,7 @@ export function RegisterPage() {
       }
     }
 
+    // Validate password confirmation locally (never sent over HTTP)
     if (!confirmPassword) {
       nextErrors.confirmPassword = 'Please confirm your password';
     } else if (form.password !== confirmPassword) {
@@ -88,6 +95,7 @@ export function RegisterPage() {
       return;
     }
 
+    // Submit validated registration -> sets HttpOnly JWT cookie -> redirect into workspace hub
     setIsSubmitting(true);
     try {
       await register(parsed.data);

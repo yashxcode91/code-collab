@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { healthRouter } from './modules/health/health.router';
 import { authRouter } from './modules/auth/auth.router';
+import { projectRouter } from './modules/projects/project.router';
 import { csrfProtection, getAllowedOrigin } from './middleware/csrf.middleware';
 import {
   globalErrorHandler,
@@ -32,9 +33,9 @@ app.use(
   })
 );
 
-// 2. Cookie parsing + JSON-only body parsing (no urlencoded form parser)
+// 2. Cookie parsing + JSON-only body parsing (1mb ceiling for large source files)
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // 3. Defense-in-depth Origin/Referer validation for state-changing requests
 app.use(csrfProtection);
@@ -42,6 +43,7 @@ app.use(csrfProtection);
 // 4. Feature routes
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/projects', projectRouter);
 
 // 5. Fallback 404 & centralized error middleware (must stay last)
 app.use(notFoundHandler);

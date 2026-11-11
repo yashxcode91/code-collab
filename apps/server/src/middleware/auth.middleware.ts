@@ -9,6 +9,7 @@ import { getUserById } from '../modules/auth/auth.service';
  * signature/expiry, and attaching the fresh public user record to req.user.
  */
 export const requireAuth: RequestHandler = async (req, _res, next) => {
+  // 1. Extract JWT from the HttpOnly cookie parsed by `cookie-parser`
   const token = req.cookies?.[AUTH_COOKIE_NAME];
 
   if (!token || typeof token !== 'string') {
@@ -16,6 +17,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
     return;
   }
 
+  // 2. Cryptographically verify JWT signature + expiry, distinguishing expiration for clearer UX
   let userId: string;
   try {
     const payload = verifyAccessToken(token);
@@ -36,6 +38,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
     return;
   }
 
+  // 3. Re-query PostgreSQL so deleted/banned accounts immediately lose access even before JWT expiry
   try {
     const user = await getUserById(userId);
     if (!user) {
@@ -43,6 +46,7 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
       return;
     }
 
+    // Attach safe public user DTO to `req.user` for downstream controllers
     req.user = user;
     next();
   } catch (err) {

@@ -12,6 +12,7 @@ export const getAllowedOrigin = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
   const rawClientUrl = process.env.CLIENT_URL;
 
+  // Allow localhost:5173 convenience fallback in dev, but require explicit CLIENT_URL in production
   if (rawClientUrl === undefined) {
     if (isProduction) {
       throw new Error('CLIENT_URL environment variable is required in production');
@@ -20,6 +21,7 @@ export const getAllowedOrigin = (): string => {
   }
 
   const trimmed = rawClientUrl.trim();
+  // Reject wildcard '*' or sandboxed 'null' because credentialed CORS/CSRF cannot trust them
   if (!trimmed || trimmed === '*' || trimmed === 'null') {
     throw new Error(`Invalid CLIENT_URL configuration: "${rawClientUrl}"`);
   }
@@ -33,6 +35,7 @@ export const getAllowedOrigin = (): string => {
     );
   }
 
+  // Reject non-web schemes (e.g. ftp:, javascript:) and force HTTPS in production
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error(
       `CLIENT_URL must use http or https protocol: "${rawClientUrl}"`
@@ -45,6 +48,7 @@ export const getAllowedOrigin = (): string => {
     );
   }
 
+  // Origin-only check: forbid paths, query strings, hashes, or embedded user:pass
   if (
     parsed.username ||
     parsed.password ||
@@ -65,6 +69,7 @@ export const getAllowedOrigin = (): string => {
  * Works alongside SameSite cookies (Step 4), strict CORS, and JSON-only parsing.
  */
 export const csrfProtection: RequestHandler = (req, _res, next) => {
+  // Read-only requests (GET/HEAD/OPTIONS) don't mutate server state
   if (SAFE_METHODS.has(req.method.toUpperCase())) {
     next();
     return;
@@ -73,6 +78,7 @@ export const csrfProtection: RequestHandler = (req, _res, next) => {
   const allowedOrigin = getAllowedOrigin();
   const originHeader = req.get('origin');
 
+  // 1. Prefer `Origin` header (sent automatically by browsers on fetch/POST; reject sandboxed `origin: null`)
   if (originHeader !== undefined) {
     if (originHeader === 'null' || originHeader !== allowedOrigin) {
       next(
@@ -88,6 +94,7 @@ export const csrfProtection: RequestHandler = (req, _res, next) => {
     return;
   }
 
+  // 2. Fall back to `Referer` origin if browser omitted `Origin`
   const refererHeader = req.get('referer');
   if (refererHeader !== undefined) {
     try {

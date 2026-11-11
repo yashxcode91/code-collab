@@ -1,0 +1,144 @@
+import { Router } from 'express';
+import {
+  AddProjectMemberSchema,
+  CreateBranchSchema,
+  CreateFileNodeSchema,
+  CreateProjectSchema,
+  SetFileAccessSchema,
+  UpdateBranchSchema,
+  UpdateFileNodeSchema,
+  UpdateProjectMemberRoleSchema,
+  UpdateProjectSchema,
+} from '@codecollab/shared';
+import { requireAuth } from '../../middleware/auth.middleware';
+import { validateBody } from '../../middleware/validate.middleware';
+import { asyncHandler } from '../../utils/asyncHandler';
+import {
+  addMemberController,
+  createBranchController,
+  createFileNodeController,
+  createProjectController,
+  deleteBranchController,
+  deleteFileNodeController,
+  deleteProjectController,
+  getFileDetailController,
+  getProjectDetailController,
+  listBranchesController,
+  listBranchFilesController,
+  listFileAccessController,
+  listProjectsController,
+  lockFileNodeController,
+  removeFileAccessController,
+  removeMemberController,
+  setFileAccessController,
+  unlockFileNodeController,
+  updateBranchController,
+  updateFileNodeController,
+  updateMemberRoleController,
+  updateProjectController,
+} from './project.controller';
+
+/**
+ * Express router mounted at `/api/projects`.
+ * Every route enforces: HttpOnly JWT auth (`requireAuth`) -> Zod body validation
+ * (`validateBody` on writes) -> async error forwarding (`asyncHandler`).
+ */
+export const projectRouter: Router = Router();
+
+// Every workspace endpoint requires an authenticated HttpOnly session
+projectRouter.use(requireAuth);
+
+// --- Workspace Projects ---
+projectRouter.get('/', asyncHandler(listProjectsController));
+projectRouter.post(
+  '/',
+  validateBody(CreateProjectSchema),
+  asyncHandler(createProjectController)
+);
+projectRouter.get('/:projectId', asyncHandler(getProjectDetailController));
+projectRouter.patch(
+  '/:projectId',
+  validateBody(UpdateProjectSchema),
+  asyncHandler(updateProjectController)
+);
+projectRouter.delete('/:projectId', asyncHandler(deleteProjectController));
+
+// --- Collaborators ---
+projectRouter.post(
+  '/:projectId/members',
+  validateBody(AddProjectMemberSchema),
+  asyncHandler(addMemberController)
+);
+projectRouter.patch(
+  '/:projectId/members/:userId',
+  validateBody(UpdateProjectMemberRoleSchema),
+  asyncHandler(updateMemberRoleController)
+);
+projectRouter.delete(
+  '/:projectId/members/:userId',
+  asyncHandler(removeMemberController)
+);
+
+// --- Branches ---
+projectRouter.get('/:projectId/branches', asyncHandler(listBranchesController));
+projectRouter.post(
+  '/:projectId/branches',
+  validateBody(CreateBranchSchema),
+  asyncHandler(createBranchController)
+);
+projectRouter.patch(
+  '/:projectId/branches/:branchId',
+  validateBody(UpdateBranchSchema),
+  asyncHandler(updateBranchController)
+);
+projectRouter.delete(
+  '/:projectId/branches/:branchId',
+  asyncHandler(deleteBranchController)
+);
+
+// --- Files, Folders & Locks ---
+projectRouter.get(
+  '/:projectId/branches/:branchId/files',
+  asyncHandler(listBranchFilesController)
+);
+projectRouter.post(
+  '/:projectId/branches/:branchId/files',
+  validateBody(CreateFileNodeSchema),
+  asyncHandler(createFileNodeController)
+);
+projectRouter.get(
+  '/:projectId/branches/:branchId/files/:fileId',
+  asyncHandler(getFileDetailController)
+);
+projectRouter.patch(
+  '/:projectId/branches/:branchId/files/:fileId',
+  validateBody(UpdateFileNodeSchema),
+  asyncHandler(updateFileNodeController)
+);
+projectRouter.delete(
+  '/:projectId/branches/:branchId/files/:fileId',
+  asyncHandler(deleteFileNodeController)
+);
+projectRouter.post(
+  '/:projectId/branches/:branchId/files/:fileId/lock',
+  asyncHandler(lockFileNodeController)
+);
+projectRouter.delete(
+  '/:projectId/branches/:branchId/files/:fileId/lock',
+  asyncHandler(unlockFileNodeController)
+);
+
+// --- Per-File Access Overrides ---
+projectRouter.get(
+  '/:projectId/branches/:branchId/files/:fileId/access',
+  asyncHandler(listFileAccessController)
+);
+projectRouter.put(
+  '/:projectId/branches/:branchId/files/:fileId/access',
+  validateBody(SetFileAccessSchema),
+  asyncHandler(setFileAccessController)
+);
+projectRouter.delete(
+  '/:projectId/branches/:branchId/files/:fileId/access/:userId',
+  asyncHandler(removeFileAccessController)
+);

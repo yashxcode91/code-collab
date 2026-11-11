@@ -23,10 +23,15 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * Provides global session state (`user`, `isLoading`) and auth actions (`login`, `register`, `logout`).
+ * Rehydrates the current user from the server's HttpOnly cookie on initial app mount via `/api/auth/me`.
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Restore active session from HttpOnly cookie on page refresh; `cancelled` prevents StrictMode double-effect races
   useEffect(() => {
     let cancelled = false;
 

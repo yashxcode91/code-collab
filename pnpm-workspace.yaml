@@ -1,8 +1,9 @@
+# Defines monorepo workspace globs so `apps/*` can import `packages/*` locally via `"workspace:*"`
 packages:
   - 'apps/*'
   - 'packages/*'
 
-
+# Explicit allow-list for dependencies permitted to run native postinstall/build scripts
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true

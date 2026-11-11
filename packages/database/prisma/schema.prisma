@@ -1,3 +1,9 @@
+// =====================================================================
+// Prisma Configuration & Enums
+// Defines our PostgreSQL connection, TypeScript client generator, and
+// strictly typed domain enums shared with backend validation.
+// =====================================================================
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -7,16 +13,48 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Global platform role (user vs site admin)
 enum UserRole {
   ADMIN
   USER
 }
 
+// External OAuth login providers linked to a User
 enum AuthProvider {
   GOOGLE
   GITHUB
 }
 
+// Supported languages for workspace starter files & Monaco highlighting
+enum SupportedLanguage {
+  JAVASCRIPT
+  TYPESCRIPT
+  PYTHON
+  CPP
+  JAVA
+}
+
+// Collaborator RBAC role inside a single workspace
+enum ProjectRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+// Tree item type inside a branch file explorer
+enum FileNodeType {
+  FILE
+  FOLDER
+}
+
+// Per-user, per-file/folder access override set by a workspace owner
+enum FileAccessPermission {
+  EDIT
+  READ_ONLY
+  DENIED
+}
+
+// Core user identity; supports password auth, OAuth-only accounts, or both
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -27,11 +65,17 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  accounts Account[]
+  accounts        Account[]
+  ownedProjects   Project[]           @relation("ProjectOwner")
+  projectMembers  ProjectMember[]
+  createdBranches ProjectBranch[]     @relation("BranchCreator")
+  lockedFiles     ProjectFile[]       @relation("FileLockHolder")
+  fileAccesses    ProjectFileAccess[]
 
   @@map("users")
 }
 
+// External OAuth provider identity linked to a local User (1 User : N Accounts)
 model Account {
   id                String       @id @default(uuid())
   userId            String
@@ -45,4 +89,109 @@ model Account {
   @@unique([provider, providerAccountId])
   @@index([userId])
   @@map("accounts")
+}
+
+// Collaborative Studio workspace housing members, Git-style branches, and live cursor limits
+model Project {
+  id                   String            @id @default(uuid())
+  name                 String
+  description          String?
+  ownerId              String
+  language             SupportedLanguage @default(TYPESCRIPT)
+  isPublic             Boolean           @default(false)
+  maxConcurrentEditors Int               @default(5)
+  preventSameLineEdit  Boolean           @default(false)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  owner    User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members  ProjectMember[]
+  branches ProjectBranch[]
+
+  @@index([ownerId])
+  @@map("projects")
+}
+
+// Join table assigning each collaborator a single ProjectRole per workspace
+model ProjectMember {
+  id        String      @id @default(uuid())
+  projectId String
+  userId    String
+  role      ProjectRole @default(EDITOR)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+// Git-style branch isolating an independent snapshot/copy of files inside a Project
+model ProjectBranch {
+  id             String   @id @default(uuid())
+  projectId      String
+  name           String
+  isDefault      Boolean  @default(false)
+  isProtected    Boolean  @default(false)
+  parentBranchId String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentBranch  ProjectBranch?  @relation("BranchParent", fields: [parentBranchId], references: [id], onDelete: SetNull)
+  childBranches ProjectBranch[] @relation("BranchParent")
+  createdBy     User?           @relation("BranchCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  files         ProjectFile[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("project_branches")
+}
+
+// Self-referencing file/folder tree node living on one ProjectBranch
+model ProjectFile {
+  id         String       @id @default(uuid())
+  branchId   String
+  parentId   String?
+  parentKey  String       @default("ROOT") // Matches parentId or "ROOT" for PG root uniqueness
+  name       String
+  nodeType   FileNodeType @default(FILE)
+  content    String       @default("") @db.Text
+  version    Int          @default(1) // Optimistic Concurrency Control for REST updates
+  yjsState   Bytes? // Binary Y.Doc snapshot reserved for Steps 7-8 multi-cursor CRDT
+  lockedById String?
+  lockedAt   DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  branch      ProjectBranch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  parent      ProjectFile?        @relation("FileTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    ProjectFile[]       @relation("FileTree")
+  lockedBy    User?               @relation("FileLockHolder", fields: [lockedById], references: [id], onDelete: SetNull)
+  accessRules ProjectFileAccess[]
+
+  @@unique([branchId, parentKey, name])
+  @@index([branchId, parentId])
+  @@map("project_files")
+}
+
+// Fine-grained per-user ACL override on a specific file or folder (inherits down folders)
+model ProjectFileAccess {
+  id         String               @id @default(uuid())
+  fileId     String
+  userId     String
+  permission FileAccessPermission
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  file ProjectFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, userId])
+  @@index([userId])
+  @@map("project_file_accesses")
 }

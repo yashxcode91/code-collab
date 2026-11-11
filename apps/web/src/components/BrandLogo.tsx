@@ -5,6 +5,7 @@ interface BrandLogoProps {
   size?: 'sm' | 'md';
 }
 
+/** Geometric Studio bracket emblem (`</>`). */
 export function BrandMark({
   className,
   size = 'md',
@@ -48,6 +49,7 @@ export function BrandMark({
   );
 }
 
+/** Full horizontal CodeCollab Studio wordmark + emblem used in page headers. */
 export function BrandLogo({ className, size = 'md' }: BrandLogoProps) {
   const textSize = size === 'sm' ? 'text-sm' : 'text-[15px]';
 

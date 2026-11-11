@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url';
 
+// Wire Tailwind + Autoprefixer explicitly from this directory so monorepo builds always find tailwind.config.js
 export default {
   plugins: {
     tailwindcss: {

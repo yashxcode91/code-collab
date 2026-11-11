@@ -2,24 +2,27 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import type { CookieOptions } from 'express';
 import type { UserRole as DbUserRole } from '@codecollab/database';
 
+// Cookie names & security floors shared between auth routes and auth middleware
 export const AUTH_COOKIE_NAME = 'codecollab_token';
 export const OAUTH_STATE_COOKIE_NAME = 'codecollab_oauth_state';
 const DEFAULT_JWT_EXPIRES_IN = '15m';
 const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 const MIN_JWT_SECRET_LENGTH = 32;
 
+/** Claims embedded inside our main session JWT (`codecollab_token`). */
 export interface AccessTokenPayload {
-  sub: string;
+  sub: string; // Authenticated User UUID
   role: DbUserRole;
 }
 
 export type OAuthProviderKey = 'google' | 'github';
 
+/** Short-lived signed claims stored in `codecollab_oauth_state` to block OAuth CSRF/replay attacks. */
 export interface OAuthStatePayload {
   purpose: 'oauth_state';
   provider: OAuthProviderKey;
   state: string;
-  codeVerifier?: string;
+  codeVerifier?: string; // PKCE secret used only during Google code exchange
 }
 
 const UNIT_TO_SECONDS: Record<string, number> = {
@@ -29,6 +32,7 @@ const UNIT_TO_SECONDS: Record<string, number> = {
   d: 86400,
 };
 
+/** Parses duration strings like "15m", "1h", or "7d" into seconds for JWT expiry & cookie `maxAge`. */
 const parseExpiresInSeconds = (rawValue: string | undefined): number => {
   const raw = rawValue === undefined ? DEFAULT_JWT_EXPIRES_IN : rawValue.trim();
   const match = /^(\d+)([smhd])$/.exec(raw);
@@ -83,6 +87,7 @@ export const getAuthCookieOptions = (): CookieOptions => ({
   path: '/',
 });
 
+/** Signs an HS256 access JWT for an authenticated user session. */
 export const signAccessToken = (payload: AccessTokenPayload): string => {
   const { secret, expiresInSeconds } = getJwtConfig();
   return jwt.sign(payload, secret, {
@@ -91,6 +96,7 @@ export const signAccessToken = (payload: AccessTokenPayload): string => {
   });
 };
 
+/** Verifies signature/algorithm (`HS256` pinned to block `alg=none` downgrade) and validates claim shape. */
 export const verifyAccessToken = (token: string): AccessTokenPayload => {
   const { secret } = getJwtConfig();
   const decoded = jwt.verify(token, secret, {
@@ -113,6 +119,7 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
   };
 };
 
+// OAuth state cookies are restricted strictly to `/api/auth` routes so they aren't sent everywhere
 export const getOAuthStateCookieOptions = (): CookieOptions => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -123,6 +130,7 @@ export const getOAuthStateCookieOptions = (): CookieOptions => ({
 export const getOAuthStateCookieMaxAgeMs = (): number =>
   OAUTH_STATE_TTL_SECONDS * 1000;
 
+/** Signs a 10-minute tamper-proof OAuth CSRF state JWT (and PKCE verifier when using Google). */
 export const signOAuthStateToken = (
   payload: Omit<OAuthStatePayload, 'purpose'>
 ): string => {
@@ -140,6 +148,7 @@ export const signOAuthStateToken = (
   );
 };
 
+/** Verifies signature, expiry, `purpose === 'oauth_state'`, and state token field invariants. */
 export const verifyOAuthStateToken = (token: string): OAuthStatePayload => {
   const { secret } = getJwtConfig();
   const decoded = jwt.verify(token, secret, {

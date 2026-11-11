@@ -6,6 +6,7 @@ interface ThemeToggleProps {
   className?: string;
 }
 
+/** Accessible Light/Dark theme switch button synced with `ThemeContext`. */
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';

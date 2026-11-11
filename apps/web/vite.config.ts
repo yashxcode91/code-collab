@@ -14,11 +14,14 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // Allows clean `@/...` imports pointing directly to `apps/web/src`
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
     port: 5173,
+    // Proxy `/api` requests in dev so frontend and Express share the `localhost:5173` origin,
+    // avoiding third-party cookie restrictions on our HttpOnly auth cookies.
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

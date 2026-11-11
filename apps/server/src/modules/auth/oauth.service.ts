@@ -17,6 +17,7 @@ export type OAuthErrorCode =
   | 'oauth_unverified_email'
   | 'oauth_failed';
 
+/** Domain error thrown during OAuth start/callback; maps cleanly to `/login?error=<code>` redirects. */
 export class OAuthFlowError extends Error {
   constructor(
     public readonly errorCode: OAuthErrorCode,
@@ -67,6 +68,7 @@ const getProviderConfig = (
   return { clientId, clientSecret, redirectUri };
 };
 
+// Constant-time string comparison blocks timing side-channels when validating OAuth CSRF state tokens
 const timingSafeEqualString = (a: string, b: string): boolean => {
   const bufA = Buffer.from(a, 'utf8');
   const bufB = Buffer.from(b, 'utf8');
@@ -74,6 +76,7 @@ const timingSafeEqualString = (a: string, b: string): boolean => {
   return crypto.timingSafeEqual(bufA, bufB);
 };
 
+/** Normalizes arbitrary GitHub/Google display names into RegisterSchema-safe base usernames. */
 export const sanitizeOAuthUsernameBase = (hint: string): string => {
   const cleaned = hint
     .trim()
@@ -115,6 +118,10 @@ const generateUniqueUsername = async (
   return `user_${crypto.randomBytes(6).toString('hex')}`.slice(0, 20);
 };
 
+/**
+ * Builds the provider consent URL + signed HttpOnly state token.
+ * Google uses PKCE (`S256` code_challenge) so intercepted auth codes cannot be exchanged without `codeVerifier`.
+ */
 export const createOAuthAuthorizationRequest = (
   provider: OAuthProviderKey
 ): { authorizationUrl: string; stateToken: string } => {
@@ -126,9 +133,11 @@ export const createOAuthAuthorizationRequest = (
     );
   }
 
+  // Cryptographically random opaque state string echoed back by Google/GitHub in `?state=...`
   const state = crypto.randomBytes(24).toString('base64url');
 
   if (provider === 'google') {
+    // PKCE: send SHA-256 hash (`code_challenge`) upfront and keep raw `codeVerifier` inside our signed cookie
     const codeVerifier = crypto.randomBytes(32).toString('base64url');
     const codeChallenge = crypto
       .createHash('sha256')
@@ -181,6 +190,7 @@ const fetchGoogleProfile = async (
   codeVerifier: string,
   config: ProviderConfig
 ): Promise<NormalizedOAuthProfile> => {
+  // 1. Exchange single-use authorization `code` + PKCE `code_verifier` for a Google access token
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: {
@@ -213,6 +223,7 @@ const fetchGoogleProfile = async (
     );
   }
 
+  // 2. Fetch OpenID user profile and require `email_verified === true` before trusting email for account linking
   const profileRes = await fetch(
     'https://openidconnect.googleapis.com/v1/userinfo',
     {
@@ -278,6 +289,7 @@ const fetchGitHubProfile = async (
   code: string,
   config: ProviderConfig
 ): Promise<NormalizedOAuthProfile> => {
+  // 1. Exchange authorization code for GitHub OAuth access token
   const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
     method: 'POST',
     headers: {
@@ -317,6 +329,7 @@ const fetchGitHubProfile = async (
     'User-Agent': 'CodeCollab-Auth',
   };
 
+  // 2. Fetch GitHub profile + email list in parallel (many users keep their primary email private on `/user`)
   const [userRes, emailsRes] = await Promise.all([
     fetch('https://api.github.com/user', {
       headers: ghHeaders,
@@ -346,6 +359,7 @@ const fetchGitHubProfile = async (
     throw new OAuthFlowError('oauth_failed', 'GitHub profile missing id');
   }
 
+  // 3. Only accept verified GitHub emails (preferring primary+verified) to block unverified email account takeover
   const verifiedEmailRecord =
     (Array.isArray(ghEmails)
       ? ghEmails.find((e) => e.primary === true && e.verified === true) ??
@@ -374,10 +388,17 @@ const fetchGitHubProfile = async (
   };
 };
 
+/**
+ * Resolves an OAuth login inside a transaction across 3 scenarios:
+ * 1. Already linked (`Account` row exists) -> sign in directly (+ backfill avatar if missing).
+ * 2. Matching local `User` by verified email -> link new `Account` while preserving password login.
+ * 3. Brand-new user -> mint unique username + create passwordless User (`passwordHash: null`) + `Account`.
+ */
 const resolveOAuthUser = async (
   profile: NormalizedOAuthProfile
 ): Promise<{ user: User; token: string }> => {
   const dbUser = await prisma.$transaction(async (tx) => {
+    // Case 1: Returning OAuth user — look up by stable (provider, providerAccountId) tuple
     const existingAccount = await tx.account.findUnique({
       where: {
         provider_providerAccountId: {
@@ -398,6 +419,7 @@ const resolveOAuthUser = async (
       return existingAccount.user;
     }
 
+    // Case 2: Existing local account shares this verified email — link provider while keeping password login intact
     const existingUserByEmail = await tx.user.findUnique({
       where: { email: profile.email },
     });
@@ -420,6 +442,7 @@ const resolveOAuthUser = async (
       return existingUserByEmail;
     }
 
+    // Case 3: First-time user — generate unique RegisterSchema-safe handle & passwordless User + Account
     const username = await generateUniqueUsername(tx, profile.usernameHint);
 
     return tx.user.create({
@@ -450,6 +473,10 @@ export interface OAuthCallbackInput {
   stateToken?: string;
 }
 
+/**
+ * Completes OAuth 2.0 callback: validates single-use state JWT (preventing CSRF & cross-provider
+ * token replay), exchanges authorization `code` for verified email/profile, and issues session JWT.
+ */
 export const completeOAuthCallback = async (
   input: OAuthCallbackInput
 ): Promise<{ user: User; token: string }> => {
@@ -485,6 +512,7 @@ export const completeOAuthCallback = async (
     );
   }
 
+  // Ensure the callback URL state matches our signed cookie using constant-time comparison
   if (
     verifiedState.provider !== input.provider ||
     !timingSafeEqualString(input.queryState, verifiedState.state)

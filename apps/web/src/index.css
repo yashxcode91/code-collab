@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens stored as raw HSL channels (`H S% L%`) so Tailwind can apply `/opacity` utilities */
 @layer base {
   /* Light theme (default) */
   :root {
