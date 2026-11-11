@@ -7,6 +7,8 @@ import {
   loginController,
   logoutController,
   meController,
+  oauthCallbackController,
+  oauthStartController,
   registerController,
 } from './auth.controller';
 
@@ -27,3 +29,9 @@ authRouter.post(
 authRouter.post('/logout', asyncHandler(logoutController));
 
 authRouter.get('/me', requireAuth, asyncHandler(meController));
+
+authRouter.get('/google', oauthStartController('google'));
+authRouter.get('/google/callback', asyncHandler(oauthCallbackController('google')));
+
+authRouter.get('/github', oauthStartController('github'));
+authRouter.get('/github/callback', asyncHandler(oauthCallbackController('github')));

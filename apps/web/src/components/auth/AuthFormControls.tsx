@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Github, Info } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Github, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function inputClassName(hasError: boolean, extra?: string) {
@@ -152,61 +152,115 @@ export function PasswordField({
   );
 }
 
-interface OAuthButtonsProps {
-  onSelectProvider: (provider: 'Google' | 'GitHub') => void;
-  notice: string | null;
+export type OAuthProvider = 'google' | 'github';
+
+export function getOAuthErrorMessage(code: string | null): string | null {
+  switch (code) {
+    case 'oauth_not_configured':
+      return 'Single sign-on is not configured on the server yet. Add your OAuth credentials to .env or sign in with email below.';
+    case 'oauth_denied':
+      return 'Sign-in was canceled at the provider. Choose a sign-in method below to try again.';
+    case 'oauth_invalid_state':
+      return 'Your sign-in session expired or could not be verified. Please try again.';
+    case 'oauth_unverified_email':
+      return 'Your provider account must have a verified email address to sign in.';
+    case 'oauth_failed':
+      return 'Could not complete sign-in with the provider. Please try again.';
+    default:
+      return null;
+  }
 }
 
-export function OAuthButtons({ onSelectProvider, notice }: OAuthButtonsProps) {
+interface OAuthButtonsProps {
+  onSelectProvider: (provider: OAuthProvider) => void;
+  pendingProvider?: OAuthProvider | null;
+  disabled?: boolean;
+  error?: string | null;
+  onDismissError?: () => void;
+}
+
+export function OAuthButtons({
+  onSelectProvider,
+  pendingProvider = null,
+  disabled = false,
+  error = null,
+  onDismissError,
+}: OAuthButtonsProps) {
+  const isBusy = disabled || pendingProvider !== null;
+
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => onSelectProvider('Google')}
+          disabled={isBusy}
+          aria-busy={pendingProvider === 'google'}
+          onClick={() => onSelectProvider('google')}
           className={cn(
             'inline-flex h-11 items-center justify-center gap-2 rounded-xl',
             'border border-slate-900/15 bg-white/60 px-3 text-[13px] font-medium text-foreground backdrop-blur-sm',
             'shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_2px_rgba(15,23,42,0.04)]',
             'hover:-translate-y-[0.5px] hover:border-slate-900/25 hover:bg-white/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),0_4px_12px_-2px_rgba(15,23,42,0.08)]',
-            'active:translate-y-0',
+            'active:translate-y-0 disabled:pointer-events-none disabled:opacity-60',
             'dark:border-white/[0.15] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]',
             'dark:hover:border-white/30 dark:hover:bg-white/[0.11]',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
             'transition-all duration-150',
           )}
         >
-          <GoogleIcon />
-          <span>Google</span>
+          {pendingProvider === 'google' ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <GoogleIcon />
+          )}
+          <span>{pendingProvider === 'google' ? 'Redirecting…' : 'Google'}</span>
         </button>
 
         <button
           type="button"
-          onClick={() => onSelectProvider('GitHub')}
+          disabled={isBusy}
+          aria-busy={pendingProvider === 'github'}
+          onClick={() => onSelectProvider('github')}
           className={cn(
             'inline-flex h-11 items-center justify-center gap-2 rounded-xl',
             'border border-slate-900/15 bg-white/60 px-3 text-[13px] font-medium text-foreground backdrop-blur-sm',
             'shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_2px_rgba(15,23,42,0.04)]',
             'hover:-translate-y-[0.5px] hover:border-slate-900/25 hover:bg-white/90 hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),0_4px_12px_-2px_rgba(15,23,42,0.08)]',
-            'active:translate-y-0',
+            'active:translate-y-0 disabled:pointer-events-none disabled:opacity-60',
             'dark:border-white/[0.15] dark:bg-white/[0.06] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]',
             'dark:hover:border-white/30 dark:hover:bg-white/[0.11]',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
             'transition-all duration-150',
           )}
         >
-          <Github className="h-4 w-4" aria-hidden="true" />
-          <span>GitHub</span>
+          {pendingProvider === 'github' ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Github className="h-4 w-4" aria-hidden="true" />
+          )}
+          <span>{pendingProvider === 'github' ? 'Redirecting…' : 'GitHub'}</span>
         </button>
       </div>
 
-      {notice && (
+      {error && (
         <div
-          role="status"
-          className="flex items-start gap-2 rounded-lg border border-primary/25 bg-accent px-3 py-2 text-xs text-accent-foreground"
+          role="alert"
+          className="flex items-start justify-between gap-2.5 rounded-xl border border-destructive/40 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive"
         >
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>{notice}</span>
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{error}</span>
+          </div>
+          {onDismissError && (
+            <button
+              type="button"
+              onClick={onDismissError}
+              aria-label="Dismiss error"
+              className="shrink-0 rounded px-1 text-xs font-medium text-destructive/80 hover:bg-destructive/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+            >
+              Dismiss
+            </button>
+          )}
         </div>
       )}
     </div>

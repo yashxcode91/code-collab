@@ -3,12 +3,23 @@ import type { CookieOptions } from 'express';
 import type { UserRole as DbUserRole } from '@codecollab/database';
 
 export const AUTH_COOKIE_NAME = 'codecollab_token';
+export const OAUTH_STATE_COOKIE_NAME = 'codecollab_oauth_state';
 const DEFAULT_JWT_EXPIRES_IN = '15m';
+const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 const MIN_JWT_SECRET_LENGTH = 32;
 
 export interface AccessTokenPayload {
   sub: string;
   role: DbUserRole;
+}
+
+export type OAuthProviderKey = 'google' | 'github';
+
+export interface OAuthStatePayload {
+  purpose: 'oauth_state';
+  provider: OAuthProviderKey;
+  state: string;
+  codeVerifier?: string;
 }
 
 const UNIT_TO_SECONDS: Record<string, number> = {
@@ -99,5 +110,59 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
   return {
     sub: decoded.sub,
     role: decoded.role,
+  };
+};
+
+export const getOAuthStateCookieOptions = (): CookieOptions => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  path: '/api/auth',
+});
+
+export const getOAuthStateCookieMaxAgeMs = (): number =>
+  OAUTH_STATE_TTL_SECONDS * 1000;
+
+export const signOAuthStateToken = (
+  payload: Omit<OAuthStatePayload, 'purpose'>
+): string => {
+  const { secret } = getJwtConfig();
+  return jwt.sign(
+    {
+      purpose: 'oauth_state',
+      ...payload,
+    },
+    secret,
+    {
+      algorithm: 'HS256',
+      expiresIn: OAUTH_STATE_TTL_SECONDS,
+    }
+  );
+};
+
+export const verifyOAuthStateToken = (token: string): OAuthStatePayload => {
+  const { secret } = getJwtConfig();
+  const decoded = jwt.verify(token, secret, {
+    algorithms: ['HS256'],
+  }) as JwtPayload;
+
+  if (
+    typeof decoded !== 'object' ||
+    decoded === null ||
+    decoded.purpose !== 'oauth_state' ||
+    (decoded.provider !== 'google' && decoded.provider !== 'github') ||
+    typeof decoded.state !== 'string' ||
+    decoded.state.length < 16 ||
+    (decoded.codeVerifier !== undefined &&
+      typeof decoded.codeVerifier !== 'string')
+  ) {
+    throw new jwt.JsonWebTokenError('Malformed OAuth state token');
+  }
+
+  return {
+    purpose: 'oauth_state',
+    provider: decoded.provider,
+    state: decoded.state,
+    ...(decoded.codeVerifier ? { codeVerifier: decoded.codeVerifier } : {}),
   };
 };

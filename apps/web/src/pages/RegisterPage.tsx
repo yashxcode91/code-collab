@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { RegisterSchema, type RegisterInput } from '@codecollab/shared';
 import { BrandMark } from '@/components/BrandLogo';
 import { AuthCenteredLayout } from '@/components/auth/AuthCenteredLayout';
 import {
+  getOAuthErrorMessage,
   OAuthButtons,
+  type OAuthProvider,
   PasswordField,
   TextField,
 } from '@/components/auth/AuthFormControls';
@@ -16,6 +18,7 @@ type RegisterFieldErrors = Partial<Record<keyof RegisterFormState, string>>;
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { register } = useAuth();
 
   const [form, setForm] = useState<RegisterFormState>({
@@ -26,9 +29,26 @@ export function RegisterPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingProvider, setPendingProvider] = useState<OAuthProvider | null>(null);
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [oauthNotice, setOauthNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
+
+  const oauthError = getOAuthErrorMessage(searchParams.get('error'));
+
+  const clearOAuthError = () => {
+    if (searchParams.has('error')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('error');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  const handleOAuthSelect = (provider: OAuthProvider) => {
+    setGlobalError(null);
+    clearOAuthError();
+    setPendingProvider(provider);
+    window.location.assign(`/api/auth/${provider}`);
+  };
 
   const updateField = <K extends keyof RegisterFormState>(key: K, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -41,6 +61,7 @@ export function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGlobalError(null);
+    clearOAuthError();
     setFieldErrors({});
 
     const { confirmPassword, ...payload } = form;
@@ -102,14 +123,13 @@ export function RegisterPage() {
           </div>
         </div>
 
-        {/* OAuth Placeholders (wired in Step 7) */}
+        {/* Google & GitHub OAuth 2.0 Sign-Up */}
         <OAuthButtons
-          onSelectProvider={(provider) =>
-            setOauthNotice(
-              `${provider} OAuth sign-up will be connected in Step 7. Register with email below for now.`,
-            )
-          }
-          notice={oauthNotice}
+          onSelectProvider={handleOAuthSelect}
+          pendingProvider={pendingProvider}
+          disabled={isSubmitting}
+          error={oauthError}
+          onDismissError={clearOAuthError}
         />
 
         {/* Divider */}
@@ -183,7 +203,7 @@ export function RegisterPage() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || pendingProvider !== null}
             className="group mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-violet-600 to-violet-700 px-4 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.32),0_2px_4px_rgba(15,23,42,0.12),0_10px_24px_-6px_rgba(109,40,217,0.45)] transition-all duration-150 hover:from-violet-500 hover:to-violet-700 active:translate-y-[0.5px] disabled:pointer-events-none disabled:opacity-60 dark:from-indigo-500 dark:to-indigo-600 dark:hover:from-indigo-400 dark:hover:to-indigo-600 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_2px_6px_rgba(0,0,0,0.4),0_12px_28px_-6px_rgba(99,102,241,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {isSubmitting ? (

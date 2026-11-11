@@ -19,9 +19,14 @@ import { apiRequest } from '@/lib/api';
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const [health, setHealth] = useState<HealthCheckResponse | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [user?.avatarUrl]);
 
   const loadHealth = useCallback(async () => {
     setHealthLoading(true);
@@ -51,6 +56,11 @@ export function DashboardPage() {
     ? user.username.slice(0, 2).toUpperCase()
     : 'CC';
 
+  const safeAvatarUrl =
+    user?.avatarUrl && /^https?:\/\//i.test(user.avatarUrl) && !avatarFailed
+      ? user.avatarUrl
+      : null;
+
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Top Bar */}
@@ -62,9 +72,19 @@ export function DashboardPage() {
             <ThemeToggle />
 
             <div className="hidden items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 sm:flex">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-accent font-mono text-[11px] font-semibold text-accent-foreground">
-                {initials}
-              </div>
+              {safeAvatarUrl ? (
+                <img
+                  src={safeAvatarUrl}
+                  alt={`${user?.username ?? 'User'} avatar`}
+                  referrerPolicy="no-referrer"
+                  onError={() => setAvatarFailed(true)}
+                  className="h-6 w-6 rounded-full object-cover ring-1 ring-border"
+                />
+              ) : (
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-accent font-mono text-[11px] font-semibold text-accent-foreground">
+                  {initials}
+                </div>
+              )}
               <span className="text-xs font-medium text-foreground">
                 @{user?.username}
               </span>
