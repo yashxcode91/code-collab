@@ -6,7 +6,9 @@ import {
   CreateExecutionRunSchema,
   CreateFileNodeSchema,
   CreateProjectSchema,
+  CreateSnapshotSchema,
   MergeBranchSchema,
+  RestoreSnapshotSchema,
   SetFileAccessSchema,
   UpdateBranchSchema,
   UpdateFileNodeSchema,
@@ -21,11 +23,19 @@ import {
   listProjectChatMessagesController,
 } from '../chat/chat.controller';
 import {
-  cancelExecutionRunController,
   createExecutionRunController,
+  cancelExecutionRunController,
   getExecutionRunDetailController,
   listBranchExecutionRunsController,
 } from '../execution/execution.controller';
+import {
+  createBranchSnapshotController,
+  deleteBranchSnapshotController,
+  diffBranchSnapshotController,
+  getBranchSnapshotDetailController,
+  listBranchSnapshotsController,
+  restoreBranchSnapshotController,
+} from '../snapshots/snapshot.controller';
 import {
   addMemberController,
   createBranchController,
@@ -195,4 +205,32 @@ projectRouter.post(
   '/:projectId/chat',
   validateBody(CreateChatMessageSchema),
   asyncHandler(createProjectChatMessageController)
+);
+
+// --- Day 5: Branch Snapshots & Version History ---
+projectRouter.get(
+  '/:projectId/branches/:branchId/snapshots',
+  asyncHandler(listBranchSnapshotsController)
+);
+projectRouter.post(
+  '/:projectId/branches/:branchId/snapshots',
+  validateBody(CreateSnapshotSchema),
+  asyncHandler(createBranchSnapshotController)
+);
+projectRouter.get(
+  '/:projectId/branches/:branchId/snapshots/:snapshotId',
+  asyncHandler(getBranchSnapshotDetailController)
+);
+projectRouter.get(
+  '/:projectId/branches/:branchId/snapshots/:snapshotId/diff',
+  asyncHandler(diffBranchSnapshotController)
+);
+projectRouter.post(
+  '/:projectId/branches/:branchId/snapshots/:snapshotId/restore',
+  validateBody(RestoreSnapshotSchema),
+  asyncHandler(restoreBranchSnapshotController)
+);
+projectRouter.delete(
+  '/:projectId/branches/:branchId/snapshots/:snapshotId',
+  asyncHandler(deleteBranchSnapshotController)
 );

@@ -2,6 +2,7 @@ import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import { prisma } from '@codecollab/database';
 import {
+  type BranchRestoredPayload,
   buildExecutionRoomKey,
   buildFileRoomKey,
   buildProjectChatRoomKey,
@@ -24,6 +25,7 @@ import {
   RealtimeErrorDetail,
   ServerToClientEvents,
   SignedWorkerEventEnvelopeSchema,
+  type SnapshotCreatedPayload,
   type WorkerExecutionEvent,
   WorkerExecutionEventSchema,
 } from '@codecollab/shared';
@@ -108,6 +110,35 @@ export const broadcastRestFileSync = (params: {
     senderId: params.senderId ?? 'system:merge',
     update: params.delta,
   });
+};
+
+/** Broadcasts newly captured branch snapshots to active workspace sockets. */
+export const broadcastSnapshotCreated = (
+  payload: SnapshotCreatedPayload
+): void => {
+  if (!activeIoServer) return;
+  activeIoServer
+    .to(buildProjectWorkspaceRoomKey(payload.projectId))
+    .emit('snapshot:created', payload);
+};
+
+/**
+ * Broadcasts branch snapshot restore notifications to active workspace sockets
+ * and evicts connected clients from file rooms removed by the restore.
+ */
+export const broadcastBranchRestored = async (
+  payload: BranchRestoredPayload
+): Promise<void> => {
+  if (!activeIoServer) return;
+
+  for (const deletedFileId of payload.deletedFileIds) {
+    const roomKey = buildFileRoomKey(payload.branchId, deletedFileId);
+    activeIoServer.in(roomKey).socketsLeave(roomKey);
+  }
+
+  activeIoServer
+    .to(buildProjectWorkspaceRoomKey(payload.projectId))
+    .emit('branch:restored', payload);
 };
 
 /** Broadcasts newly queued runs to authorized workspace members, skipping denied per-file ACLs. */
@@ -981,6 +1012,7 @@ export const createRealtimeServer = (
         });
 
         await socket.join(room.roomKey);
+        await socket.join(buildProjectWorkspaceRoomKey(payload.projectId));
         roomManager.addSocketMember(room, {
           socketId: socket.id,
           userId: user.id,
