@@ -10,6 +10,7 @@ import {
   Folder,
   FileCode2,
   Globe,
+  History,
   Loader2,
   Lock,
   LogOut,
@@ -27,6 +28,7 @@ import {
   AddProjectMemberSchema,
   COLLAB_LIMITS,
   UpdateProjectSchema,
+  type BranchSnapshotSummaryDto,
   type ChatFileReferenceDto,
   type ChatMessageDto,
   type FileAccessPermission,
@@ -34,8 +36,10 @@ import {
   type ProjectBranchDto,
   type ProjectFileNodeDto,
   type ProjectMemberDto,
+  type RestoreSnapshotInput,
 } from '@codecollab/shared';
 import { StudioChatPanel } from '@/components/studio-ide/StudioChatPanel';
+import { StudioHistoryPanel } from '@/components/studio-ide/StudioHistoryPanel';
 import { buildNodeBreadcrumb } from '@/components/studio-ide/studioLanguage';
 import type { TypingPeer } from '@/hooks/useWorkspaceChat';
 import { ApiClientError } from '@/lib/api';
@@ -86,6 +90,30 @@ interface StudioInspectorDrawerProps {
     onClearError: () => void;
     onNavigateToFileRef: (fileRef: ChatFileReferenceDto) => void;
   };
+  historyState: {
+    snapshots: BranchSnapshotSummaryDto[];
+    nextCursor: string | null;
+    isLoading: boolean;
+    isLoadingMore: boolean;
+    isCreating: boolean;
+    isRestoring: boolean;
+    isDeleting: boolean;
+    snapshotError: string | null;
+    lastRestoreNotice: string | null;
+    onCreateSnapshot: (input: {
+      title: string;
+      description?: string;
+    }) => Promise<BranchSnapshotSummaryDto | null>;
+    onRestoreSnapshot: (
+      snapshotId: string,
+      input?: RestoreSnapshotInput,
+    ) => Promise<unknown>;
+    onDeleteSnapshot: (snapshotId: string) => Promise<boolean>;
+    onLoadMore: () => void;
+    onOpenDiffModal: (snapshot: BranchSnapshotSummaryDto) => void;
+    onClearError: () => void;
+    onClearRestoreNotice: () => void;
+  };
   onChangeTab: (tab: InspectorTab) => void;
   onSelectAclTarget: (nodeId: string | null) => void;
   onWorkspaceLeftOrDeleted: () => void;
@@ -109,6 +137,7 @@ export function StudioInspectorDrawer({
   isWorkspaceMember,
   canSendChat,
   chatState,
+  historyState,
   onChangeTab,
   onSelectAclTarget,
   onWorkspaceLeftOrDeleted,
@@ -472,7 +501,23 @@ export function StudioInspectorDrawer({
           {/* Desktop Contextual Title (no repetition of TopBar Team/Access/Settings buttons) */}
           <div className="hidden min-w-0 flex-1 items-center justify-between gap-2 lg:flex">
             <div className="flex min-w-0 items-center gap-2">
-              {resolvedTab === 'chat' && (
+              {resolvedTab === 'history' && (
+                <>
+                  <History
+                    className="h-3.5 w-3.5 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+                    Version History
+                  </span>
+                </>
+              )}
+              {resolvedTab === 'history' && (
+              <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-primary">
+                {historyState.snapshots.length} saved
+              </span>
+            )}
+            {resolvedTab === 'chat' && (
                 <>
                   <MessageSquare
                     className="h-3.5 w-3.5 shrink-0 text-primary"
@@ -518,6 +563,11 @@ export function StudioInspectorDrawer({
               )}
             </div>
 
+            {resolvedTab === 'history' && (
+              <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-primary">
+                {historyState.snapshots.length} saved
+              </span>
+            )}
             {resolvedTab === 'chat' && (
               <span
                 className={cn(
@@ -553,6 +603,20 @@ export function StudioInspectorDrawer({
 
           {/* Mobile / Tablet Compact Switcher (`<lg` overlay where TopBar sits underneath) */}
           <div className="flex items-center gap-1 lg:hidden">
+            <button
+              type="button"
+              onClick={() => onChangeTab('history')}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-medium transition-colors',
+                resolvedTab === 'history'
+                  ? 'border border-primary/45 bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <History className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>History</span>
+            </button>
+
             {isWorkspaceMember && (
               <button
                 type="button"
@@ -629,11 +693,37 @@ export function StudioInspectorDrawer({
         <div
           className={cn(
             'relative z-10 min-h-0 flex-1 p-3.5',
-            resolvedTab === 'chat'
+            resolvedTab === 'chat' || resolvedTab === 'history'
               ? 'flex flex-col overflow-hidden'
               : 'space-y-4 overflow-y-auto',
           )}
         >
+          {/* ==================== -1. VERSION HISTORY TAB ==================== */}
+          {resolvedTab === 'history' && (
+            <StudioHistoryPanel
+              branch={branch}
+              snapshots={historyState.snapshots}
+              nextCursor={historyState.nextCursor}
+              currentUserId={currentUserId}
+              isOwner={isOwner}
+              canEdit={canSendChat}
+              isLoading={historyState.isLoading}
+              isLoadingMore={historyState.isLoadingMore}
+              isCreating={historyState.isCreating}
+              isRestoring={historyState.isRestoring}
+              isDeleting={historyState.isDeleting}
+              snapshotError={historyState.snapshotError}
+              lastRestoreNotice={historyState.lastRestoreNotice}
+              onCreateSnapshot={historyState.onCreateSnapshot}
+              onRestoreSnapshot={historyState.onRestoreSnapshot}
+              onDeleteSnapshot={historyState.onDeleteSnapshot}
+              onLoadMore={historyState.onLoadMore}
+              onOpenDiffModal={historyState.onOpenDiffModal}
+              onClearError={historyState.onClearError}
+              onClearRestoreNotice={historyState.onClearRestoreNotice}
+            />
+          )}
+
           {/* ==================== 0. WORKSPACE CHAT TAB ==================== */}
           {resolvedTab === 'chat' && (
             <StudioChatPanel

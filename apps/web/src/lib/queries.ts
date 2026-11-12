@@ -2,12 +2,15 @@ import type {
   AddProjectMemberInput,
   BranchMergePreviewResponse,
   BranchMergeResultResponse,
+  BranchSnapshotDetailDto,
+  BranchSnapshotSummaryDto,
   ChatMessageDto,
   CreateBranchInput,
   CreateChatMessageInput,
   CreateExecutionRunInput,
   CreateFileNodeInput,
   CreateProjectInput,
+  CreateSnapshotInput,
   ExecutionRunDetailDto,
   ExecutionRunDto,
   HealthCheckResponse,
@@ -19,7 +22,10 @@ import type {
   ProjectFileDetailDto,
   ProjectFileNodeDto,
   ProjectMemberDto,
+  RestoreSnapshotInput,
+  RestoreSnapshotResultDto,
   SetFileAccessInput,
+  SnapshotDiffResponse,
   UpdateBranchInput,
   UpdateFileNodeInput,
   UpdateProjectInput,
@@ -69,6 +75,24 @@ export const queryKeys = {
     runDetail: (projectId: string, runId: string) =>
       ['projects', projectId, 'runs', runId] as const,
     chat: (projectId: string) => ['projects', projectId, 'chat'] as const,
+    snapshots: (projectId: string, branchId: string) =>
+      ['projects', projectId, 'branches', branchId, 'snapshots'] as const,
+    snapshotDiff: (
+      projectId: string,
+      branchId: string,
+      snapshotId: string,
+      targetSnapshotId?: string | null,
+    ) =>
+      [
+        'projects',
+        projectId,
+        'branches',
+        branchId,
+        'snapshots',
+        snapshotId,
+        'diff',
+        targetSnapshotId ?? 'live',
+      ] as const,
   },
 } as const;
 
@@ -484,4 +508,99 @@ export async function sendProjectChatMessage(
     },
   );
   return res.message;
+}
+
+// =====================================================================
+// Day 5: Branch Snapshots & Version History
+// =====================================================================
+
+export interface SnapshotListPage {
+  snapshots: BranchSnapshotSummaryDto[];
+  nextCursor: string | null;
+}
+
+/** Lists immutable branch snapshots ordered newest-first. */
+export async function fetchBranchSnapshots(
+  projectId: string,
+  branchId: string,
+  params?: { cursor?: string; limit?: number },
+): Promise<SnapshotListPage> {
+  const search = new URLSearchParams();
+  if (params?.cursor) search.set('cursor', params.cursor);
+  if (params?.limit) search.set('limit', String(params.limit));
+  const qs = search.toString();
+  return apiRequest<SnapshotListPage>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/snapshots${qs ? `?${qs}` : ''}`,
+  );
+}
+
+/** Captures a named branch snapshot after flushing live Yjs rooms. Owner/Editor only. */
+export async function createBranchSnapshot(
+  projectId: string,
+  branchId: string,
+  input: CreateSnapshotInput,
+): Promise<BranchSnapshotSummaryDto> {
+  const res = await apiRequest<{ snapshot: BranchSnapshotSummaryDto }>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/snapshots`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+  return res.snapshot;
+}
+
+/** Fetches snapshot metadata and ACL-filtered files inside a snapshot. */
+export async function fetchBranchSnapshotDetail(
+  projectId: string,
+  branchId: string,
+  snapshotId: string,
+): Promise<BranchSnapshotDetailDto> {
+  return apiRequest<BranchSnapshotDetailDto>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/snapshots/${encodeURIComponent(snapshotId)}`,
+  );
+}
+
+/** Compares a snapshot against the live branch (or another snapshot on the same branch). */
+export async function fetchBranchSnapshotDiff(
+  projectId: string,
+  branchId: string,
+  snapshotId: string,
+  targetSnapshotId?: string | null,
+): Promise<SnapshotDiffResponse> {
+  const qs = targetSnapshotId
+    ? `?targetSnapshotId=${encodeURIComponent(targetSnapshotId)}`
+    : '';
+  const res = await apiRequest<{ diff: SnapshotDiffResponse }>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/snapshots/${encodeURIComponent(snapshotId)}/diff${qs}`,
+  );
+  return res.diff;
+}
+
+/** Atomically restores a branch tree to match `snapshotId` (with optional pre-restore safety backup). */
+export async function restoreBranchSnapshot(
+  projectId: string,
+  branchId: string,
+  snapshotId: string,
+  input: RestoreSnapshotInput = { createSafetySnapshot: true },
+): Promise<RestoreSnapshotResultDto> {
+  return apiRequest<RestoreSnapshotResultDto>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/snapshots/${encodeURIComponent(snapshotId)}/restore`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+/** Deletes a snapshot (allowed for workspace Owner or snapshot creator). */
+export async function deleteBranchSnapshot(
+  projectId: string,
+  branchId: string,
+  snapshotId: string,
+): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/snapshots/${encodeURIComponent(snapshotId)}`,
+    { method: 'DELETE' },
+  );
 }

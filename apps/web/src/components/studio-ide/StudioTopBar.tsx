@@ -6,6 +6,7 @@ import {
   ChevronDown,
   GitBranch,
   GitMerge,
+  History,
   Loader2,
   Lock,
   LockOpen,
@@ -953,6 +954,25 @@ export function StudioTopBar({
 
           {/* Group 3 (Right): Inspector Tabs, Window Expand & Theme */}
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() =>
+                onSetRightPanelTab(
+                  rightPanelTab === 'history' ? 'closed' : 'history',
+                )
+              }
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors',
+                rightPanelTab === 'history'
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground',
+              )}
+              title="Branch Snapshots & Version History"
+            >
+              <History className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="hidden lg:inline">History</span>
+            </button>
+
             {isWorkspaceMember && (
               <button
                 type="button"

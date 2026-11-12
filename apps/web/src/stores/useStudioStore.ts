@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import type { ProjectFileDetailDto } from '@codecollab/shared';
 
-export type InspectorTab = 'closed' | 'chat' | 'members' | 'access' | 'settings';
+export type InspectorTab =
+  | 'closed'
+  | 'history'
+  | 'chat'
+  | 'members'
+  | 'access'
+  | 'settings';
 
 export interface FileDraftBuffer {
   fileId: string;

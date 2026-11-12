@@ -8,6 +8,8 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type {
   BranchMergeResultResponse,
+  BranchRestoredPayload,
+  BranchSnapshotSummaryDto,
   ChatFileReferenceDto,
   ProjectFileDetailDto,
   ProjectFileNodeDto,
@@ -20,6 +22,7 @@ import { disposeStudioModels } from '@/components/studio-ide/monacoWorkerSetup';
 import { StudioEditorPane } from '@/components/studio-ide/StudioEditorPane';
 import { StudioExecutionConsole } from '@/components/studio-ide/StudioExecutionConsole';
 import { StudioInspectorDrawer } from '@/components/studio-ide/StudioInspectorDrawer';
+import { StudioSnapshotDiffModal } from '@/components/studio-ide/StudioSnapshotDiffModal';
 import {
   collectSubtreeIds,
   inferExecutionLanguage,
@@ -29,6 +32,7 @@ import { StudioTopBar } from '@/components/studio-ide/StudioTopBar';
 import { StudioBackdrop } from '@/components/studio-ui/StudioBackdrop';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
+import { useBranchSnapshots } from '@/hooks/useBranchSnapshots';
 import { useExecutionConsole } from '@/hooks/useExecutionConsole';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { useWorkspaceChat } from '@/hooks/useWorkspaceChat';
@@ -66,6 +70,8 @@ export function StudioPage() {
     sourceBranchId?: string | null;
     targetBranchId?: string | null;
   }>({ open: false });
+  const [diffSnapshotTarget, setDiffSnapshotTarget] =
+    useState<BranchSnapshotSummaryDto | null>(null);
   const [scrollToLineRequest, setScrollToLineRequest] = useState<{
     fileId?: string;
     line: number;
@@ -304,6 +310,58 @@ export function StudioPage() {
     isMember: isWorkspaceMember,
     canSend: isEditorOrOwnerRole,
     isOpen: rightPanelTab === 'chat',
+  });
+
+  const handleBranchRestored = useCallback(
+    (payload: BranchRestoredPayload) => {
+      for (const deletedId of payload.deletedFileIds) {
+        disposeStudioModels(
+          `inmemory://studio/${payload.branchId}/${deletedId}/`,
+        );
+      }
+      if (payload.deletedFileIds.length > 0) {
+        removeDeletedNode(payload.deletedFileIds);
+      }
+
+      const activeWasDeleted =
+        activeFileId !== null && payload.deletedFileIds.includes(activeFileId);
+
+      if (!collab.roomReady || activeWasDeleted) {
+        disposeStudioModels(`inmemory://studio/${payload.branchId}/`);
+        resetMergedBranchBuffers();
+      } else {
+        resetMergedBranchBuffers(activeFileId);
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.projects.files(projectId, payload.branchId),
+      });
+      if (activeFileId && !activeWasDeleted) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.fileDetail(
+            projectId,
+            payload.branchId,
+            activeFileId,
+          ),
+        });
+      }
+    },
+    [
+      activeFileId,
+      collab.roomReady,
+      projectId,
+      queryClient,
+      removeDeletedNode,
+      resetMergedBranchBuffers,
+    ],
+  );
+
+  const snapshots = useBranchSnapshots({
+    socket: collab.socket,
+    projectId: project?.id ?? '',
+    branchId: activeBranch?.id ?? null,
+    enabled: Boolean(project && user),
+    onBranchRestored: handleBranchRestored,
   });
 
   // Reset manual language override when switching active file
@@ -1063,6 +1121,24 @@ export function StudioPage() {
               onClearError: chat.clearChatError,
               onNavigateToFileRef: handleNavigateToChatFileRef,
             }}
+            historyState={{
+              snapshots: snapshots.snapshots,
+              nextCursor: snapshots.nextCursor,
+              isLoading: snapshots.isLoading,
+              isLoadingMore: snapshots.isLoadingMore,
+              isCreating: snapshots.isCreating,
+              isRestoring: snapshots.isRestoring,
+              isDeleting: snapshots.isDeleting,
+              snapshotError: snapshots.snapshotError,
+              lastRestoreNotice: snapshots.lastRestoreNotice,
+              onCreateSnapshot: snapshots.createSnapshot,
+              onRestoreSnapshot: snapshots.restoreSnapshot,
+              onDeleteSnapshot: snapshots.deleteSnapshot,
+              onLoadMore: () => void snapshots.loadMoreSnapshots(),
+              onOpenDiffModal: (snap) => setDiffSnapshotTarget(snap),
+              onClearError: snapshots.clearSnapshotError,
+              onClearRestoreNotice: snapshots.clearRestoreNotice,
+            }}
             onChangeTab={setRightPanelTab}
             onSelectAclTarget={setAclTargetNodeId}
             onWorkspaceLeftOrDeleted={() => navigate('/', { replace: true })}
@@ -1080,6 +1156,22 @@ export function StudioPage() {
         dirtyCount={dirtyCount}
         onClose={() => setMergeModalState({ open: false })}
         onMerged={handleBranchMerged}
+      />
+
+      <StudioSnapshotDiffModal
+        open={diffSnapshotTarget !== null}
+        projectId={project.id}
+        branch={activeBranch}
+        baseSnapshot={diffSnapshotTarget}
+        allSnapshots={snapshots.snapshots}
+        canRestore={Boolean(
+          activeBranch &&
+            isEditorOrOwner &&
+            (!activeBranch.isProtected || project.currentUserRole === 'owner'),
+        )}
+        isRestoring={snapshots.isRestoring}
+        onClose={() => setDiffSnapshotTarget(null)}
+        onRestore={snapshots.restoreSnapshot}
       />
     </div>
   );
