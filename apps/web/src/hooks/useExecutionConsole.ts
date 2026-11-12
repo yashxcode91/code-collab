@@ -88,6 +88,7 @@ export function useExecutionConsole({
   onSelectRunRef.current = onSelectRun;
   const lastChunkSeqRef = useRef<number>(0);
   const segmentSeqRef = useRef<number>(0);
+  const seededRunIdRef = useRef<string | null>(null);
 
   // Branch execution history (ACL-filtered by server)
   const runsQuery = useQuery({
@@ -98,24 +99,29 @@ export function useExecutionConsole({
 
   const runs = useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
 
-  // Clear local stream state when activeRunId becomes null or branch changes
+  // Clear local stream state ONLY when activeRunId changes
   useEffect(() => {
     setConsoleError(null);
     lastChunkSeqRef.current = 0;
+    seededRunIdRef.current = null;
 
     if (!activeRunId) {
       setActiveRun(null);
       setSegments([]);
       setElapsedMs(0);
-      return;
     }
+  }, [activeRunId]);
 
-    // Optimistically seed from history list while Socket.IO `execution:join` / REST detail resolves
+  // Optimistically seed from history list ONCE per activeRunId if live/REST hasn't populated it yet
+  useEffect(() => {
+    if (!activeRunId || seededRunIdRef.current === activeRunId) return;
+
     const cached = runs.find((r) => r.id === activeRunId) ?? null;
     if (cached) {
-      setActiveRun(cached);
-      setSegments(buildSegmentsFromRun(cached));
-      setElapsedMs(cached.durationMs ?? 0);
+      seededRunIdRef.current = activeRunId;
+      setActiveRun((prev) => prev ?? cached);
+      setSegments((prev) => (prev.length > 0 ? prev : buildSegmentsFromRun(cached)));
+      setElapsedMs((prev) => (prev > 0 ? prev : cached.durationMs ?? 0));
     }
   }, [activeRunId, runs]);
 
@@ -201,6 +207,7 @@ export function useExecutionConsole({
           }
           return;
         }
+        seededRunIdRef.current = runId;
         lastChunkSeqRef.current = ack.data.lastChunkSeq;
         setActiveRun(ack.data.run);
         setSegments((prev) => {
@@ -341,6 +348,7 @@ export function useExecutionConsole({
         ((err.code === 'PROJECT_FORBIDDEN' || err.code === 'PROJECT_NOT_FOUND') &&
           (!err.projectId || err.projectId === projectId))
       ) {
+        seededRunIdRef.current = activeRunIdRef.current;
         setActiveRun(null);
         setSegments([]);
         setElapsedMs(0);
@@ -359,6 +367,7 @@ export function useExecutionConsole({
         ((err.runId && err.runId === activeRunIdRef.current) ||
           (err.fileId && err.fileId === activeRunFileIdRef.current))
       ) {
+        seededRunIdRef.current = activeRunIdRef.current;
         setActiveRun(null);
         setSegments([]);
         setElapsedMs(0);

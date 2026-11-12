@@ -27,6 +27,13 @@ const loginIpLimiter = createRateLimitMiddleware({
   message: 'Too many login attempts; please try again shortly',
 });
 
+const oauthIpLimiter = createRateLimitMiddleware({
+  keyPrefix: 'auth:oauth-ip',
+  maxRequests: 60,
+  windowSec: 60,
+  message: 'Too many OAuth attempts; please try again shortly',
+});
+
 const loginAccountLimiter = createRateLimitMiddleware({
   keyPrefix: 'auth:login-acct',
   maxRequests: 10,
@@ -73,8 +80,16 @@ authRouter.post('/logout', asyncHandler(logoutController));
 authRouter.get('/me', requireAuth, asyncHandler(meController));
 
 // Browser redirect flows for Google (PKCE) & GitHub OAuth 2.0
-authRouter.get('/google', oauthStartController('google'));
-authRouter.get('/google/callback', asyncHandler(oauthCallbackController('google')));
+authRouter.get('/google', oauthIpLimiter, oauthStartController('google'));
+authRouter.get(
+  '/google/callback',
+  oauthIpLimiter,
+  asyncHandler(oauthCallbackController('google'))
+);
 
-authRouter.get('/github', oauthStartController('github'));
-authRouter.get('/github/callback', asyncHandler(oauthCallbackController('github')));
+authRouter.get('/github', oauthIpLimiter, oauthStartController('github'));
+authRouter.get(
+  '/github/callback',
+  oauthIpLimiter,
+  asyncHandler(oauthCallbackController('github'))
+);

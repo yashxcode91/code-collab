@@ -52,6 +52,7 @@ export function useWorkspaceChat({
 
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
   const lastTypingEmitRef = useRef(0);
   const stopTypingTimerRef = useRef<number | null>(null);
 
@@ -86,9 +87,9 @@ export function useWorkspaceChat({
       const page = await fetchProjectChatMessages(projectId, {
         limit: CHAT_LIMITS.DEFAULT_PAGE_SIZE,
       });
-      // Backend returns newest-first for cursor pagination; display oldest -> newest in thread
-      const chronological = [...page.messages].reverse();
-      setMessages(chronological);
+      // Backend already reverses each cursor page into oldest -> newest chronological order
+      seenMessageIdsRef.current = new Set(page.messages.map((m) => m.id));
+      setMessages(page.messages);
       setNextCursor(page.nextCursor);
     } catch (err) {
       setChatError(
@@ -102,6 +103,7 @@ export function useWorkspaceChat({
   }, [isMember, projectId]);
 
   useEffect(() => {
+    seenMessageIdsRef.current.clear();
     setMessages([]);
     setNextCursor(null);
     setUnreadCount(0);
@@ -119,10 +121,10 @@ export function useWorkspaceChat({
         cursor: nextCursor,
         limit: CHAT_LIMITS.DEFAULT_PAGE_SIZE,
       });
-      const olderChronological = [...page.messages].reverse();
       setMessages((prev) => {
         const seen = new Set(prev.map((m) => m.id));
-        const dedupedOlder = olderChronological.filter((m) => !seen.has(m.id));
+        const dedupedOlder = page.messages.filter((m) => !seen.has(m.id));
+        for (const m of dedupedOlder) seenMessageIdsRef.current.add(m.id);
         return [...dedupedOlder, ...prev];
       });
       setNextCursor(page.nextCursor);
@@ -169,6 +171,9 @@ export function useWorkspaceChat({
 
     const handleIncomingMessage = (msg: ChatMessageDto) => {
       if (msg.projectId !== projectId) return;
+      if (seenMessageIdsRef.current.has(msg.id)) return;
+      seenMessageIdsRef.current.add(msg.id);
+
       setMessages((prev) => {
         if (prev.some((existing) => existing.id === msg.id)) {
           return prev;
@@ -219,6 +224,7 @@ export function useWorkspaceChat({
             err.code === 'PROJECT_FORBIDDEN' ||
             err.code === 'PROJECT_NOT_FOUND'))
       ) {
+        seenMessageIdsRef.current.clear();
         setChatJoined(false);
         setMessages([]);
         setNextCursor(null);
@@ -344,6 +350,7 @@ export function useWorkspaceChat({
             });
           });
 
+          seenMessageIdsRef.current.add(created.id);
           setMessages((prev) =>
             prev.some((m) => m.id === created.id) ? prev : [...prev, created],
           );
@@ -356,6 +363,7 @@ export function useWorkspaceChat({
           fileId: payload.fileId,
           lineNumber: payload.lineNumber,
         });
+        seenMessageIdsRef.current.add(created.id);
         setMessages((prev) =>
           prev.some((m) => m.id === created.id) ? prev : [...prev, created],
         );

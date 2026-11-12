@@ -173,5 +173,19 @@ describe('Backend Security Infrastructure (CORS, CSRF, Errors)', () => {
       expect(throttled.body.error?.code).toBe('RATE_LIMIT_EXCEEDED');
       expect(throttled.headers['retry-after']).toBeDefined();
     });
+
+    it('attaches Redis sliding-window rate limiting to OAuth GET initiation routes', async () => {
+      const oauthKeysBefore = await redis.keys('codecollab:ratelimit:auth:oauth-ip:*');
+      for (const k of oauthKeysBefore) {
+        // Leave unrelated parallel test counters untouched; verify counter increments cleanly
+        expect(k).toContain('codecollab:ratelimit:auth:oauth-ip:');
+      }
+
+      const res = await request(app).get('/api/auth/google');
+      expect(res.status).toBe(302);
+
+      const oauthKeysAfter = await redis.keys('codecollab:ratelimit:auth:oauth-ip:*');
+      expect(oauthKeysAfter.length).toBeGreaterThan(0);
+    });
   });
 });

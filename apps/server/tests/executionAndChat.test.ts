@@ -547,11 +547,23 @@ describe('Day 4 Execution & Workspace Chat API + Socket.IO Gateway', () => {
     expect(ed2Msg.fileRef).toBeNull();
     expect(vwMsg.fileRef?.fileName).toBe('secret.py');
 
-    // REST cursor pagination also redacts fileRef for editor2
+    // Send a second message so chronological oldest -> newest pagination ordering is asserted
+    const secondSendAck = await new Promise<RealtimeAck<ChatMessageDto>>((resolve) => {
+      ownerSock.emit(
+        'chat:send',
+        { projectId, content: 'Follow-up chronological message' },
+        (ack) => resolve(ack)
+      );
+    });
+    expect(secondSendAck.ok).toBe(true);
+
+    // REST cursor pagination returns oldest -> newest and redacts secret fileRef for editor2
     const histRes = await editor2.agent.get(`/api/projects/${projectId}/chat`);
     expect(histRes.status).toBe(200);
-    expect(histRes.body.data.messages).toHaveLength(1);
+    expect(histRes.body.data.messages).toHaveLength(2);
+    expect(histRes.body.data.messages[0].content).toBe('Check this secret file');
     expect(histRes.body.data.messages[0].fileRef).toBeNull();
+    expect(histRes.body.data.messages[1].content).toBe('Follow-up chronological message');
 
     // Removing editor2 triggers live eviction error on their active socket
     const evictedPromise = new Promise<RealtimeErrorPayload>((resolve) => {
