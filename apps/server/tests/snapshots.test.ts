@@ -714,4 +714,198 @@ describe('Day 5 Branch Snapshots & Version History API + Yjs Resync', () => {
     collabMainDoc.destroy();
     collabSocket.disconnect();
   });
+
+  it('prevents deleted DENIED secret leakage/restore (VULN-01), keeps GET /diff read-only (VULN-05), returns totalCount (VULN-06), and enforces rate limits (VULN-04)', async () => {
+    // 1. Owner creates a root secret file, denies editor2, captures snapshot, then deletes it from live
+    const topSecretRes = await owner.agent
+      .post(`/api/projects/${projectId}/branches/${featureBranchId}/files`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({
+        name: 'top_secret.env',
+        nodeType: 'file',
+        content: 'DB_PASSWORD="hunter2-audit-secret"\n',
+      });
+    expect(topSecretRes.status).toBe(201);
+    const topSecretId = topSecretRes.body.data.file.id as string;
+
+    const denySecretRes = await owner.agent
+      .put(
+        `/api/projects/${projectId}/branches/${featureBranchId}/files/${topSecretId}/access`
+      )
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ userId: editor2.id, permission: 'denied' });
+    expect(denySecretRes.status).toBe(200);
+
+    const secretSnapRes = await owner.agent
+      .post(`/api/projects/${projectId}/branches/${featureBranchId}/snapshots`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ title: 'With deleted secret guard' });
+    expect(secretSnapRes.status).toBe(201);
+    const secretSnapId = secretSnapRes.body.data.snapshot.id as string;
+
+    const delSecretRes = await owner.agent
+      .delete(
+        `/api/projects/${projectId}/branches/${featureBranchId}/files/${topSecretId}`
+      )
+      .set('Origin', TRUSTED_ORIGIN);
+    expect(delSecretRes.status).toBe(200);
+
+    // Deleted file must remain hidden in snapshot detail & diff for editor2
+    const ed2DetailAfterDel = await editor2.agent.get(
+      `/api/projects/${projectId}/branches/${featureBranchId}/snapshots/${secretSnapId}`
+    );
+    expect(ed2DetailAfterDel.status).toBe(200);
+    const ed2DetailBody = ed2DetailAfterDel.body.data as BranchSnapshotDetailDto;
+    expect(ed2DetailBody.redactedCount).toBeGreaterThanOrEqual(1);
+    expect(
+      ed2DetailBody.files.some(
+        (f) => f.path === 'top_secret.env' || f.content.includes('hunter2')
+      )
+    ).toBe(false);
+
+    const ed2DiffAfterDel = await editor2.agent.get(
+      `/api/projects/${projectId}/branches/${featureBranchId}/snapshots/${secretSnapId}/diff`
+    );
+    expect(ed2DiffAfterDel.status).toBe(200);
+    const ed2DiffBody = ed2DiffAfterDel.body.data.diff as SnapshotDiffResponse;
+    expect(ed2DiffBody.summary.redactedCount).toBeGreaterThanOrEqual(1);
+    expect(
+      ed2DiffBody.changes.some((c) => c.path === 'top_secret.env')
+    ).toBe(false);
+
+    // editor2 cannot recreate the deleted secret by restoring secretSnapId
+    const ed2RestoreBypass = await editor2.agent
+      .post(
+        `/api/projects/${projectId}/branches/${featureBranchId}/snapshots/${secretSnapId}/restore`
+      )
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ createSafetySnapshot: false });
+    expect(ed2RestoreBypass.status).toBe(403);
+    expect(ed2RestoreBypass.body.error?.code).toBe('FILE_ACCESS_DENIED');
+
+    // Owner restoring secretSnapId recreates top_secret.env AND re-hydrates DENIED ACL for editor2
+    const ownerRestoreSecret = await owner.agent
+      .post(
+        `/api/projects/${projectId}/branches/${featureBranchId}/snapshots/${secretSnapId}/restore`
+      )
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ createSafetySnapshot: false });
+    expect(ownerRestoreSecret.status).toBe(200);
+
+    const treeAfterOwnerRestore = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${featureBranchId}/files`
+    );
+    const recreatedSecretNode = (
+      treeAfterOwnerRestore.body.data.files as Array<{ id: string; name: string }>
+    ).find((f) => f.name === 'top_secret.env');
+    expect(recreatedSecretNode).toBeTruthy();
+
+    const ed2ReadRecreated = await editor2.agent.get(
+      `/api/projects/${projectId}/branches/${featureBranchId}/files/${recreatedSecretNode!.id}`
+    );
+    expect(ed2ReadRecreated.status).toBe(403);
+
+    // 2. VULN-05: Viewer GET .../diff reflects unsaved live Yjs edits WITHOUT bumping DB version
+    const preDbMain = await prisma.projectFile.findUnique({
+      where: { id: mainFileId },
+      select: { name: true, version: true },
+    });
+    const editorSocket = await connectSocket(baseUrl, editor.cookieHeader);
+    createdSockets.push(editorSocket);
+
+    const joinMainAck = await new Promise<FileJoinAck>((resolve) => {
+      editorSocket.emit(
+        'file:join',
+        { projectId, branchId: featureBranchId, fileId: mainFileId },
+        (ack) => resolve(ack)
+      );
+    });
+    expect(joinMainAck.ok).toBe(true);
+
+    const tempDoc = new Y.Doc();
+    Y.applyUpdate(tempDoc, new Uint8Array(joinMainAck.data!.yjsSyncUpdate));
+    const unsavedDelta = await new Promise<Uint8Array>((resolve) => {
+      tempDoc.once('update', (upd: Uint8Array) => resolve(upd));
+      tempDoc.transact(() => {
+        const yText = tempDoc.getText('monaco');
+        yText.insert(yText.length, '# unsaved-live-ram-edit\n');
+      });
+    });
+    const yjsPushAck = await new Promise<YjsUpdateAck>((resolve) => {
+      editorSocket.emit(
+        'yjs:update',
+        {
+          projectId,
+          branchId: featureBranchId,
+          fileId: mainFileId,
+          update: unsavedDelta,
+        },
+        (ack) => resolve(ack)
+      );
+    });
+    expect(yjsPushAck.ok).toBe(true);
+
+    const viewerDiffRes = await viewer.agent.get(
+      `/api/projects/${projectId}/branches/${featureBranchId}/snapshots/${secretSnapId}/diff`
+    );
+    expect(viewerDiffRes.status).toBe(200);
+    const viewerDiff = viewerDiffRes.body.data.diff as SnapshotDiffResponse;
+    const liveChangedMain = viewerDiff.changes.find((c) =>
+      c.path.endsWith(preDbMain!.name)
+    );
+    expect(liveChangedMain?.targetContent).toContain('# unsaved-live-ram-edit');
+
+    const postDbMain = await prisma.projectFile.findUnique({
+      where: { id: mainFileId },
+      select: { version: true },
+    });
+    expect(postDbMain?.version).toBe(preDbMain?.version);
+
+    tempDoc.destroy();
+    editorSocket.disconnect();
+
+    // 3. VULN-06: Paginated list includes exact server `totalCount`
+    const pagedRes = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${featureBranchId}/snapshots?limit=1`
+    );
+    expect(pagedRes.status).toBe(200);
+    expect(pagedRes.body.data.snapshots).toHaveLength(1);
+    expect(pagedRes.body.data.nextCursor).toBeTruthy();
+    expect(pagedRes.body.data.totalCount).toBeGreaterThanOrEqual(2);
+
+    // 4. VULN-02 / VULN-03: Parallel restores serialize cleanly & Yjs restore barrier blocks concurrent cold-load
+    const [r1, r2] = await Promise.all([
+      owner.agent
+        .post(
+          `/api/projects/${projectId}/branches/${featureBranchId}/snapshots/${secretSnapId}/restore`
+        )
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({ createSafetySnapshot: false }),
+      owner.agent
+        .post(
+          `/api/projects/${projectId}/branches/${featureBranchId}/snapshots/${secretSnapId}/restore`
+        )
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({ createSafetySnapshot: false }),
+    ]);
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+
+    // 5. VULN-04: Snapshot mutation sliding-window rate limiter blocks burst calls with 429
+    await redis.del(`codecollab:ratelimit:snapshot:write:${viewer.id}`);
+    for (let i = 0; i < 15; i += 1) {
+      const attempt = await viewer.agent
+        .post(`/api/projects/${projectId}/branches/${featureBranchId}/snapshots`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({ title: `Burst ${i}` });
+      expect(attempt.status).toBe(403);
+    }
+    const throttledSnap = await viewer.agent
+      .post(`/api/projects/${projectId}/branches/${featureBranchId}/snapshots`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ title: 'Burst throttled' });
+    expect(throttledSnap.status).toBe(429);
+    expect(throttledSnap.body.error?.code).toBe('RATE_LIMIT_EXCEEDED');
+    await redis.del(`codecollab:ratelimit:snapshot:write:${viewer.id}`);
+  });
 });

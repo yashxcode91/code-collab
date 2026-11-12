@@ -199,15 +199,17 @@ describe('useBranchSnapshots', () => {
     expect(result.current.lastRestoreNotice).toContain('@yash');
   });
 
-  it('supports createSnapshot, cursor loadMoreSnapshots, and deleteSnapshot', async () => {
+  it('supports createSnapshot, cursor loadMoreSnapshots, deleteSnapshot, and accurate totalCount', async () => {
     fetchBranchSnapshotsMock
       .mockResolvedValueOnce({
         snapshots: [makeSnap('s-2', 'Newer')],
         nextCursor: 's-2',
+        totalCount: 42,
       })
       .mockResolvedValueOnce({
         snapshots: [makeSnap('s-1', 'Older')],
         nextCursor: null,
+        totalCount: 42,
       });
 
     const createdSnap = makeSnap('s-3', 'Created now');
@@ -230,6 +232,7 @@ describe('useBranchSnapshots', () => {
 
     await waitFor(() => {
       expect(result.current.snapshots.map((s) => s.id)).toEqual(['s-2']);
+      expect(result.current.totalCount).toBe(42);
     });
 
     await act(async () => {
@@ -237,6 +240,7 @@ describe('useBranchSnapshots', () => {
     });
     expect(result.current.snapshots.map((s) => s.id)).toEqual(['s-2', 's-1']);
     expect(result.current.nextCursor).toBeNull();
+    expect(result.current.totalCount).toBe(42);
 
     await act(async () => {
       const res = await result.current.createSnapshot({ title: 'Created now' });
@@ -247,6 +251,7 @@ describe('useBranchSnapshots', () => {
       's-2',
       's-1',
     ]);
+    expect(result.current.totalCount).toBe(43);
 
     await act(async () => {
       const ok = await result.current.deleteSnapshot('s-3');
@@ -254,6 +259,7 @@ describe('useBranchSnapshots', () => {
     });
     await waitFor(() => {
       expect(result.current.snapshots.map((s) => s.id)).toEqual(['s-2', 's-1']);
+      expect(result.current.totalCount).toBe(42);
     });
   });
 });
