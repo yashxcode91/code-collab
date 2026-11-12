@@ -313,6 +313,7 @@ model BranchSnapshotFile {
   nodeType       FileNodeType @default(FILE)
   content        String       @default("") @db.Text
   sizeBytes      Int          @default(0)
+  deniedUserIds  String[]     @default([])
 
   snapshot BranchSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
 

@@ -8,6 +8,10 @@ export const SNAPSHOT_LIMITS = {
   MAX_SNAPSHOT_TOTAL_BYTES: 10 * 1024 * 1024, // 10 MB aggregate branch text per snapshot
   DEFAULT_PAGE_SIZE: 30,
   MAX_PAGE_SIZE: 100,
+  RATE_LIMIT_WINDOW_SEC: 60,
+  RATE_LIMIT_MAX_MUTATIONS: 15,
+  RATE_LIMIT_MAX_DIFFS: 30,
+  RATE_LIMIT_MAX_READS: 60,
 } as const;
 
 export interface SnapshotAuthorDto {
