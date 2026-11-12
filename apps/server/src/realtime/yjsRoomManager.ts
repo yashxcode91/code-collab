@@ -45,18 +45,25 @@ export interface ActiveYjsRoom {
 export class YjsRoomManager {
   private readonly rooms = new Map<string, ActiveYjsRoom>();
   private readonly loadingRooms = new Map<string, Promise<ActiveYjsRoom>>();
+  private readonly branchRestoreBarriers = new Map<string, Promise<void>>();
+  private readonly branchRestoreResolvers = new Map<string, () => void>();
+  private readonly restoringBranches = new Set<string>();
   private readonly debounceMs: number;
 
   constructor(debounceMs = DEFAULT_FLUSH_DEBOUNCE_MS) {
     this.debounceMs = debounceMs;
   }
 
-  /** Gets an already-loaded room or cold-loads it safely without duplicate race loads. */
+  /** Gets an already-loaded room or cold-loads it safely without duplicate or restore-window races. */
   async getOrLoadRoom(params: {
     projectId: string;
     branchId: string;
     fileId: string;
   }): Promise<ActiveYjsRoom> {
+    while (this.branchRestoreBarriers.has(params.branchId)) {
+      await this.branchRestoreBarriers.get(params.branchId);
+    }
+
     const roomKey = buildFileRoomKey(params.branchId, params.fileId);
     const existing = this.rooms.get(roomKey);
     if (existing) {
@@ -93,6 +100,9 @@ export class YjsRoomManager {
 
     if (!file || file.branchId !== params.branchId || file.nodeType !== 'FILE') {
       throw new Error('FILE_NOT_FOUND');
+    }
+    if (this.restoringBranches.has(params.branchId)) {
+      throw new Error('BRANCH_RESTORE_IN_PROGRESS');
     }
 
     const doc = new Y.Doc();
@@ -488,7 +498,7 @@ export class YjsRoomManager {
     if (!room) return;
 
     room.persistChain = room.persistChain.then(async () => {
-      if (!room.dirty) return;
+      if (!room.dirty || this.restoringBranches.has(room.branchId)) return;
 
       const yjsState = Buffer.from(Y.encodeStateAsUpdate(room.doc));
       const content = room.doc.getText(YJS_TEXT_KEY).toString();
@@ -591,6 +601,62 @@ export class YjsRoomManager {
       room.doc.destroy();
       this.rooms.delete(key);
     }
+  }
+
+  /**
+   * Acquires an exclusive per-branch restore barrier, waits for any in-flight
+   * room cold loads to settle, and flushes dirty Yjs rooms before a restore
+   * transaction begins. Must be paired with `endBranchRestore(branchId)` in `finally`.
+   */
+  async beginBranchRestore(branchId: string): Promise<void> {
+    while (this.branchRestoreBarriers.has(branchId)) {
+      await this.branchRestoreBarriers.get(branchId);
+    }
+
+    let resolveBarrier!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      resolveBarrier = resolve;
+    });
+    this.branchRestoreBarriers.set(branchId, barrier);
+    this.branchRestoreResolvers.set(branchId, resolveBarrier);
+
+    try {
+      const prefix = `branch:${branchId}:file:`;
+      const inFlightLoads: Promise<ActiveYjsRoom>[] = [];
+      for (const [key, loadPromise] of this.loadingRooms.entries()) {
+        if (key.startsWith(prefix)) {
+          inFlightLoads.push(loadPromise);
+        }
+      }
+      if (inFlightLoads.length > 0) {
+        await Promise.allSettled(inFlightLoads);
+      }
+
+      await this.flushBranchRooms(branchId);
+      this.restoringBranches.add(branchId);
+    } catch (err) {
+      this.endBranchRestore(branchId);
+      throw err;
+    }
+  }
+
+  /** Releases an active per-branch restore barrier so queued room loads can proceed. */
+  endBranchRestore(branchId: string): void {
+    this.restoringBranches.delete(branchId);
+    const resolve = this.branchRestoreResolvers.get(branchId);
+    this.branchRestoreResolvers.delete(branchId);
+    this.branchRestoreBarriers.delete(branchId);
+    resolve?.();
+  }
+
+  /** Returns a read-only map of `fileId -> current in-memory Yjs text` for active rooms on a branch. */
+  getBranchLiveTextMap(branchId: string): Map<string, string> {
+    const liveTexts = new Map<string, string>();
+    for (const room of this.rooms.values()) {
+      if (room.branchId !== branchId) continue;
+      liveTexts.set(room.fileId, room.doc.getText(YJS_TEXT_KEY).toString());
+    }
+    return liveTexts;
   }
 
   /** Flushes all dirty rooms belonging to a specific branch before diff/merge inspection. */
