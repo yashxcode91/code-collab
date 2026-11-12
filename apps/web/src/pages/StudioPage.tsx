@@ -7,10 +7,12 @@ import {
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type {
+  BranchMergeResultResponse,
   ProjectFileDetailDto,
   ProjectFileNodeDto,
 } from '@codecollab/shared';
 import { BrandLogo } from '@/components/BrandLogo';
+import { BranchMergeModal } from '@/components/studio-ide/BranchMergeModal';
 import { FileExplorerPane } from '@/components/studio-ide/FileExplorerPane';
 import { disposeStudioModels } from '@/components/studio-ide/monacoWorkerSetup';
 import { StudioEditorPane } from '@/components/studio-ide/StudioEditorPane';
@@ -53,6 +55,11 @@ export function StudioPage() {
   const { user } = useAuth();
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [mergeModalState, setMergeModalState] = useState<{
+    open: boolean;
+    sourceBranchId?: string | null;
+    targetBranchId?: string | null;
+  }>({ open: false });
   const [scrollToLineRequest, setScrollToLineRequest] = useState<{
     line: number;
     seq: number;
@@ -92,6 +99,9 @@ export function StudioPage() {
   const toggleExplorer = useStudioStore((s) => s.toggleExplorer);
   const toggleWindowExpanded = useStudioStore((s) => s.toggleWindowExpanded);
   const toggleFocusMode = useStudioStore((s) => s.toggleFocusMode);
+  const resetMergedBranchBuffers = useStudioStore(
+    (s) => s.resetMergedBranchBuffers,
+  );
   const resetStudio = useStudioStore((s) => s.resetStudio);
 
   // Reset ephemeral IDE store and dispose stale Monaco models when switching/leaving Studio
@@ -531,6 +541,52 @@ export function StudioPage() {
     [activeBranch?.id, selectBranch],
   );
 
+  // Refresh merged target branch tree, open Monaco models, and caches after branch merge
+  const handleBranchMerged = useCallback(
+    async (result: BranchMergeResultResponse) => {
+      const mergedActiveTargetBranch =
+        activeBranch?.id === result.targetBranch.id;
+
+      if (!mergedActiveTargetBranch || !collab.roomReady) {
+        disposeStudioModels(`inmemory://studio/${result.targetBranch.id}/`);
+        resetMergedBranchBuffers();
+      } else {
+        resetMergedBranchBuffers(activeFileId);
+      }
+
+      if (
+        result.deletedSourceBranch &&
+        activeBranch?.id === result.sourceBranch.id
+      ) {
+        handleSelectBranch(result.targetBranch.id);
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.detail(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.all,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.files(
+            projectId,
+            result.targetBranch.id,
+          ),
+        }),
+      ]);
+    },
+    [
+      activeBranch?.id,
+      activeFileId,
+      collab.roomReady,
+      handleSelectBranch,
+      projectId,
+      queryClient,
+      resetMergedBranchBuffers,
+    ],
+  );
+
   // Rename / Delete model & tab cleanup handlers
   const handleNodeRenamed = useCallback(
     (updated: ProjectFileDetailDto) => {
@@ -726,6 +782,13 @@ export function StudioPage() {
         onToggleExplorer={toggleExplorer}
         onToggleWindowExpanded={toggleWindowExpanded}
         onSelectBranch={handleSelectBranch}
+        onOpenMergeModal={(preset) =>
+          setMergeModalState({
+            open: true,
+            sourceBranchId: preset?.sourceBranchId ?? null,
+            targetBranchId: preset?.targetBranchId ?? null,
+          })
+        }
         onSaveActiveFile={() => void handleSaveFile()}
         onToggleLockActiveFile={handleToggleLockActiveFile}
         onSetRightPanelTab={setRightPanelTab}
@@ -835,6 +898,18 @@ export function StudioPage() {
           />
         </main>
       </div>
+
+      <BranchMergeModal
+        open={mergeModalState.open}
+        project={project}
+        branches={branches}
+        activeBranchId={activeBranch?.id ?? null}
+        presetSourceBranchId={mergeModalState.sourceBranchId}
+        presetTargetBranchId={mergeModalState.targetBranchId}
+        dirtyCount={dirtyCount}
+        onClose={() => setMergeModalState({ open: false })}
+        onMerged={handleBranchMerged}
+      />
     </div>
   );
 }

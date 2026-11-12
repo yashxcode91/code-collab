@@ -532,6 +532,34 @@ export class YjsRoomManager {
     this.rooms.delete(roomKey);
   }
 
+  /** Flushes all dirty rooms belonging to a specific branch before diff/merge inspection. */
+  async flushBranchRooms(branchId: string): Promise<void> {
+    const branchKeys: string[] = [];
+    for (const [key, room] of this.rooms.entries()) {
+      if (room.branchId === branchId) {
+        if (room.flushTimer) {
+          clearTimeout(room.flushTimer);
+          room.flushTimer = null;
+        }
+        branchKeys.push(key);
+      }
+    }
+    await Promise.all(branchKeys.map((key) => this.flushRoom(key)));
+  }
+
+  /** Drops all in-memory rooms belonging to a deleted branch. */
+  destroyBranchRooms(branchId: string): void {
+    for (const [key, room] of Array.from(this.rooms.entries())) {
+      if (room.branchId !== branchId) continue;
+      if (room.flushTimer) {
+        clearTimeout(room.flushTimer);
+        room.flushTimer = null;
+      }
+      room.doc.destroy();
+      this.rooms.delete(key);
+    }
+  }
+
   /** Flushes all dirty rooms cleanly (called during server shutdown and test teardown). */
   async flushAllRooms(): Promise<void> {
     const keys = Array.from(this.rooms.keys());

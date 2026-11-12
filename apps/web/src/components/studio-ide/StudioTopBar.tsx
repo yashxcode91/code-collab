@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   GitBranch,
+  GitMerge,
   Loader2,
   Lock,
   LockOpen,
@@ -70,6 +71,10 @@ interface StudioTopBarProps {
   onToggleExplorer: () => void;
   onToggleWindowExpanded: () => void;
   onSelectBranch: (branchId: string) => void;
+  onOpenMergeModal: (preset?: {
+    sourceBranchId?: string;
+    targetBranchId?: string;
+  }) => void;
   onSaveActiveFile: () => void;
   onToggleLockActiveFile: () => void;
   onSetRightPanelTab: (tab: InspectorTab) => void;
@@ -102,6 +107,7 @@ export function StudioTopBar({
   onToggleExplorer,
   onToggleWindowExpanded,
   onSelectBranch,
+  onOpenMergeModal,
   onSaveActiveFile,
   onToggleLockActiveFile,
   onSetRightPanelTab,
@@ -532,75 +538,98 @@ export function StudioTopBar({
                               )}
                             </button>
 
-                            {isOwner && (
-                              <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex shrink-0 items-center gap-1">
+                              {canCreateBranch && !isCurrent && (
                                 <button
                                   type="button"
-                                  disabled={protectBranchMutation.isPending}
-                                  onClick={() =>
-                                    protectBranchMutation.mutate({
-                                      branchId: branch.id,
-                                      isProtected: !branch.isProtected,
-                                    })
-                                  }
-                                  title={
-                                    branch.isProtected
-                                      ? 'Unprotect branch (allow editors)'
-                                      : 'Protect branch (owner-only writes)'
-                                  }
-                                  className={cn(
-                                    'rounded-lg p-1 transition-colors',
-                                    branch.isProtected
-                                      ? 'text-primary hover:bg-primary/15'
-                                      : 'text-muted-foreground hover:text-foreground',
-                                  )}
+                                  onClick={() => {
+                                    setBranchMenuOpen(false);
+                                    onOpenMergeModal({
+                                      sourceBranchId: branch.id,
+                                      targetBranchId: activeBranch?.id,
+                                    });
+                                  }}
+                                  title={`Merge ${branch.name} into ${activeBranch?.name ?? 'current branch'}`}
+                                  aria-label={`Merge ${branch.name} into ${activeBranch?.name ?? 'current branch'}`}
+                                  className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-primary/15 hover:text-primary"
                                 >
-                                  <ShieldCheck
+                                  <GitMerge
                                     className="h-3.5 w-3.5"
                                     aria-hidden="true"
                                   />
                                 </button>
+                              )}
 
-                                {!branch.isDefault &&
-                                  (isConfirmDelete ? (
-                                    <div className="flex items-center gap-1">
+                              {isOwner && (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={protectBranchMutation.isPending}
+                                    onClick={() =>
+                                      protectBranchMutation.mutate({
+                                        branchId: branch.id,
+                                        isProtected: !branch.isProtected,
+                                      })
+                                    }
+                                    title={
+                                      branch.isProtected
+                                        ? 'Unprotect branch (allow editors)'
+                                        : 'Protect branch (owner-only writes)'
+                                    }
+                                    className={cn(
+                                      'rounded-lg p-1 transition-colors',
+                                      branch.isProtected
+                                        ? 'text-primary hover:bg-primary/15'
+                                        : 'text-muted-foreground hover:text-foreground',
+                                    )}
+                                  >
+                                    <ShieldCheck
+                                      className="h-3.5 w-3.5"
+                                      aria-hidden="true"
+                                    />
+                                  </button>
+
+                                  {!branch.isDefault &&
+                                    (isConfirmDelete ? (
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          disabled={deleteBranchMutation.isPending}
+                                          onClick={() =>
+                                            deleteBranchMutation.mutate(branch.id)
+                                          }
+                                          className="rounded bg-destructive px-1.5 py-0.5 text-[9px] font-semibold text-destructive-foreground"
+                                        >
+                                          Del
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setConfirmDeleteBranchId(null)
+                                          }
+                                          className="rounded px-1 py-0.5 text-[9px] text-muted-foreground hover:text-foreground"
+                                        >
+                                          No
+                                        </button>
+                                      </div>
+                                    ) : (
                                       <button
                                         type="button"
-                                        disabled={deleteBranchMutation.isPending}
                                         onClick={() =>
-                                          deleteBranchMutation.mutate(branch.id)
+                                          setConfirmDeleteBranchId(branch.id)
                                         }
-                                        className="rounded bg-destructive px-1.5 py-0.5 text-[9px] font-semibold text-destructive-foreground"
+                                        title={`Delete branch ${branch.name}`}
+                                        className="rounded-lg p-1 text-muted-foreground hover:text-destructive"
                                       >
-                                        Del
+                                        <Trash2
+                                          className="h-3.5 w-3.5"
+                                          aria-hidden="true"
+                                        />
                                       </button>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setConfirmDeleteBranchId(null)
-                                        }
-                                        className="rounded px-1 py-0.5 text-[9px] text-muted-foreground hover:text-foreground"
-                                      >
-                                        No
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setConfirmDeleteBranchId(branch.id)
-                                      }
-                                      title={`Delete branch ${branch.name}`}
-                                      className="rounded-lg p-1 text-muted-foreground hover:text-destructive"
-                                    >
-                                      <Trash2
-                                        className="h-3.5 w-3.5"
-                                        aria-hidden="true"
-                                      />
-                                    </button>
-                                  ))}
-                              </div>
-                            )}
+                                    ))}
+                                </>
+                              )}
+                            </div>
                           </li>
                         );
                       })}
@@ -644,6 +673,18 @@ export function StudioTopBar({
                 </div>
               )}
             </div>
+
+            {branches.length > 1 && canCreateBranch && (
+              <button
+                type="button"
+                onClick={() => onOpenMergeModal()}
+                title="Merge changes between branches"
+                className="inline-flex h-8 items-center gap-1 rounded-lg px-2 font-mono text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-primary"
+              >
+                <GitMerge className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="hidden lg:inline">Merge</span>
+              </button>
+            )}
           </div>
 
           {/* Group 2 (Center): Active File Lock & Save Actions */}

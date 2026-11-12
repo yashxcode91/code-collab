@@ -2,9 +2,12 @@ import { RequestHandler } from 'express';
 import {
   AddProjectMemberInput,
   ApiResponse,
+  BranchMergePreviewResponse,
+  BranchMergeResultResponse,
   CreateBranchInput,
   CreateFileNodeInput,
   CreateProjectInput,
+  MergeBranchInput,
   Project,
   ProjectBranchDto,
   ProjectDetailResponse,
@@ -190,6 +193,48 @@ export const deleteBranchController: RequestHandler = async (req, res) => {
   const response: ApiResponse<{ message: string }> = {
     success: true,
     data: { message: 'Branch deleted' },
+  };
+  res.status(200).json(response);
+};
+
+export const previewBranchMergeController: RequestHandler = async (
+  req,
+  res
+) => {
+  const userId = requireUserId(req.user);
+  const projectId = assertValidUuid(req.params.projectId, 'project');
+  const targetBranchId = assertValidUuid(req.params.branchId, 'branch');
+  const sourceBranchId = assertValidUuid(
+    req.query.sourceBranchId,
+    'source branch'
+  );
+  const preview = await projectService.previewBranchMerge(
+    projectId,
+    targetBranchId,
+    sourceBranchId,
+    userId
+  );
+  const response: ApiResponse<BranchMergePreviewResponse> = {
+    success: true,
+    data: preview,
+  };
+  res.status(200).json(response);
+};
+
+export const mergeBranchController: RequestHandler = async (req, res) => {
+  const userId = requireUserId(req.user);
+  const projectId = assertValidUuid(req.params.projectId, 'project');
+  const targetBranchId = assertValidUuid(req.params.branchId, 'branch');
+  const input = req.body as MergeBranchInput;
+  const result = await projectService.mergeBranch(
+    projectId,
+    targetBranchId,
+    userId,
+    input
+  );
+  const response: ApiResponse<BranchMergeResultResponse> = {
+    success: true,
+    data: result,
   };
   res.status(200).json(response);
 };

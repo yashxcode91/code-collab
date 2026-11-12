@@ -1,9 +1,12 @@
 import type {
   AddProjectMemberInput,
+  BranchMergePreviewResponse,
+  BranchMergeResultResponse,
   CreateBranchInput,
   CreateFileNodeInput,
   CreateProjectInput,
   HealthCheckResponse,
+  MergeBranchInput,
   Project,
   ProjectBranchDto,
   ProjectDetailResponse,
@@ -31,6 +34,19 @@ export const queryKeys = {
     detail: (projectId: string) => ['projects', projectId] as const,
     files: (projectId: string, branchId: string) =>
       ['projects', projectId, 'branches', branchId, 'files'] as const,
+    mergePreview: (
+      projectId: string,
+      targetBranchId: string,
+      sourceBranchId: string,
+    ) =>
+      [
+        'projects',
+        projectId,
+        'branches',
+        targetBranchId,
+        'merge-preview',
+        sourceBranchId,
+      ] as const,
     fileDetail: (projectId: string, branchId: string, fileId: string) =>
       ['projects', projectId, 'branches', branchId, 'files', fileId] as const,
     fileAccess: (projectId: string, branchId: string, fileId: string) =>
@@ -207,6 +223,32 @@ export async function deleteBranch(
   return apiRequest<{ message: string }>(
     `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}`,
     { method: 'DELETE' },
+  );
+}
+
+/** Computes a dry-run diff preview for merging `sourceBranchId` into `targetBranchId`. */
+export async function fetchBranchMergePreview(
+  projectId: string,
+  targetBranchId: string,
+  sourceBranchId: string,
+): Promise<BranchMergePreviewResponse> {
+  return apiRequest<BranchMergePreviewResponse>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(targetBranchId)}/merge/preview?sourceBranchId=${encodeURIComponent(sourceBranchId)}`,
+  );
+}
+
+/** Atomically merges `input.sourceBranchId` into `targetBranchId`. */
+export async function mergeBranches(
+  projectId: string,
+  targetBranchId: string,
+  input: MergeBranchInput,
+): Promise<BranchMergeResultResponse> {
+  return apiRequest<BranchMergeResultResponse>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(targetBranchId)}/merge`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
   );
 }
 

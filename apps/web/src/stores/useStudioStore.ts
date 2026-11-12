@@ -65,6 +65,7 @@ interface StudioState {
   toggleExplorer: () => void;
   toggleWindowExpanded: () => void;
   toggleFocusMode: () => void;
+  resetMergedBranchBuffers: (preserveFileId?: string | null) => void;
   resetStudio: () => void;
 }
 
@@ -356,6 +357,22 @@ export const useStudioStore = create<StudioState>((set) => ({
 
   toggleFocusMode: () =>
     set((state) => ({ focusModeEnabled: !state.focusModeEnabled })),
+
+  resetMergedBranchBuffers: (preserveFileId) =>
+    set((state) => {
+      if (!preserveFileId) {
+        return { buffers: {}, conflicts: {} };
+      }
+      const nextBuffers: Record<string, FileDraftBuffer> = {};
+      if (state.buffers[preserveFileId]) {
+        nextBuffers[preserveFileId] = state.buffers[preserveFileId];
+      }
+      const nextConflicts: Record<string, FileVersionConflict> = {};
+      if (state.conflicts[preserveFileId]) {
+        nextConflicts[preserveFileId] = state.conflicts[preserveFileId];
+      }
+      return { buffers: nextBuffers, conflicts: nextConflicts };
+    }),
 
   resetStudio: () => set({ ...INITIAL_STATE }),
 }));

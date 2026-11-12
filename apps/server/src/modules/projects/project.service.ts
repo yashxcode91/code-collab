@@ -2,10 +2,14 @@ import crypto from 'node:crypto';
 import { prisma } from '@codecollab/database';
 import {
   AddProjectMemberInput,
+  BranchMergeFileChangeDto,
+  BranchMergePreviewResponse,
+  BranchMergeResultResponse,
   CreateBranchInput,
   CreateFileNodeInput,
   CreateProjectInput,
   FileAccessPermission,
+  MergeBranchInput,
   Project,
   ProjectBranchDto,
   ProjectDetailResponse,
@@ -39,6 +43,7 @@ import {
 } from './project.auth';
 import { buildStarterWorkspaceNodes } from './project.templates';
 import { yjsRoomManager } from '../../realtime/yjsRoomManager';
+import { broadcastRestFileSync } from '../../realtime/socketServer';
 
 // =====================================================================
 // DTO Mappers (DB Rows -> Safe @codecollab/shared Wire Payloads)
@@ -801,6 +806,645 @@ export const deleteBranch = async (
   }
 
   await prisma.projectBranch.delete({ where: { id: branch.id } });
+  yjsRoomManager.destroyBranchRooms(branch.id);
+};
+
+interface MergeTreeNodeRow {
+  id: string;
+  parentId: string | null;
+  name: string;
+  nodeType: 'FILE' | 'FOLDER';
+  content: string;
+  version: number;
+  lockedById: string | null;
+  lockedBy: { id: string; username: string } | null;
+  accessRules: Array<{
+    userId: string;
+    permission: 'EDIT' | 'READ_ONLY' | 'DENIED';
+  }>;
+}
+
+interface IndexedMergeNode {
+  row: MergeTreeNodeRow;
+  path: string;
+  depth: number;
+  overrideForCaller: FileAccessPermission | null;
+}
+
+/**
+ * Indexes all nodes in a branch by canonical relative path (`src/utils/math.ts`),
+ * sorted parent-first by depth, and computes each node's inherited caller ACL.
+ */
+const buildBranchPathIndex = (
+  rows: MergeTreeNodeRow[],
+  callerId: string
+): {
+  entries: IndexedMergeNode[];
+  byPath: Map<string, IndexedMergeNode>;
+} => {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const entries: IndexedMergeNode[] = [];
+  const byPath = new Map<string, IndexedMergeNode>();
+
+  for (const row of rows) {
+    const segments: string[] = [];
+    let cursor: string | null = row.id;
+    let steps = 0;
+
+    while (cursor && steps < 100) {
+      steps += 1;
+      const node = byId.get(cursor);
+      if (!node) break;
+      segments.unshift(node.name);
+      cursor = node.parentId;
+    }
+
+    let aclCursor: string | null = row.id;
+    let inheritedReadOnly = false;
+    let overrideForCaller: FileAccessPermission | null = null;
+    let aclSteps = 0;
+
+    while (aclCursor && aclSteps < 100) {
+      aclSteps += 1;
+      const node = byId.get(aclCursor);
+      if (!node) break;
+      const rule = node.accessRules.find((r) => r.userId === callerId);
+      if (rule) {
+        const perm = toDtoAccessPermission(rule.permission);
+        if (perm === 'denied') {
+          overrideForCaller = 'denied';
+          break;
+        }
+        if (perm === 'read_only') {
+          inheritedReadOnly = true;
+        }
+      }
+      aclCursor = node.parentId;
+    }
+
+    if (overrideForCaller === null && inheritedReadOnly) {
+      overrideForCaller = 'read_only';
+    }
+
+    const path = segments.join('/');
+    const indexed: IndexedMergeNode = {
+      row,
+      path,
+      depth: segments.length,
+      overrideForCaller,
+    };
+    entries.push(indexed);
+    byPath.set(path, indexed);
+  }
+
+  entries.sort((a, b) => a.depth - b.depth || a.path.localeCompare(b.path));
+  return { entries, byPath };
+};
+
+const resolveAncestorBlockedReason = (params: {
+  path: string;
+  targetByPath: Map<string, IndexedMergeNode>;
+  role: ProjectRole;
+  callerId: string;
+}): string | null => {
+  const { path, targetByPath, role, callerId } = params;
+  const parts = path.split('/');
+  let deepestExistingFolder: IndexedMergeNode | null = null;
+
+  for (let i = 1; i < parts.length; i += 1) {
+    const ancestorPath = parts.slice(0, i).join('/');
+    const existing = targetByPath.get(ancestorPath);
+    if (!existing) {
+      break;
+    }
+    if (existing.row.nodeType !== 'FOLDER') {
+      return `Target path "${ancestorPath}" is a file, not a folder`;
+    }
+    deepestExistingFolder = existing;
+  }
+
+  if (!deepestExistingFolder) {
+    return null;
+  }
+
+  if (role !== 'owner' && deepestExistingFolder.overrideForCaller === 'denied') {
+    return `Access denied on target folder "${deepestExistingFolder.path}"`;
+  }
+  if (
+    role !== 'owner' &&
+    deepestExistingFolder.overrideForCaller === 'read_only'
+  ) {
+    return `Target folder "${deepestExistingFolder.path}" is read-only for your account`;
+  }
+  if (
+    deepestExistingFolder.row.lockedById &&
+    deepestExistingFolder.row.lockedById !== callerId
+  ) {
+    return `Target folder "${deepestExistingFolder.path}" is locked by @${deepestExistingFolder.row.lockedBy?.username ?? 'collaborator'}`;
+  }
+
+  return null;
+};
+
+/**
+ * Computes a dry-run path-based diff between `sourceBranchId` and `targetBranchId`,
+ * flushing live Yjs rooms first and checking branch protection, locks, and ACLs.
+ */
+export const previewBranchMerge = async (
+  projectId: string,
+  targetBranchId: string,
+  sourceBranchId: string,
+  callerId: string
+): Promise<BranchMergePreviewResponse> => {
+  const { role } = await assertProjectAccess(projectId, callerId, 'editor');
+  const resolvedRole: ProjectRole = role ?? 'editor';
+  const targetBranch = await assertBranchInProject(projectId, targetBranchId);
+  const sourceBranch = await assertBranchInProject(projectId, sourceBranchId);
+
+  if (sourceBranch.id === targetBranch.id) {
+    throw new AppError(
+      400,
+      'SAME_BRANCH_MERGE',
+      'Source and target branches must be different'
+    );
+  }
+
+  // Persist any active in-memory CRDT edits before inspecting database file contents
+  await Promise.all([
+    yjsRoomManager.flushBranchRooms(sourceBranch.id),
+    yjsRoomManager.flushBranchRooms(targetBranch.id),
+  ]);
+
+  const [sourceRows, targetRows] = await Promise.all([
+    prisma.projectFile.findMany({
+      where: { branchId: sourceBranch.id },
+      select: {
+        id: true,
+        parentId: true,
+        name: true,
+        nodeType: true,
+        content: true,
+        version: true,
+        lockedById: true,
+        lockedBy: { select: { id: true, username: true } },
+        accessRules: { select: { userId: true, permission: true } },
+      },
+    }),
+    prisma.projectFile.findMany({
+      where: { branchId: targetBranch.id },
+      select: {
+        id: true,
+        parentId: true,
+        name: true,
+        nodeType: true,
+        content: true,
+        version: true,
+        lockedById: true,
+        lockedBy: { select: { id: true, username: true } },
+        accessRules: { select: { userId: true, permission: true } },
+      },
+    }),
+  ]);
+
+  const sourceIndex = buildBranchPathIndex(sourceRows, callerId);
+  const targetIndex = buildBranchPathIndex(targetRows, callerId);
+
+  const changes: BranchMergeFileChangeDto[] = [];
+  let added = 0;
+  let modified = 0;
+  let typeConflicts = 0;
+  let unchanged = 0;
+
+  for (const src of sourceIndex.entries) {
+    const tgt = targetIndex.byPath.get(src.path);
+
+    if (!tgt) {
+      const sourceDenied =
+        resolvedRole !== 'owner' && src.overrideForCaller === 'denied';
+      const ancestorBlock = resolveAncestorBlockedReason({
+        path: src.path,
+        targetByPath: targetIndex.byPath,
+        role: resolvedRole,
+        callerId,
+      });
+      const blockedReason = sourceDenied
+        ? 'Source file is restricted by per-file ACL'
+        : ancestorBlock;
+
+      added += 1;
+      changes.push({
+        path: src.path,
+        nodeType: toDtoNodeType(src.row.nodeType),
+        status: 'added',
+        sourceNodeId: src.row.id,
+        targetNodeId: null,
+        sourceContent:
+          sourceDenied || src.row.nodeType === 'FOLDER' ? null : src.row.content,
+        targetContent: null,
+        targetLockedByUsername: null,
+        blockedByLockOrAcl: Boolean(blockedReason),
+        blockedReason,
+      });
+      continue;
+    }
+
+    if (src.row.nodeType !== tgt.row.nodeType) {
+      typeConflicts += 1;
+      changes.push({
+        path: src.path,
+        nodeType: toDtoNodeType(src.row.nodeType),
+        status: 'type_conflict',
+        sourceNodeId: src.row.id,
+        targetNodeId: tgt.row.id,
+        sourceContent: null,
+        targetContent: null,
+        targetLockedByUsername: tgt.row.lockedBy?.username ?? null,
+        blockedByLockOrAcl: true,
+        blockedReason: `Path type conflict (${toDtoNodeType(src.row.nodeType)} in ${sourceBranch.name} vs ${toDtoNodeType(tgt.row.nodeType)} in ${targetBranch.name})`,
+      });
+      continue;
+    }
+
+    if (src.row.nodeType === 'FOLDER') {
+      unchanged += 1;
+      continue;
+    }
+
+    if (src.row.content === tgt.row.content) {
+      unchanged += 1;
+      continue;
+    }
+
+    const aclDenied =
+      resolvedRole !== 'owner' &&
+      (tgt.overrideForCaller === 'denied' || src.overrideForCaller === 'denied');
+    const aclReadOnly =
+      resolvedRole !== 'owner' && tgt.overrideForCaller === 'read_only';
+    const lockedByOther = Boolean(
+      tgt.row.lockedById && tgt.row.lockedById !== callerId
+    );
+
+    let blockedReason: string | null = null;
+    if (aclDenied) {
+      blockedReason = 'Access denied by per-file ACL';
+    } else if (aclReadOnly) {
+      blockedReason = 'Target file is read-only for your account';
+    } else if (lockedByOther) {
+      blockedReason = `Locked by @${tgt.row.lockedBy?.username ?? 'collaborator'}`;
+    }
+
+    modified += 1;
+    changes.push({
+      path: src.path,
+      nodeType: 'file',
+      status: 'modified',
+      sourceNodeId: src.row.id,
+      targetNodeId: tgt.row.id,
+      sourceContent: aclDenied ? null : src.row.content,
+      targetContent: aclDenied ? null : tgt.row.content,
+      targetLockedByUsername: tgt.row.lockedBy?.username ?? null,
+      blockedByLockOrAcl: Boolean(blockedReason),
+      blockedReason,
+    });
+  }
+
+  let branchBlockedReason: string | null = null;
+  if (targetBranch.isProtected && resolvedRole !== 'owner') {
+    branchBlockedReason =
+      'Target branch is protected; only workspace owners can merge into it';
+  } else if (typeConflicts > 0) {
+    branchBlockedReason =
+      'Resolve file/folder type conflicts before merging these branches';
+  } else {
+    const firstBlocked = changes.find((c) => c.blockedByLockOrAcl);
+    if (firstBlocked) {
+      branchBlockedReason = firstBlocked.blockedReason;
+    }
+  }
+
+  return {
+    sourceBranch: mapBranchDto(sourceBranch),
+    targetBranch: mapBranchDto(targetBranch),
+    canMerge: branchBlockedReason === null,
+    blockedReason: branchBlockedReason,
+    summary: {
+      added,
+      modified,
+      typeConflicts,
+      unchanged,
+      totalChanges: added + modified + typeConflicts,
+    },
+    changes,
+  };
+};
+
+/**
+ * Atomically merges `input.sourceBranchId` into `targetBranchId` inside a single
+ * PostgreSQL transaction, applying per-file conflict resolutions, cloning new
+ * folders/files top-down, syncing active Yjs CRDT rooms, and optionally deleting
+ * the merged source branch (owner-only, non-default).
+ */
+export const mergeBranch = async (
+  projectId: string,
+  targetBranchId: string,
+  callerId: string,
+  input: MergeBranchInput
+): Promise<BranchMergeResultResponse> => {
+  const { role } = await assertProjectAccess(projectId, callerId, 'editor');
+  const resolvedRole: ProjectRole = role ?? 'editor';
+  const targetBranch = await assertBranchInProject(projectId, targetBranchId);
+  const sourceBranch = await assertBranchInProject(
+    projectId,
+    input.sourceBranchId
+  );
+
+  if (sourceBranch.id === targetBranch.id) {
+    throw new AppError(
+      400,
+      'SAME_BRANCH_MERGE',
+      'Source and target branches must be different'
+    );
+  }
+
+  if (targetBranch.isProtected && resolvedRole !== 'owner') {
+    throw new AppError(
+      403,
+      'BRANCH_PROTECTED',
+      'Only workspace owners can merge into a protected branch'
+    );
+  }
+
+  if (input.deleteSourceBranch) {
+    if (resolvedRole !== 'owner') {
+      throw new AppError(
+        403,
+        'INSUFFICIENT_ROLE',
+        'Only workspace owners can delete a source branch after merging'
+      );
+    }
+    if (sourceBranch.isDefault) {
+      throw new AppError(
+        400,
+        'CANNOT_DELETE_DEFAULT_BRANCH',
+        'The default branch cannot be deleted'
+      );
+    }
+  }
+
+  // Flush dirty CRDT buffers on both branches so DB holds the latest collaborator edits
+  await Promise.all([
+    yjsRoomManager.flushBranchRooms(sourceBranch.id),
+    yjsRoomManager.flushBranchRooms(targetBranch.id),
+  ]);
+
+  const syncedFiles: Array<{ id: string; content: string; version: number }> =
+    [];
+  let addedNodes = 0;
+  let updatedFiles = 0;
+  let keptTargetFiles = 0;
+
+  await prisma.$transaction(async (tx) => {
+    const [sourceRows, targetRows] = await Promise.all([
+      tx.projectFile.findMany({
+        where: { branchId: sourceBranch.id },
+        select: {
+          id: true,
+          parentId: true,
+          name: true,
+          nodeType: true,
+          content: true,
+          version: true,
+          lockedById: true,
+          lockedBy: { select: { id: true, username: true } },
+          accessRules: { select: { userId: true, permission: true } },
+        },
+      }),
+      tx.projectFile.findMany({
+        where: { branchId: targetBranch.id },
+        select: {
+          id: true,
+          parentId: true,
+          name: true,
+          nodeType: true,
+          content: true,
+          version: true,
+          lockedById: true,
+          lockedBy: { select: { id: true, username: true } },
+          accessRules: { select: { userId: true, permission: true } },
+        },
+      }),
+    ]);
+
+    const sourceIndex = buildBranchPathIndex(sourceRows, callerId);
+    const targetIndex = buildBranchPathIndex(targetRows, callerId);
+
+    const createdIdByPath = new Map<string, string>();
+    const accessClones: Array<{
+      fileId: string;
+      userId: string;
+      permission: 'EDIT' | 'READ_ONLY' | 'DENIED';
+    }> = [];
+
+    for (const src of sourceIndex.entries) {
+      const tgt = targetIndex.byPath.get(src.path);
+
+      if (tgt) {
+        if (src.row.nodeType !== tgt.row.nodeType) {
+          throw new AppError(
+            409,
+            'MERGE_TYPE_CONFLICT',
+            `Cannot merge "${src.path}" because one branch has a file and the other has a folder`
+          );
+        }
+
+        if (src.row.nodeType === 'FOLDER' || src.row.content === tgt.row.content) {
+          continue;
+        }
+
+        const resolution = input.resolutions?.[src.path] ?? 'take_source';
+        if (resolution === 'keep_target') {
+          keptTargetFiles += 1;
+          continue;
+        }
+
+        if (resolvedRole !== 'owner' && src.overrideForCaller === 'denied') {
+          throw new AppError(
+            403,
+            'FILE_ACCESS_DENIED',
+            `You do not have access to read "${src.path}" on source branch`
+          );
+        }
+
+        assertCanWriteFileNode({
+          role: resolvedRole,
+          userId: callerId,
+          branchIsProtected: targetBranch.isProtected,
+          fileLockedById: tgt.row.lockedById,
+          lockedByUsername: tgt.row.lockedBy?.username,
+          override: tgt.overrideForCaller,
+        });
+
+        let nextContent = src.row.content;
+        if (resolution === 'custom') {
+          const custom = input.customContents?.[src.path];
+          if (typeof custom !== 'string') {
+            throw new AppError(
+              400,
+              'MISSING_CUSTOM_CONTENT',
+              `Custom merged content is required for "${src.path}"`
+            );
+          }
+          nextContent = custom;
+        }
+
+        const updated = await tx.projectFile.update({
+          where: { id: tgt.row.id },
+          data: {
+            content: nextContent,
+            yjsState: null,
+            version: { increment: 1 },
+          },
+        });
+
+        updatedFiles += 1;
+        syncedFiles.push({
+          id: updated.id,
+          content: updated.content,
+          version: updated.version,
+        });
+        continue;
+      }
+
+      // Missing in target branch -> insert new file or folder top-down
+      if (resolvedRole !== 'owner' && src.overrideForCaller === 'denied') {
+        throw new AppError(
+          403,
+          'FILE_ACCESS_DENIED',
+          `You do not have access to merge restricted node "${src.path}"`
+        );
+      }
+
+      const resolution = input.resolutions?.[src.path] ?? 'take_source';
+      if (src.row.nodeType === 'FILE' && resolution === 'keep_target') {
+        keptTargetFiles += 1;
+        continue;
+      }
+
+      const slashIdx = src.path.lastIndexOf('/');
+      const parentPath = slashIdx === -1 ? null : src.path.slice(0, slashIdx);
+      let mappedParentId: string | null = null;
+
+      if (parentPath !== null) {
+        const createdParentId = createdIdByPath.get(parentPath);
+        if (createdParentId) {
+          mappedParentId = createdParentId;
+        } else {
+          const existingParent = targetIndex.byPath.get(parentPath);
+          if (!existingParent) {
+            throw new AppError(
+              409,
+              'MERGE_PARENT_MISSING',
+              `Target parent folder "${parentPath}" could not be resolved`
+            );
+          }
+          if (existingParent.row.nodeType !== 'FOLDER') {
+            throw new AppError(
+              409,
+              'MERGE_TYPE_CONFLICT',
+              `Target path "${parentPath}" is a file, not a folder`
+            );
+          }
+          assertCanWriteFileNode({
+            role: resolvedRole,
+            userId: callerId,
+            branchIsProtected: targetBranch.isProtected,
+            fileLockedById: existingParent.row.lockedById,
+            lockedByUsername: existingParent.row.lockedBy?.username,
+            override: existingParent.overrideForCaller,
+          });
+          mappedParentId = existingParent.row.id;
+        }
+      }
+
+      let nextContent = src.row.nodeType === 'FOLDER' ? '' : src.row.content;
+      if (src.row.nodeType === 'FILE' && resolution === 'custom') {
+        const custom = input.customContents?.[src.path];
+        if (typeof custom !== 'string') {
+          throw new AppError(
+            400,
+            'MISSING_CUSTOM_CONTENT',
+            `Custom merged content is required for "${src.path}"`
+          );
+        }
+        nextContent = custom;
+      }
+
+      const newId = crypto.randomUUID();
+      await tx.projectFile.create({
+        data: {
+          id: newId,
+          branchId: targetBranch.id,
+          parentId: mappedParentId,
+          parentKey: mappedParentId ?? 'ROOT',
+          name: src.row.name,
+          nodeType: src.row.nodeType,
+          content: nextContent,
+          version: 1,
+          yjsState: null,
+        },
+      });
+
+      createdIdByPath.set(src.path, newId);
+      for (const rule of src.row.accessRules) {
+        accessClones.push({
+          fileId: newId,
+          userId: rule.userId,
+          permission: rule.permission,
+        });
+      }
+
+      addedNodes += 1;
+    }
+
+    if (accessClones.length > 0) {
+      await tx.projectFileAccess.createMany({ data: accessClones });
+    }
+
+    if (input.deleteSourceBranch) {
+      await tx.projectBranch.delete({ where: { id: sourceBranch.id } });
+    }
+  });
+
+  // Synchronize any live in-memory Yjs rooms & connected sockets on target branch
+  for (const file of syncedFiles) {
+    const delta = yjsRoomManager.syncFileContentFromRest(
+      targetBranch.id,
+      file.id,
+      file.content,
+      file.version
+    );
+    broadcastRestFileSync({
+      branchId: targetBranch.id,
+      fileId: file.id,
+      delta,
+      senderId: callerId,
+    });
+  }
+
+  if (input.deleteSourceBranch) {
+    yjsRoomManager.destroyBranchRooms(sourceBranch.id);
+  }
+
+  return {
+    sourceBranch: mapBranchDto(sourceBranch),
+    targetBranch: mapBranchDto(targetBranch),
+    applied: {
+      addedNodes,
+      updatedFiles,
+      keptTargetFiles,
+    },
+    deletedSourceBranch: Boolean(input.deleteSourceBranch),
+  };
 };
 
 // =====================================================================

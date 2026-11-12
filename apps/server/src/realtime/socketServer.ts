@@ -35,6 +35,27 @@ export type TypedRealtimeIoServer = Server<
   SocketData
 >;
 
+let activeIoServer: TypedRealtimeIoServer | null = null;
+
+/** Broadcasts a REST-originated CRDT text update (e.g., branch merge) to connected room sockets. */
+export const broadcastRestFileSync = (params: {
+  branchId: string;
+  fileId: string;
+  delta: Uint8Array | null;
+  senderId?: string;
+}): void => {
+  if (!activeIoServer || !params.delta || params.delta.byteLength === 0) {
+    return;
+  }
+  const roomKey = buildFileRoomKey(params.branchId, params.fileId);
+  activeIoServer.to(roomKey).emit('yjs:update', {
+    branchId: params.branchId,
+    fileId: params.fileId,
+    senderId: params.senderId ?? 'system:merge',
+    update: params.delta,
+  });
+};
+
 const APP_ERROR_TO_REALTIME_CODE: Record<string, RealtimeErrorCode> = {
   INVALID_ID: 'INVALID_ID',
   PROJECT_NOT_FOUND: 'PROJECT_NOT_FOUND',
@@ -185,6 +206,13 @@ export const createRealtimeServer = (
       credentials: true,
     },
     maxHttpBufferSize: REALTIME_MAX_FRAME_BYTES + 16_384,
+  });
+
+  activeIoServer = io;
+  httpServer.once('close', () => {
+    if (activeIoServer === io) {
+      activeIoServer = null;
+    }
   });
 
   io.use(socketAuthMiddleware);

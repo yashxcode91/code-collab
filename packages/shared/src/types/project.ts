@@ -132,3 +132,46 @@ export interface ProjectDetailResponse {
   branches: ProjectBranchDto[];
   members: ProjectMemberDto[];
 }
+
+export type BranchMergeResolution = 'take_source' | 'keep_target' | 'custom';
+
+export type BranchMergeChangeStatus = 'added' | 'modified' | 'type_conflict';
+
+export interface BranchMergeFileChangeDto {
+  path: string;
+  nodeType: FileNodeType;
+  status: BranchMergeChangeStatus;
+  sourceNodeId: string;
+  targetNodeId: string | null;
+  sourceContent: string | null;
+  targetContent: string | null;
+  targetLockedByUsername: string | null;
+  blockedByLockOrAcl: boolean;
+  blockedReason: string | null;
+}
+
+export interface BranchMergePreviewResponse {
+  sourceBranch: ProjectBranchDto;
+  targetBranch: ProjectBranchDto;
+  canMerge: boolean;
+  blockedReason: string | null;
+  summary: {
+    added: number;
+    modified: number;
+    typeConflicts: number;
+    unchanged: number;
+    totalChanges: number;
+  };
+  changes: BranchMergeFileChangeDto[];
+}
+
+export interface BranchMergeResultResponse {
+  sourceBranch: ProjectBranchDto;
+  targetBranch: ProjectBranchDto;
+  applied: {
+    addedNodes: number;
+    updatedFiles: number;
+    keptTargetFiles: number;
+  };
+  deletedSourceBranch: boolean;
+}

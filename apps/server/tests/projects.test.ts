@@ -697,4 +697,240 @@ describe('Studio Workspaces, Branches, Locks & Fine-Grained ACLs (/api/projects)
     expect(staleSave.body.error.details.version).toBe(baseVersion + 1);
     expect(staleSave.body.error.details.content).toBe('# Winner concurrent edit\n');
   });
+
+  it('previews branch diffs, resolves per-file merge conflicts, enforces locks/protection, and optionally deletes merged source branches', async () => {
+    // 1. Cut a feature branch `feat/merge-e2e` from `main`
+    const cutRes = await editor.agent
+      .post(`/api/projects/${projectId}/branches`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ name: 'feat/merge-e2e', sourceBranchId: mainBranchId });
+    expect(cutRes.status).toBe(201);
+    const featBranchId = cutRes.body.data.branch.id as string;
+
+    // 2. Reject merging a branch into itself
+    const samePreviewRes = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${mainBranchId}/merge/preview?sourceBranchId=${mainBranchId}`
+    );
+    expect(samePreviewRes.status).toBe(400);
+    expect(samePreviewRes.body.error.code).toBe('SAME_BRANCH_MERGE');
+
+    // 3. List feature branch files so we can modify existing nodes and add nested folders/files
+    const featFilesRes = await editor.agent.get(
+      `/api/projects/${projectId}/branches/${featBranchId}/files`
+    );
+    expect(featFilesRes.status).toBe(200);
+    const featFiles = featFilesRes.body.data.files as Array<{
+      id: string;
+      name: string;
+      parentId: string | null;
+      nodeType: 'file' | 'folder';
+    }>;
+
+    const featReadme = featFiles.find((f) => f.name === 'README.md' && !f.parentId)!;
+    const featSrc = featFiles.find((f) => f.name === 'src' && !f.parentId)!;
+    const featUtils = featFiles.find(
+      (f) => f.name === 'utils' && f.parentId === featSrc.id
+    )!;
+    const featMath = featFiles.find(
+      (f) => f.name === 'math.ts' && f.parentId === featUtils.id
+    )!;
+
+    // Edit `README.md` and `src/utils/math.ts` on `feat/merge-e2e`
+    const editFeatReadme = await editor.agent
+      .patch(
+        `/api/projects/${projectId}/branches/${featBranchId}/files/${featReadme.id}`
+      )
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ content: '# Feature README update\n' });
+    expect(editFeatReadme.status).toBe(200);
+
+    const editFeatMath = await editor.agent
+      .patch(
+        `/api/projects/${projectId}/branches/${featBranchId}/files/${featMath.id}`
+      )
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ content: 'export const featureFn = () => 42;\n' });
+    expect(editFeatMath.status).toBe(200);
+
+    // Add nested `src/features/banner.ts` only on `feat/merge-e2e`
+    const addFolderRes = await editor.agent
+      .post(`/api/projects/${projectId}/branches/${featBranchId}/files`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ parentId: featSrc.id, name: 'features', nodeType: 'folder' });
+    expect(addFolderRes.status).toBe(201);
+    const featuresFolderId = addFolderRes.body.data.file.id as string;
+
+    const addBannerRes = await editor.agent
+      .post(`/api/projects/${projectId}/branches/${featBranchId}/files`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({
+        parentId: featuresFolderId,
+        name: 'banner.ts',
+        nodeType: 'file',
+        content: 'export const BANNER = "CodeCollab Merge";\n',
+      });
+    expect(addBannerRes.status).toBe(201);
+
+    // Also modify `src/utils/math.ts` on `main` so target diverges cleanly
+    const targetMathUpdate = await owner.agent
+      .patch(
+        `/api/projects/${projectId}/branches/${mainBranchId}/files/${utilsMathFileId}`
+      )
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ content: 'export const targetKept = true;\n' });
+    expect(targetMathUpdate.status).toBe(200);
+
+    // 4. Preview diff into `main`: 2 added (`src/features`, `src/features/banner.ts`) + 2 modified (`README.md`, `src/utils/math.ts`)
+    const previewRes = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${mainBranchId}/merge/preview?sourceBranchId=${featBranchId}`
+    );
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.body.data.canMerge).toBe(true);
+    expect(previewRes.body.data.summary.added).toBe(2);
+    expect(previewRes.body.data.summary.modified).toBe(2);
+    expect(previewRes.body.data.summary.typeConflicts).toBe(0);
+
+    const previewPaths = (
+      previewRes.body.data.changes as Array<{ path: string; status: string }>
+    ).map((c) => `${c.status}:${c.path}`);
+    expect(previewPaths).toContain('added:src/features');
+    expect(previewPaths).toContain('added:src/features/banner.ts');
+    expect(previewPaths).toContain('modified:README.md');
+    expect(previewPaths).toContain('modified:src/utils/math.ts');
+
+    // 5. Protected target branch blocks `editor` merges (`403 BRANCH_PROTECTED`)
+    const protectMain = await owner.agent
+      .patch(`/api/projects/${projectId}/branches/${mainBranchId}`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ isProtected: true });
+    expect(protectMain.status).toBe(200);
+
+    const editorBlockedPreview = await editor.agent.get(
+      `/api/projects/${projectId}/branches/${mainBranchId}/merge/preview?sourceBranchId=${featBranchId}`
+    );
+    expect(editorBlockedPreview.status).toBe(200);
+    expect(editorBlockedPreview.body.data.canMerge).toBe(false);
+
+    const editorBlockedMerge = await editor.agent
+      .post(`/api/projects/${projectId}/branches/${mainBranchId}/merge`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ sourceBranchId: featBranchId });
+    expect(editorBlockedMerge.status).toBe(403);
+    expect(editorBlockedMerge.body.error.code).toBe('BRANCH_PROTECTED');
+
+    const unprotectMain = await owner.agent
+      .patch(`/api/projects/${projectId}/branches/${mainBranchId}`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ isProtected: false });
+    expect(unprotectMain.status).toBe(200);
+
+    // 6. Exclusive lock on target file blocks default `take_source` overwrite, unless resolved via `keep_target`
+    const lockMathOnMain = await editor.agent
+      .post(
+        `/api/projects/${projectId}/branches/${mainBranchId}/files/${utilsMathFileId}/lock`
+      )
+      .set('Origin', TRUSTED_ORIGIN);
+    expect(lockMathOnMain.status).toBe(200);
+
+    const lockedMergeFail = await owner.agent
+      .post(`/api/projects/${projectId}/branches/${mainBranchId}/merge`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({ sourceBranchId: featBranchId });
+    expect(lockedMergeFail.status).toBe(403);
+    expect(lockedMergeFail.body.error.code).toBe('FILE_LOCKED');
+
+    // Non-owner cannot pass `deleteSourceBranch: true`
+    const editorDeleteDenied = await editor.agent
+      .post(`/api/projects/${projectId}/branches/${mainBranchId}/merge`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({
+        sourceBranchId: featBranchId,
+        deleteSourceBranch: true,
+        resolutions: { 'src/utils/math.ts': 'keep_target' },
+      });
+    expect(editorDeleteDenied.status).toBe(403);
+    expect(editorDeleteDenied.body.error.code).toBe('INSUFFICIENT_ROLE');
+
+    // Owner cannot delete default branch (`main`) by merging `main` into `feat/merge-e2e`
+    const deleteDefaultDenied = await owner.agent
+      .post(`/api/projects/${projectId}/branches/${featBranchId}/merge`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({
+        sourceBranchId: mainBranchId,
+        deleteSourceBranch: true,
+      });
+    expect(deleteDefaultDenied.status).toBe(400);
+    expect(deleteDefaultDenied.body.error.code).toBe(
+      'CANNOT_DELETE_DEFAULT_BRANCH'
+    );
+
+    // 7. Owner executes full merge with `custom` README resolution, `keep_target` on locked math.ts, and `deleteSourceBranch: true`
+    const customReadmeText = '# Custom Merged README\nCombined both branches cleanly.\n';
+    const mergeSuccessRes = await owner.agent
+      .post(`/api/projects/${projectId}/branches/${mainBranchId}/merge`)
+      .set('Origin', TRUSTED_ORIGIN)
+      .send({
+        sourceBranchId: featBranchId,
+        deleteSourceBranch: true,
+        resolutions: {
+          'README.md': 'custom',
+          'src/utils/math.ts': 'keep_target',
+        },
+        customContents: {
+          'README.md': customReadmeText,
+        },
+      });
+    expect(mergeSuccessRes.status).toBe(200);
+    expect(mergeSuccessRes.body.data.applied.addedNodes).toBe(2);
+    expect(mergeSuccessRes.body.data.applied.updatedFiles).toBe(1);
+    expect(mergeSuccessRes.body.data.applied.keptTargetFiles).toBe(1);
+    expect(mergeSuccessRes.body.data.deletedSourceBranch).toBe(true);
+
+    // Verify `main` contains updated README, kept target `math.ts`, and newly created `src/features/banner.ts`
+    const mainReadmeAfter = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${mainBranchId}/files/${readmeFileId}`
+    );
+    expect(mainReadmeAfter.status).toBe(200);
+    expect(mainReadmeAfter.body.data.file.content).toBe(customReadmeText);
+
+    const mainMathAfter = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${mainBranchId}/files/${utilsMathFileId}`
+    );
+    expect(mainMathAfter.status).toBe(200);
+    expect(mainMathAfter.body.data.file.content).toBe(
+      'export const targetKept = true;\n'
+    );
+
+    const mainTreeAfter = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${mainBranchId}/files`
+    );
+    expect(mainTreeAfter.status).toBe(200);
+    const mainNodesAfter = mainTreeAfter.body.data.files as Array<{
+      id: string;
+      name: string;
+    }>;
+    const mergedBanner = mainNodesAfter.find((n) => n.name === 'banner.ts');
+    expect(mergedBanner).toBeDefined();
+
+    const bannerDetail = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${mainBranchId}/files/${mergedBanner!.id}`
+    );
+    expect(bannerDetail.status).toBe(200);
+    expect(bannerDetail.body.data.file.content).toBe(
+      'export const BANNER = "CodeCollab Merge";\n'
+    );
+
+    // Source branch was deleted
+    const deletedBranchFiles = await owner.agent.get(
+      `/api/projects/${projectId}/branches/${featBranchId}/files`
+    );
+    expect(deletedBranchFiles.status).toBe(404);
+
+    // Cleanup lock left on math.ts
+    await owner.agent
+      .delete(
+        `/api/projects/${projectId}/branches/${mainBranchId}/files/${utilsMathFileId}/lock`
+      )
+      .set('Origin', TRUSTED_ORIGIN);
+  });
 });

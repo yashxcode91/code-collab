@@ -202,6 +202,27 @@ export const SetFileAccessSchema = z.object({
   permission: FileAccessPermissionSchema,
 });
 
+export const BranchMergeResolutionSchema = z.enum([
+  'take_source',
+  'keep_target',
+  'custom',
+]);
+
+export const MergeBranchSchema = z.object({
+  sourceBranchId: z.string().uuid('Invalid source branch ID'),
+  resolutions: z.record(z.string(), BranchMergeResolutionSchema).optional(),
+  customContents: z
+    .record(
+      z.string(),
+      z.string().max(
+        COLLAB_LIMITS.MAX_FILE_CONTENT_CHARS,
+        `File content cannot exceed ${COLLAB_LIMITS.MAX_FILE_CONTENT_CHARS} characters`
+      )
+    )
+    .optional(),
+  deleteSourceBranch: z.boolean().optional().default(false),
+});
+
 export type CreateProjectInput = z.infer<typeof CreateProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof UpdateProjectSchema>;
 export type CreateBranchInput = z.infer<typeof CreateBranchSchema>;
@@ -213,3 +234,4 @@ export type UpdateProjectMemberRoleInput = z.infer<
   typeof UpdateProjectMemberRoleSchema
 >;
 export type SetFileAccessInput = z.infer<typeof SetFileAccessSchema>;
+export type MergeBranchInput = z.infer<typeof MergeBranchSchema>;

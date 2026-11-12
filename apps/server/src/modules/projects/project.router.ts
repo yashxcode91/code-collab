@@ -4,6 +4,7 @@ import {
   CreateBranchSchema,
   CreateFileNodeSchema,
   CreateProjectSchema,
+  MergeBranchSchema,
   SetFileAccessSchema,
   UpdateBranchSchema,
   UpdateFileNodeSchema,
@@ -28,6 +29,8 @@ import {
   listFileAccessController,
   listProjectsController,
   lockFileNodeController,
+  mergeBranchController,
+  previewBranchMergeController,
   removeFileAccessController,
   removeMemberController,
   setFileAccessController,
@@ -94,6 +97,15 @@ projectRouter.patch(
 projectRouter.delete(
   '/:projectId/branches/:branchId',
   asyncHandler(deleteBranchController)
+);
+projectRouter.get(
+  '/:projectId/branches/:branchId/merge/preview',
+  asyncHandler(previewBranchMergeController)
+);
+projectRouter.post(
+  '/:projectId/branches/:branchId/merge',
+  validateBody(MergeBranchSchema),
+  asyncHandler(mergeBranchController)
 );
 
 // --- Files, Folders & Locks ---
