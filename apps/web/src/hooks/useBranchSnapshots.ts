@@ -102,7 +102,11 @@ export function useBranchSnapshots({
         queryKeys.projects.snapshots(projectId, branchId),
         (prev) => {
           if (!prev) {
-            return { snapshots: [payload.snapshot], nextCursor: null };
+            return {
+              snapshots: [payload.snapshot],
+              nextCursor: null,
+              totalCount: 1,
+            };
           }
           if (prev.snapshots.some((s) => s.id === payload.snapshot.id)) {
             return prev;
@@ -110,6 +114,9 @@ export function useBranchSnapshots({
           return {
             ...prev,
             snapshots: [payload.snapshot, ...prev.snapshots],
+            ...(prev.totalCount !== undefined
+              ? { totalCount: prev.totalCount + 1 }
+              : {}),
           };
         },
       );
@@ -161,9 +168,17 @@ export function useBranchSnapshots({
         queryClient.setQueryData<SnapshotListPage>(
           queryKeys.projects.snapshots(projectId, branchId),
           (prev) => {
-            if (!prev) return { snapshots: [created], nextCursor: null };
+            if (!prev) {
+              return { snapshots: [created], nextCursor: null, totalCount: 1 };
+            }
             if (prev.snapshots.some((s) => s.id === created.id)) return prev;
-            return { ...prev, snapshots: [created, ...prev.snapshots] };
+            return {
+              ...prev,
+              snapshots: [created, ...prev.snapshots],
+              ...(prev.totalCount !== undefined
+                ? { totalCount: prev.totalCount + 1 }
+                : {}),
+            };
           },
         );
       }
@@ -219,6 +234,9 @@ export function useBranchSnapshots({
               ? {
                   ...prev,
                   snapshots: prev.snapshots.filter((s) => s.id !== snapshotId),
+                  ...(prev.totalCount !== undefined
+                    ? { totalCount: Math.max(0, prev.totalCount - 1) }
+                    : {}),
                 }
               : prev,
         );
@@ -307,6 +325,7 @@ export function useBranchSnapshots({
 
   return {
     snapshots: mergedSnapshots,
+    totalCount: listQuery.data?.totalCount ?? mergedSnapshots.length,
     nextCursor: effectiveNextCursor,
     isLoading: listQuery.isLoading,
     isFetching: listQuery.isFetching,

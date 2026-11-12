@@ -113,6 +113,8 @@ export function StudioSnapshotDiffModal({
         snapshotId,
         normalizedTargetId,
       ),
+    staleTime: 0,
+    refetchOnMount: 'always',
     enabled: Boolean(open && projectId && branchId && snapshotId),
   });
 

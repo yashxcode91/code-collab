@@ -1123,6 +1123,7 @@ export function StudioPage() {
             }}
             historyState={{
               snapshots: snapshots.snapshots,
+              totalCount: snapshots.totalCount,
               nextCursor: snapshots.nextCursor,
               isLoading: snapshots.isLoading,
               isLoadingMore: snapshots.isLoadingMore,

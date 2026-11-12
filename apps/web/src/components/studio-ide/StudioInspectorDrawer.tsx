@@ -92,6 +92,7 @@ interface StudioInspectorDrawerProps {
   };
   historyState: {
     snapshots: BranchSnapshotSummaryDto[];
+    totalCount?: number;
     nextCursor: string | null;
     isLoading: boolean;
     isLoadingMore: boolean;
@@ -703,6 +704,7 @@ export function StudioInspectorDrawer({
             <StudioHistoryPanel
               branch={branch}
               snapshots={historyState.snapshots}
+              totalCount={historyState.totalCount}
               nextCursor={historyState.nextCursor}
               currentUserId={currentUserId}
               isOwner={isOwner}

@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 interface StudioHistoryPanelProps {
   branch: ProjectBranchDto | null;
   snapshots: BranchSnapshotSummaryDto[];
+  totalCount?: number;
   nextCursor: string | null;
   currentUserId: string;
   isOwner: boolean;
@@ -77,6 +78,7 @@ const formatRelativeTime = (iso: string): string => {
 export function StudioHistoryPanel({
   branch,
   snapshots,
+  totalCount,
   nextCursor,
   currentUserId,
   isOwner,
@@ -144,7 +146,7 @@ export function StudioHistoryPanel({
           </span>
         </div>
         <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-          {snapshots.length}/{SNAPSHOT_LIMITS.MAX_SNAPSHOTS_PER_BRANCH}
+          {totalCount ?? snapshots.length}/{SNAPSHOT_LIMITS.MAX_SNAPSHOTS_PER_BRANCH}
         </span>
       </div>
 

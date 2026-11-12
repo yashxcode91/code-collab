@@ -517,6 +517,7 @@ export async function sendProjectChatMessage(
 export interface SnapshotListPage {
   snapshots: BranchSnapshotSummaryDto[];
   nextCursor: string | null;
+  totalCount?: number;
 }
 
 /** Lists immutable branch snapshots ordered newest-first. */
