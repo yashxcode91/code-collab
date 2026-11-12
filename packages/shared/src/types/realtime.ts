@@ -5,6 +5,7 @@ import type {
   ExecutionStatus,
 } from './execution';
 import { COLLAB_LIMITS, FileAccessPermission } from './project';
+import type { BranchSnapshotSummaryDto } from './snapshot';
 
 /**
  * 10 high-contrast collaborator cursor colors matching `COLLAB_LIMITS.MAX_CONCURRENT_EDITORS` (10),
@@ -263,6 +264,28 @@ export interface ChatTypingServerPayload {
   isTyping: boolean;
 }
 
+// =====================================================================
+// Day 5: Branch Snapshots & Version Restore Socket Contracts
+// =====================================================================
+
+export interface SnapshotCreatedPayload {
+  projectId: string;
+  branchId: string;
+  snapshot: BranchSnapshotSummaryDto;
+}
+
+export interface BranchRestoredPayload {
+  projectId: string;
+  branchId: string;
+  restoredSnapshotId: string;
+  restoredSnapshotTitle: string;
+  restoredByUserId: string;
+  restoredByUsername: string;
+  safetySnapshotId: string | null;
+  deletedFileIds: string[];
+  restoredAt: string;
+}
+
 /** Typed Socket.IO events accepted by the server from connected clients. */
 export interface ClientToServerEvents {
   'file:join': (
@@ -322,4 +345,6 @@ export interface ServerToClientEvents {
   'execution:cancelled': (payload: ExecutionLifecyclePayload) => void;
   'chat:message': (payload: ChatMessageDto) => void;
   'chat:typing': (payload: ChatTypingServerPayload) => void;
+  'snapshot:created': (payload: SnapshotCreatedPayload) => void;
+  'branch:restored': (payload: BranchRestoredPayload) => void;
 }

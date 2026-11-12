@@ -20,3 +20,7 @@ export * from './types/execution';
 export * from './schemas/execution';
 export * from './types/chat';
 export * from './schemas/chat';
+
+// Export Day 5 branch snapshot & version history contracts and Zod schemas
+export * from './types/snapshot';
+export * from './schemas/snapshot';
