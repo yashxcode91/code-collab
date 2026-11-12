@@ -13,6 +13,7 @@ import {
   Loader2,
   Lock,
   LogOut,
+  MessageSquare,
   Shield,
   ShieldCheck,
   SlidersHorizontal,
@@ -26,13 +27,17 @@ import {
   AddProjectMemberSchema,
   COLLAB_LIMITS,
   UpdateProjectSchema,
+  type ChatFileReferenceDto,
+  type ChatMessageDto,
   type FileAccessPermission,
   type Project,
   type ProjectBranchDto,
   type ProjectFileNodeDto,
   type ProjectMemberDto,
 } from '@codecollab/shared';
+import { StudioChatPanel } from '@/components/studio-ide/StudioChatPanel';
 import { buildNodeBreadcrumb } from '@/components/studio-ide/studioLanguage';
+import type { TypingPeer } from '@/hooks/useWorkspaceChat';
 import { ApiClientError } from '@/lib/api';
 import {
   addProjectMember,
@@ -57,6 +62,30 @@ interface StudioInspectorDrawerProps {
   aclTargetNodeId: string | null;
   currentUserId: string;
   activeTab: InspectorTab;
+  activeFile: ProjectFileNodeDto | null;
+  activeCursorLine: number;
+  isWorkspaceMember: boolean;
+  canSendChat: boolean;
+  chatState: {
+    messages: ChatMessageDto[];
+    nextCursor: string | null;
+    isLoadingHistory: boolean;
+    isLoadingOlder: boolean;
+    isSending: boolean;
+    chatJoined: boolean;
+    chatError: string | null;
+    typingPeers: TypingPeer[];
+    onLoadOlder: () => void;
+    onSendMessage: (input: {
+      content: string;
+      branchId?: string | null;
+      fileId?: string | null;
+      lineNumber?: number | null;
+    }) => Promise<boolean>;
+    onNotifyTyping: (isTyping: boolean) => void;
+    onClearError: () => void;
+    onNavigateToFileRef: (fileRef: ChatFileReferenceDto) => void;
+  };
   onChangeTab: (tab: InspectorTab) => void;
   onSelectAclTarget: (nodeId: string | null) => void;
   onWorkspaceLeftOrDeleted: () => void;
@@ -75,6 +104,11 @@ export function StudioInspectorDrawer({
   aclTargetNodeId,
   currentUserId,
   activeTab,
+  activeFile,
+  activeCursorLine,
+  isWorkspaceMember,
+  canSendChat,
+  chatState,
   onChangeTab,
   onSelectAclTarget,
   onWorkspaceLeftOrDeleted,
@@ -84,9 +118,11 @@ export function StudioInspectorDrawer({
   const resolvedTab: Exclude<InspectorTab, 'closed'> =
     activeTab === 'access' && !isOwner
       ? 'members'
-      : activeTab === 'closed'
+      : activeTab === 'chat' && !isWorkspaceMember
         ? 'members'
-        : activeTab;
+        : activeTab === 'closed'
+          ? 'members'
+          : activeTab;
 
   // --- Avatar Fallback State ---
   const [failedAvatars, setFailedAvatars] = useState<Record<string, boolean>>(
@@ -419,14 +455,35 @@ export function StudioInspectorDrawer({
 
       <aside
         aria-label="Studio Inspector"
-        className="glass-surface fixed bottom-3 right-3 top-14 z-30 flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl xl:w-[308px] lg:static lg:inset-auto lg:z-10"
+        className={cn(
+          'fixed bottom-3 right-3 top-14 z-30 flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl xl:w-[320px] lg:static lg:inset-auto lg:z-10',
+          resolvedTab === 'chat' ? 'glass-mirror' : 'glass-surface',
+        )}
       >
         {/* Drawer Header: Single contextual title on desktop (TopBar switches tabs); mobile switcher `<lg` */}
-        <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3.5 py-2.5">
+        <div
+          className={cn(
+            'relative z-10 flex items-center justify-between gap-2 border-b px-3.5 py-2.5',
+            resolvedTab === 'chat'
+              ? 'border-white/35 bg-white/30 backdrop-blur-md dark:border-white/10 dark:bg-white/[0.03]'
+              : 'border-border/60',
+          )}
+        >
           {/* Desktop Contextual Title (no repetition of TopBar Team/Access/Settings buttons) */}
           <div className="hidden min-w-0 flex-1 items-center justify-between gap-2 lg:flex">
             <div className="flex min-w-0 items-center gap-2">
-              {resolvedTab === 'members' && (
+              {resolvedTab === 'chat' && (
+                <>
+                  <MessageSquare
+                    className="h-3.5 w-3.5 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+                    Workspace Chat
+                  </span>
+                </>
+              )}
+            {resolvedTab === 'members' && (
                 <>
                   <Users
                     className="h-3.5 w-3.5 shrink-0 text-primary"
@@ -461,9 +518,30 @@ export function StudioInspectorDrawer({
               )}
             </div>
 
+            {resolvedTab === 'chat' && (
+              <span
+                className={cn(
+                  'glass-control inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px]',
+                  chatState.chatJoined
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-muted-foreground',
+                )}
+              >
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    chatState.chatJoined ? 'bg-emerald-500' : 'bg-muted-foreground/60',
+                  )}
+                />
+                <span>{chatState.chatJoined ? 'Live' : 'Sync'}</span>
+              </span>
+            )}
             {resolvedTab === 'members' && (
-              <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                {members.length} / {project.maxConcurrentEditors}
+              <span
+                title={`${members.length} total workspace ${members.length === 1 ? 'member' : 'members'} · Up to ${project.maxConcurrentEditors} simultaneous live ${project.maxConcurrentEditors === 1 ? 'editor' : 'editors'}`}
+                className="glass-control shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+              >
+                {members.length} team · {project.maxConcurrentEditors} live
               </span>
             )}
             {resolvedTab === 'settings' && (
@@ -475,6 +553,22 @@ export function StudioInspectorDrawer({
 
           {/* Mobile / Tablet Compact Switcher (`<lg` overlay where TopBar sits underneath) */}
           <div className="flex items-center gap-1 lg:hidden">
+            {isWorkspaceMember && (
+              <button
+                type="button"
+                onClick={() => onChangeTab('chat')}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-medium transition-colors',
+                  resolvedTab === 'chat'
+                    ? 'border border-primary/45 bg-primary/15 text-primary'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Chat</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onChangeTab('members')}
@@ -532,7 +626,38 @@ export function StudioInspectorDrawer({
         </div>
 
         {/* Scrollable Panel Body */}
-        <div className="flex-1 space-y-4 overflow-y-auto p-3.5">
+        <div
+          className={cn(
+            'relative z-10 min-h-0 flex-1 p-3.5',
+            resolvedTab === 'chat'
+              ? 'flex flex-col overflow-hidden'
+              : 'space-y-4 overflow-y-auto',
+          )}
+        >
+          {/* ==================== 0. WORKSPACE CHAT TAB ==================== */}
+          {resolvedTab === 'chat' && (
+            <StudioChatPanel
+              isMember={isWorkspaceMember}
+              canSend={canSendChat}
+              currentUserId={currentUserId}
+              messages={chatState.messages}
+              nextCursor={chatState.nextCursor}
+              isLoadingHistory={chatState.isLoadingHistory}
+              isLoadingOlder={chatState.isLoadingOlder}
+              isSending={chatState.isSending}
+              chatError={chatState.chatError}
+              typingPeers={chatState.typingPeers}
+              activeBranchId={branch?.id ?? null}
+              activeFile={activeFile}
+              activeCursorLine={activeCursorLine}
+              onLoadOlder={chatState.onLoadOlder}
+              onSendMessage={chatState.onSendMessage}
+              onNotifyTyping={chatState.onNotifyTyping}
+              onClearError={chatState.onClearError}
+              onNavigateToFileRef={chatState.onNavigateToFileRef}
+            />
+          )}
+
           {/* ==================== 1. TEAM TAB ==================== */}
           {resolvedTab === 'members' && (
             <div className="space-y-4">
@@ -540,8 +665,11 @@ export function StudioInspectorDrawer({
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Collaborators
                 </h2>
-                <span className="glass-control rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  {members.length} / {project.maxConcurrentEditors}
+                <span
+                  title={`${members.length} total workspace ${members.length === 1 ? 'member' : 'members'} · Up to ${project.maxConcurrentEditors} simultaneous live ${project.maxConcurrentEditors === 1 ? 'editor' : 'editors'}`}
+                  className="glass-control shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                >
+                  {members.length} team · {project.maxConcurrentEditors} live
                 </span>
               </div>
 

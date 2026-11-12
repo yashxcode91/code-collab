@@ -43,6 +43,11 @@ import {
 } from './project.auth';
 import { buildStarterWorkspaceNodes } from './project.templates';
 import { yjsRoomManager } from '../../realtime/yjsRoomManager';
+import { redis } from '../../lib/redis';
+import {
+  publishExecutionCancel,
+  removeExecutionJob,
+} from '../execution/execution.queue';
 import { broadcastRestFileSync } from '../../realtime/socketServer';
 
 // =====================================================================
@@ -167,6 +172,42 @@ const mapFileNodeDto = (
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
+
+let projectRealtimeHooks: {
+  evictProjectMember?: (params: { projectId: string; userId: string }) => void;
+  evictProjectAll?: (params: { projectId: string }) => void;
+  evictFileAccess?: (params: {
+    projectId: string;
+    branchId: string;
+    targetUserId: string;
+    permission?: FileAccessPermission;
+  }) => void;
+  syncMemberRole?: (params: { projectId: string; targetUserId: string }) => void;
+  evictDeletedBranch?: (params: {
+    projectId: string;
+    branchId: string;
+    runIds: string[];
+  }) => void;
+  evictDeletedFiles?: (params: {
+    projectId: string;
+    branchId: string;
+    fileIds: string[];
+  }) => void;
+} = {};
+
+export const registerProjectRealtimeHooks = (
+  hooks: typeof projectRealtimeHooks
+): void => {
+  projectRealtimeHooks = hooks;
+};
+
+const cleanupDeletedScopeRuns = (runIds: string[]): void => {
+  for (const runId of runIds) {
+    void removeExecutionJob(runId);
+    void publishExecutionCancel(runId);
+    void redis.del(`codecollab:ratelimit:stdin-bytes:${runId}`).catch(() => undefined);
+  }
+};
 
 /**
  * Walks upward from `nodeId` through all ancestor folders to resolve inherited
@@ -437,7 +478,17 @@ export const deleteProject = async (
   userId: string
 ): Promise<void> => {
   await assertProjectAccess(projectId, userId, 'owner');
+  const activeRuns = await prisma.executionRun.findMany({
+    where: {
+      projectId,
+      status: { in: ['QUEUED', 'RUNNING'] },
+    },
+    select: { id: true },
+  });
   await prisma.project.delete({ where: { id: projectId } });
+  cleanupDeletedScopeRuns(activeRuns.map((r) => r.id));
+  yjsRoomManager.destroyProjectRooms(projectId);
+  projectRealtimeHooks.evictProjectAll?.({ projectId });
 };
 
 // =====================================================================
@@ -535,6 +586,8 @@ export const updateProjectMemberRole = async (
     },
   });
 
+  projectRealtimeHooks.syncMemberRole?.({ projectId, targetUserId });
+
   return mapMemberDto(updated);
 };
 
@@ -589,6 +642,11 @@ export const removeProjectMember = async (
         file: { branch: { projectId } },
       },
     });
+  });
+
+  projectRealtimeHooks.evictProjectMember?.({
+    projectId,
+    userId: targetUserId,
   });
 };
 
@@ -805,8 +863,23 @@ export const deleteBranch = async (
     );
   }
 
+  const activeRuns = await prisma.executionRun.findMany({
+    where: {
+      branchId: branch.id,
+      status: { in: ['QUEUED', 'RUNNING'] },
+    },
+    select: { id: true },
+  });
+  const activeRunIds = activeRuns.map((r) => r.id);
+
   await prisma.projectBranch.delete({ where: { id: branch.id } });
+  cleanupDeletedScopeRuns(activeRunIds);
   yjsRoomManager.destroyBranchRooms(branch.id);
+  projectRealtimeHooks.evictDeletedBranch?.({
+    projectId,
+    branchId: branch.id,
+    runIds: activeRunIds,
+  });
 };
 
 interface MergeTreeNodeRow {
@@ -1868,6 +1941,8 @@ export const deleteFileNode = async (
     override,
   });
 
+  const deletedIds: string[] = [file.id];
+
   if (file.nodeType === 'FOLDER') {
     const branchNodes = await prisma.projectFile.findMany({
       where: { branchId: branch.id },
@@ -1889,6 +1964,7 @@ export const deleteFileNode = async (
     const queue = [...(childrenByParent.get(file.id) ?? [])];
     while (queue.length > 0) {
       const desc = queue.shift()!;
+      deletedIds.push(desc.id);
       if (desc.lockedById && desc.lockedById !== userId) {
         throw new AppError(
           403,
@@ -1912,7 +1988,12 @@ export const deleteFileNode = async (
   }
 
   await prisma.projectFile.delete({ where: { id: file.id } });
-  yjsRoomManager.destroyRoomIfLoaded(branch.id, file.id);
+  yjsRoomManager.destroyRoomsByFileIds(branch.id, deletedIds);
+  projectRealtimeHooks.evictDeletedFiles?.({
+    projectId,
+    branchId: branch.id,
+    fileIds: deletedIds,
+  });
 };
 
 /**
@@ -2106,6 +2187,13 @@ export const setFileAccessRule = async (
     },
   });
 
+  projectRealtimeHooks.evictFileAccess?.({
+    projectId,
+    branchId: branch.id,
+    targetUserId: input.userId,
+    permission: input.permission,
+  });
+
   return {
     id: rule.id,
     fileId: rule.fileId,
@@ -2132,5 +2220,11 @@ export const removeFileAccessRule = async (
 
   await prisma.projectFileAccess.deleteMany({
     where: { fileId: file.id, userId: targetUserId },
+  });
+
+  projectRealtimeHooks.evictFileAccess?.({
+    projectId,
+    branchId: branch.id,
+    targetUserId,
   });
 };

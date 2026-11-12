@@ -8,24 +8,30 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type {
   BranchMergeResultResponse,
+  ChatFileReferenceDto,
   ProjectFileDetailDto,
   ProjectFileNodeDto,
+  SupportedLanguage,
 } from '@codecollab/shared';
 import { BrandLogo } from '@/components/BrandLogo';
 import { BranchMergeModal } from '@/components/studio-ide/BranchMergeModal';
 import { FileExplorerPane } from '@/components/studio-ide/FileExplorerPane';
 import { disposeStudioModels } from '@/components/studio-ide/monacoWorkerSetup';
 import { StudioEditorPane } from '@/components/studio-ide/StudioEditorPane';
+import { StudioExecutionConsole } from '@/components/studio-ide/StudioExecutionConsole';
 import { StudioInspectorDrawer } from '@/components/studio-ide/StudioInspectorDrawer';
 import {
   collectSubtreeIds,
+  inferExecutionLanguage,
   pickDefaultEntryFile,
 } from '@/components/studio-ide/studioLanguage';
 import { StudioTopBar } from '@/components/studio-ide/StudioTopBar';
 import { StudioBackdrop } from '@/components/studio-ui/StudioBackdrop';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
+import { useExecutionConsole } from '@/hooks/useExecutionConsole';
 import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
+import { useWorkspaceChat } from '@/hooks/useWorkspaceChat';
 import { ApiClientError } from '@/lib/api';
 import {
   fetchBranchFiles,
@@ -61,9 +67,12 @@ export function StudioPage() {
     targetBranchId?: string | null;
   }>({ open: false });
   const [scrollToLineRequest, setScrollToLineRequest] = useState<{
+    fileId?: string;
     line: number;
     seq: number;
   } | null>(null);
+  const [languageOverride, setLanguageOverride] =
+    useState<SupportedLanguage | null>(null);
   const autoOpenedBranchRef = useRef<string | null>(null);
 
   // Ephemeral Zustand IDE state
@@ -79,6 +88,9 @@ export function StudioPage() {
   const explorerCollapsed = useStudioStore((s) => s.explorerCollapsed);
   const isWindowExpanded = useStudioStore((s) => s.isWindowExpanded);
   const focusModeEnabled = useStudioStore((s) => s.focusModeEnabled);
+  const consoleOpen = useStudioStore((s) => s.consoleOpen);
+  const consoleExpanded = useStudioStore((s) => s.consoleExpanded);
+  const activeRunId = useStudioStore((s) => s.activeRunId);
 
   const initProjectSession = useStudioStore((s) => s.initProjectSession);
   const selectBranch = useStudioStore((s) => s.selectBranch);
@@ -99,6 +111,10 @@ export function StudioPage() {
   const toggleExplorer = useStudioStore((s) => s.toggleExplorer);
   const toggleWindowExpanded = useStudioStore((s) => s.toggleWindowExpanded);
   const toggleFocusMode = useStudioStore((s) => s.toggleFocusMode);
+  const setConsoleOpen = useStudioStore((s) => s.setConsoleOpen);
+  const toggleConsole = useStudioStore((s) => s.toggleConsole);
+  const toggleConsoleExpanded = useStudioStore((s) => s.toggleConsoleExpanded);
+  const setActiveRunId = useStudioStore((s) => s.setActiveRunId);
   const resetMergedBranchBuffers = useStudioStore(
     (s) => s.resetMergedBranchBuffers,
   );
@@ -265,6 +281,45 @@ export function StudioPage() {
     onContentSynced: syncCollabBuffer,
     onPermissionChanged: handleCollabPermissionChanged,
   });
+
+  const isWorkspaceMember = Boolean(project?.currentUserRole);
+  const isEditorOrOwnerRole =
+    project?.currentUserRole === 'owner' ||
+    project?.currentUserRole === 'editor';
+
+  const execution = useExecutionConsole({
+    socket: collab.socket,
+    projectId: project?.id ?? '',
+    branchId: activeBranch?.id ?? null,
+    activeRunId,
+    enabled: Boolean(project && user && isWorkspaceMember),
+    onSelectRun: setActiveRunId,
+    onOpenConsole: () => setConsoleOpen(true),
+  });
+
+  const chat = useWorkspaceChat({
+    socket: collab.socket,
+    projectId: project?.id ?? '',
+    currentUserId: user?.id ?? '',
+    isMember: isWorkspaceMember,
+    canSend: isEditorOrOwnerRole,
+    isOpen: rightPanelTab === 'chat',
+  });
+
+  // Reset manual language override when switching active file
+  useEffect(() => {
+    setLanguageOverride(null);
+  }, [activeFileId]);
+
+  const resolvedExecutionLanguage = useMemo(
+    () =>
+      languageOverride ??
+      inferExecutionLanguage(
+        activeFile?.name,
+        project?.language ?? 'javascript',
+      ),
+    [languageOverride, activeFile?.name, project?.language],
+  );
 
   useEffect(() => {
     if (
@@ -615,6 +670,46 @@ export function StudioPage() {
     [activeBranch?.id, files, removeDeletedNode],
   );
 
+  const handleRunActiveFile = useCallback(() => {
+    if (!activeFile || activeFile.nodeType !== 'file') return;
+    const liveBuffer =
+      useStudioStore.getState().buffers[activeFile.id]?.content ??
+      (collab.roomReady && collab.ytext ? collab.ytext.toString() : null) ??
+      activeFileDetailQuery.data?.content ??
+      '';
+
+    void execution.runCode({
+      language: resolvedExecutionLanguage,
+      fileId: activeFile.id,
+      entryFileName: activeFile.name,
+      sourceCode: liveBuffer,
+    });
+  }, [
+    activeFile,
+    activeFileDetailQuery.data?.content,
+    collab.roomReady,
+    collab.ytext,
+    execution,
+    resolvedExecutionLanguage,
+  ]);
+
+  const handleNavigateToChatFileRef = useCallback(
+    (fileRef: ChatFileReferenceDto) => {
+      if (fileRef.branchId && activeBranch?.id && fileRef.branchId !== activeBranch.id) {
+        handleSelectBranch(fileRef.branchId);
+      }
+      openFileTab(fileRef.fileId);
+      if (fileRef.lineNumber) {
+        setScrollToLineRequest((prev) => ({
+          fileId: fileRef.fileId,
+          line: fileRef.lineNumber!,
+          seq: (prev?.seq ?? 0) + 1,
+        }));
+      }
+    },
+    [activeBranch?.id, handleSelectBranch, openFileTab],
+  );
+
   // Global Ctrl/Cmd + S save handler + beforeunload guard for dirty buffers
   const handleSaveRef = useRef(handleSaveFile);
   handleSaveRef.current = handleSaveFile;
@@ -752,6 +847,22 @@ export function StudioPage() {
   );
   const resolvedPreventSameLineEdit =
     collab.preventSameLineEdit ?? project.preventSameLineEdit;
+  const hasRunnableSource = Boolean(
+    activeFile &&
+      activeFile.nodeType === 'file' &&
+      (activeDraft !== null || activeFileDetailQuery.data?.id === activeFile.id),
+  );
+  const isExecutionActive = Boolean(
+    execution.activeRun &&
+      (execution.activeRun.status === 'QUEUED' ||
+        execution.activeRun.status === 'RUNNING'),
+  );
+  const canCancelActiveExecution = Boolean(
+    execution.activeRun &&
+      isExecutionActive &&
+      (execution.activeRun.userId === currentUserId ||
+        project.currentUserRole === 'owner'),
+  );
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground">
@@ -776,6 +887,17 @@ export function StudioPage() {
         collabSyncStatus={collab.syncStatus}
         collabRoomReady={collab.roomReady}
         presenceUsers={collab.presenceUsers}
+        consoleOpen={consoleOpen}
+        canRunCode={isEditorOrOwner}
+        hasRunnableSource={hasRunnableSource}
+        isExecutionActive={isExecutionActive}
+        isExecutionStarting={execution.isStarting}
+        canCancelExecution={canCancelActiveExecution}
+        isWorkspaceMember={isWorkspaceMember}
+        chatUnreadCount={chat.unreadCount}
+        onRunCode={handleRunActiveFile}
+        onCancelExecution={execution.cancelActiveRun}
+        onToggleConsole={toggleConsole}
         onJumpToCollaboratorLine={(line) =>
           setScrollToLineRequest((prev) => ({ line, seq: (prev?.seq ?? 0) + 1 }))
         }
@@ -837,51 +959,81 @@ export function StudioPage() {
             }}
           />
 
-          <StudioEditorPane
-            project={project}
-            branch={activeBranch}
-            files={files}
-            openTabIds={openTabIds}
-            activeFile={activeFile}
-            activeDraft={activeDraft}
-            activeConflict={activeConflict}
-            isFileLoading={activeFileDetailQuery.isLoading}
-            fileLoadError={
-              activeFileDetailQuery.isError
-                ? activeFileDetailQuery.error instanceof Error
-                  ? activeFileDetailQuery.error.message
-                  : 'Unable to fetch file content'
-                : null
-            }
-            saveError={saveError}
-            isSaving={saveFileMutation.isPending}
-            canEditActiveFile={canEditActiveFile}
-            buffers={buffers}
-            currentUserId={currentUserId}
-            collabConnectionStatus={collab.connectionStatus}
-            collabSyncStatus={collab.syncStatus}
-            collabRoomReady={collab.roomReady}
-            collabActiveRoomKey={collab.activeRoomKey}
-            collabYText={collab.ytext}
-            presenceUsers={collab.presenceUsers}
-            preventSameLineEdit={resolvedPreventSameLineEdit}
-            realtimeError={collab.realtimeError}
-            focusModeEnabled={focusModeEnabled}
-            scrollToLineRequest={scrollToLineRequest}
-            onSelectTab={openFileTab}
-            onCloseTab={closeFileTab}
-            onChangeContent={updateDraftContent}
-            onChangeCursor={setCursorPosition}
-            onSaveFile={handleSaveFile}
-            onDiscardDraft={discardFileDraft}
-            onResolveConflictReload={handleResolveConflictReload}
-            onResolveConflictOverwrite={handleResolveConflictOverwrite}
-            onDismissSaveError={() => setSaveError(null)}
-            onDismissRealtimeError={collab.clearRealtimeError}
-            onToggleFocusMode={toggleFocusMode}
-            onPublishAwareness={collab.publishAwareness}
-            onRetryFileLoad={() => void activeFileDetailQuery.refetch()}
-          />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+            <StudioEditorPane
+              project={project}
+              branch={activeBranch}
+              files={files}
+              openTabIds={openTabIds}
+              activeFile={activeFile}
+              activeDraft={activeDraft}
+              activeConflict={activeConflict}
+              isFileLoading={activeFileDetailQuery.isLoading}
+              fileLoadError={
+                activeFileDetailQuery.isError
+                  ? activeFileDetailQuery.error instanceof Error
+                    ? activeFileDetailQuery.error.message
+                    : 'Unable to fetch file content'
+                  : null
+              }
+              saveError={saveError}
+              isSaving={saveFileMutation.isPending}
+              canEditActiveFile={canEditActiveFile}
+              buffers={buffers}
+              currentUserId={currentUserId}
+              collabConnectionStatus={collab.connectionStatus}
+              collabSyncStatus={collab.syncStatus}
+              collabRoomReady={collab.roomReady}
+              collabActiveRoomKey={collab.activeRoomKey}
+              collabYText={collab.ytext}
+              presenceUsers={collab.presenceUsers}
+              preventSameLineEdit={resolvedPreventSameLineEdit}
+              realtimeError={collab.realtimeError}
+              focusModeEnabled={focusModeEnabled}
+              scrollToLineRequest={scrollToLineRequest}
+              onSelectTab={openFileTab}
+              onCloseTab={closeFileTab}
+              onChangeContent={updateDraftContent}
+              onChangeCursor={setCursorPosition}
+              onSaveFile={handleSaveFile}
+              onDiscardDraft={discardFileDraft}
+              onResolveConflictReload={handleResolveConflictReload}
+              onResolveConflictOverwrite={handleResolveConflictOverwrite}
+              onDismissSaveError={() => setSaveError(null)}
+              onDismissRealtimeError={collab.clearRealtimeError}
+              onToggleFocusMode={toggleFocusMode}
+              onPublishAwareness={collab.publishAwareness}
+              onRetryFileLoad={() => void activeFileDetailQuery.refetch()}
+            />
+
+            <StudioExecutionConsole
+              open={consoleOpen}
+              expanded={consoleExpanded}
+              language={resolvedExecutionLanguage}
+              onChangeLanguage={setLanguageOverride}
+              activeFile={activeFile}
+              activeRun={execution.activeRun}
+              runs={execution.runs}
+              runsLoading={execution.runsLoading}
+              segments={execution.segments}
+              elapsedMs={execution.elapsedMs}
+              consoleError={execution.consoleError}
+              canRun={isEditorOrOwner}
+              isOwner={project.currentUserRole === 'owner'}
+              currentUserId={currentUserId}
+              isStarting={execution.isStarting}
+              isCancelling={execution.isCancelling}
+              hasRunnableSource={hasRunnableSource}
+              onRun={handleRunActiveFile}
+              onCancel={execution.cancelActiveRun}
+              onSendStdin={(line) => execution.sendStdin(line, true)}
+              onSelectRun={setActiveRunId}
+              onClearOutput={execution.clearOutputSegments}
+              onDismissError={execution.clearConsoleError}
+              onToggleExpanded={toggleConsoleExpanded}
+              onClose={() => setConsoleOpen(false)}
+            />
+          </div>
 
           <StudioInspectorDrawer
             project={project}
@@ -892,6 +1044,25 @@ export function StudioPage() {
             aclTargetNodeId={aclTargetNodeId}
             currentUserId={currentUserId}
             activeTab={rightPanelTab}
+            activeFile={activeFile}
+            activeCursorLine={activeDraft?.cursorLine ?? 1}
+            isWorkspaceMember={isWorkspaceMember}
+            canSendChat={isEditorOrOwner}
+            chatState={{
+              messages: chat.messages,
+              nextCursor: chat.nextCursor,
+              isLoadingHistory: chat.isLoadingHistory,
+              isLoadingOlder: chat.isLoadingOlder,
+              isSending: chat.isSending,
+              chatJoined: chat.chatJoined,
+              chatError: chat.chatError,
+              typingPeers: chat.typingPeers,
+              onLoadOlder: () => void chat.loadOlderMessages(),
+              onSendMessage: chat.sendMessage,
+              onNotifyTyping: chat.notifyTyping,
+              onClearError: chat.clearChatError,
+              onNavigateToFileRef: handleNavigateToChatFileRef,
+            }}
             onChangeTab={setRightPanelTab}
             onSelectAclTarget={setAclTargetNodeId}
             onWorkspaceLeftOrDeleted={() => navigate('/', { replace: true })}

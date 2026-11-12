@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   AddProjectMemberSchema,
   CreateBranchSchema,
+  CreateChatMessageSchema,
+  CreateExecutionRunSchema,
   CreateFileNodeSchema,
   CreateProjectSchema,
   MergeBranchSchema,
@@ -14,6 +16,16 @@ import {
 import { requireAuth } from '../../middleware/auth.middleware';
 import { validateBody } from '../../middleware/validate.middleware';
 import { asyncHandler } from '../../utils/asyncHandler';
+import {
+  createProjectChatMessageController,
+  listProjectChatMessagesController,
+} from '../chat/chat.controller';
+import {
+  cancelExecutionRunController,
+  createExecutionRunController,
+  getExecutionRunDetailController,
+  listBranchExecutionRunsController,
+} from '../execution/execution.controller';
 import {
   addMemberController,
   createBranchController,
@@ -153,4 +165,34 @@ projectRouter.put(
 projectRouter.delete(
   '/:projectId/branches/:branchId/files/:fileId/access/:userId',
   asyncHandler(removeFileAccessController)
+);
+
+// --- Day 4: Isolated Code Execution ---
+projectRouter.get(
+  '/:projectId/branches/:branchId/runs',
+  asyncHandler(listBranchExecutionRunsController)
+);
+projectRouter.post(
+  '/:projectId/branches/:branchId/runs',
+  validateBody(CreateExecutionRunSchema),
+  asyncHandler(createExecutionRunController)
+);
+projectRouter.get(
+  '/:projectId/runs/:runId',
+  asyncHandler(getExecutionRunDetailController)
+);
+projectRouter.post(
+  '/:projectId/runs/:runId/cancel',
+  asyncHandler(cancelExecutionRunController)
+);
+
+// --- Day 4: Real-Time Workspace Chat ---
+projectRouter.get(
+  '/:projectId/chat',
+  asyncHandler(listProjectChatMessagesController)
+);
+projectRouter.post(
+  '/:projectId/chat',
+  validateBody(CreateChatMessageSchema),
+  asyncHandler(createProjectChatMessageController)
 );

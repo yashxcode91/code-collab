@@ -41,6 +41,7 @@ interface UseRealtimeCollabParams {
 }
 
 export interface UseRealtimeCollabResult {
+  socket: TypedClientSocket | null;
   connectionStatus: RealtimeConnectionStatus;
   syncStatus: RealtimeSyncStatus;
   roomReady: boolean;
@@ -60,7 +61,7 @@ export interface UseRealtimeCollabResult {
   }) => void;
 }
 
-type TypedClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+export type TypedClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 interface ActiveRoomSession {
   projectId: string;
@@ -103,6 +104,9 @@ export function useRealtimeCollab({
     number | null
   >(null);
   const [realtimeError, setRealtimeError] = useState<RealtimeErrorState | null>(
+    null,
+  );
+  const [sharedSocket, setSharedSocket] = useState<TypedClientSocket | null>(
     null,
   );
 
@@ -281,6 +285,7 @@ export function useRealtimeCollab({
       reconnectionDelayMax: 5000,
     });
     socketRef.current = socket;
+    setSharedSocket(socket);
 
     socket.on('connect', () => {
       setConnectionStatus('connected');
@@ -365,6 +370,11 @@ export function useRealtimeCollab({
       ) {
         setServerPermission(msg.permission);
         if (msg.permission === 'denied') {
+          current.doc.destroy();
+          activeSessionRef.current = null;
+          pendingAckCountRef.current = 0;
+          setYdoc(null);
+          setPresenceUsers([]);
           setRoomReady(false);
           setSyncStatus('offline');
         }
@@ -373,7 +383,27 @@ export function useRealtimeCollab({
     });
 
     socket.on('realtime:error', (err) => {
+      if (err.runId) {
+        return;
+      }
       const current = activeSessionRef.current;
+      if (
+        err.code === 'UNAUTHORIZED' ||
+        err.code === 'PROJECT_FORBIDDEN' ||
+        err.code === 'PROJECT_NOT_FOUND' ||
+        (err.code === 'FILE_ACCESS_DENIED' &&
+          (!err.fileId || err.fileId === current?.fileId))
+      ) {
+        if (current) {
+          current.doc.destroy();
+          activeSessionRef.current = null;
+          pendingAckCountRef.current = 0;
+        }
+        setYdoc(null);
+        setPresenceUsers([]);
+        setRoomReady(false);
+        setSyncStatus('offline');
+      }
       if (err.fileId && current && err.fileId !== current.fileId) {
         return;
       }
@@ -401,6 +431,7 @@ export function useRealtimeCollab({
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
+      setSharedSocket(null);
       pendingAckCountRef.current = 0;
       setConnectionStatus('disconnected');
       setSyncStatus('offline');
@@ -546,6 +577,7 @@ export function useRealtimeCollab({
   );
 
   return {
+    socket: sharedSocket,
     connectionStatus,
     syncStatus,
     roomReady,

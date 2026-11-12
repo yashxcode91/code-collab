@@ -4,6 +4,7 @@ import http from 'node:http';
 import { prisma } from '@codecollab/database';
 import { app } from './app';
 import { redis } from './lib/redis';
+import { closeExecutionQueue } from './modules/execution/execution.queue';
 import { createRealtimeServer } from './realtime/socketServer';
 import { yjsRoomManager } from './realtime/yjsRoomManager';
 
@@ -29,6 +30,7 @@ const shutdown = async (signal: string) => {
   try {
     await io.close();
     await yjsRoomManager.closeAll();
+    await closeExecutionQueue();
     await prisma.$disconnect();
     if (redis.status === 'ready') {
       await redis.quit();

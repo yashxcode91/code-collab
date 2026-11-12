@@ -10,14 +10,18 @@ import {
   Lock,
   LockOpen,
   Maximize2,
+  MessageSquare,
   Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
+  Play,
   Plus,
   Save,
   Shield,
   ShieldCheck,
   SlidersHorizontal,
+  Square,
+  Terminal,
   Trash2,
   Unlock,
   Users,
@@ -67,6 +71,17 @@ interface StudioTopBarProps {
   collabSyncStatus: RealtimeSyncStatus;
   collabRoomReady: boolean;
   presenceUsers: RealtimePresenceUser[];
+  consoleOpen: boolean;
+  canRunCode: boolean;
+  hasRunnableSource: boolean;
+  isExecutionActive: boolean;
+  isExecutionStarting: boolean;
+  canCancelExecution: boolean;
+  isWorkspaceMember: boolean;
+  chatUnreadCount: number;
+  onRunCode: () => void;
+  onCancelExecution: () => void;
+  onToggleConsole: () => void;
   onJumpToCollaboratorLine: (lineNumber: number) => void;
   onToggleExplorer: () => void;
   onToggleWindowExpanded: () => void;
@@ -103,6 +118,17 @@ export function StudioTopBar({
   collabSyncStatus,
   collabRoomReady,
   presenceUsers,
+  consoleOpen,
+  canRunCode,
+  hasRunnableSource,
+  isExecutionActive,
+  isExecutionStarting,
+  canCancelExecution,
+  isWorkspaceMember,
+  chatUnreadCount,
+  onRunCode,
+  onCancelExecution,
+  onToggleConsole,
   onJumpToCollaboratorLine,
   onToggleExplorer,
   onToggleWindowExpanded,
@@ -687,8 +713,62 @@ export function StudioTopBar({
             )}
           </div>
 
-          {/* Group 2 (Center): Active File Lock & Save Actions */}
+          {/* Group 2 (Center): Run, Console, Active File Lock & Save Actions */}
           <div className="flex items-center gap-1">
+            {canRunCode &&
+              (isExecutionActive ? (
+                <button
+                  type="button"
+                  disabled={!canCancelExecution}
+                  onClick={onCancelExecution}
+                  title="Stop running execution"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-destructive/15 px-2.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/25 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Square className="h-3 w-3 fill-current" aria-hidden="true" />
+                  <span>Stop</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!hasRunnableSource || isExecutionStarting}
+                  onClick={onRunCode}
+                  title={
+                    hasRunnableSource
+                      ? `Run ${activeFile?.name ?? 'file'} in Docker sandbox`
+                      : 'Open a file to run'
+                  }
+                  className="btn-studio-primary inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {isExecutionStarting ? (
+                    <Loader2
+                      className="h-3.5 w-3.5 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Play className="h-3 w-3 fill-current" aria-hidden="true" />
+                  )}
+                  <span>{isExecutionStarting ? 'Running…' : 'Run'}</span>
+                </button>
+              ))}
+
+            <button
+              type="button"
+              onClick={onToggleConsole}
+              title={consoleOpen ? 'Hide execution console' : 'Open execution console'}
+              aria-label={
+                consoleOpen ? 'Hide execution console' : 'Open execution console'
+              }
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-colors',
+                consoleOpen
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground',
+              )}
+            >
+              <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="hidden xl:inline">Console</span>
+            </button>
+
             {activeFile && activeFile.nodeType === 'file' && (
               <>
                 <button
@@ -873,6 +953,32 @@ export function StudioTopBar({
 
           {/* Group 3 (Right): Inspector Tabs, Window Expand & Theme */}
           <div className="flex items-center gap-1">
+            {isWorkspaceMember && (
+              <button
+                type="button"
+                onClick={() =>
+                  onSetRightPanelTab(
+                    rightPanelTab === 'chat' ? 'closed' : 'chat',
+                  )
+                }
+                className={cn(
+                  'relative inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors',
+                  rightPanelTab === 'chat'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground',
+                )}
+                title="Workspace Chat"
+              >
+                <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="hidden lg:inline">Chat</span>
+                {chatUnreadCount > 0 && rightPanelTab !== 'chat' && (
+                  <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9.5px] font-bold text-primary-foreground">
+                    {chatUnreadCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() =>

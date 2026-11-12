@@ -5,6 +5,7 @@ import { healthRouter } from './modules/health/health.router';
 import { authRouter } from './modules/auth/auth.router';
 import { projectRouter } from './modules/projects/project.router';
 import { csrfProtection, getAllowedOrigin } from './middleware/csrf.middleware';
+import { securityHeaders } from './middleware/securityHeaders.middleware';
 import {
   globalErrorHandler,
   notFoundHandler,
@@ -18,6 +19,8 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export const app: Application = express();
+app.disable('x-powered-by');
+app.use(securityHeaders);
 
 // 1. Credentialed CORS locked to our validated frontend origin
 app.use(

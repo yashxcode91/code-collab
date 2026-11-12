@@ -143,5 +143,35 @@ describe('Backend Security Infrastructure (CORS, CSRF, Errors)', () => {
       expect(notFoundRes.body.success).toBe(false);
       expect(notFoundRes.body.error.code).toBe('ROUTE_NOT_FOUND');
     });
+
+    it('applies defensive HTTP security headers and removes X-Powered-By (VULN-06)', async () => {
+      const res = await request(app).get('/api/health');
+      expect(res.status).toBe(200);
+      expect(res.headers['x-powered-by']).toBeUndefined();
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+      expect(res.headers['x-frame-options']).toBe('DENY');
+      expect(res.headers['referrer-policy']).toBe('no-referrer');
+      expect(res.headers['cross-origin-resource-policy']).toBe('same-site');
+      expect(res.headers['content-security-policy']).toContain("default-src 'none'");
+    });
+
+    it('enforces per-account Redis rate limiting on POST /api/auth/login (VULN-06)', async () => {
+      const targetEmail = `ratelimit_target_${Date.now()}@codecollab.test`;
+      for (let i = 0; i < 10; i += 1) {
+        const attempt = await request(app)
+          .post('/api/auth/login')
+          .set('Origin', TRUSTED_ORIGIN)
+          .send({ identifier: targetEmail, password: 'WrongPassword123!' });
+        expect(attempt.status).toBe(401);
+      }
+
+      const throttled = await request(app)
+        .post('/api/auth/login')
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({ identifier: targetEmail, password: 'WrongPassword123!' });
+      expect(throttled.status).toBe(429);
+      expect(throttled.body.error?.code).toBe('RATE_LIMIT_EXCEEDED');
+      expect(throttled.headers['retry-after']).toBeDefined();
+    });
   });
 });

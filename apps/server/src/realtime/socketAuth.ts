@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Socket } from 'socket.io';
 import type {
   ClientToServerEvents,
@@ -11,6 +12,7 @@ export interface SocketUser {
   id: string;
   username: string;
   avatarUrl?: string;
+  tokenHash?: string;
 }
 
 export interface SocketData {
@@ -75,10 +77,13 @@ export const socketAuthMiddleware = async (
       return;
     }
 
+    const tokenHash = createHash('sha256').update(token, 'utf8').digest('hex');
+
     socket.data.user = {
       id: user.id,
       username: user.username,
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+      tokenHash,
     };
 
     next();

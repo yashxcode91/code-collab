@@ -87,7 +87,7 @@ interface StudioEditorPaneProps {
   preventSameLineEdit: boolean;
   realtimeError: RealtimeErrorState | null;
   focusModeEnabled: boolean;
-  scrollToLineRequest: { line: number; seq: number } | null;
+  scrollToLineRequest: { fileId?: string; line: number; seq: number } | null;
   onSelectTab: (fileId: string) => void;
   onCloseTab: (fileId: string) => void;
   onChangeContent: (fileId: string, value: string) => void;
@@ -377,12 +377,24 @@ export function StudioEditorPane({
     activeModelUri,
   ]);
 
-  // Jump editor viewport to a teammate's line when clicking their avatar in TopBar
+  // Jump editor viewport to a teammate's line or chat code reference
+  const lastAppliedScrollSeqRef = useRef<number>(0);
+
   useEffect(() => {
     if (!scrollToLineRequest || !editorRef.current) return;
+    if (scrollToLineRequest.seq <= lastAppliedScrollSeqRef.current) return;
+    if (
+      scrollToLineRequest.fileId &&
+      renderedTarget?.file.id !== scrollToLineRequest.fileId
+    ) {
+      return;
+    }
+
     const editor = editorRef.current;
     const model = editor.getModel();
     if (!model) return;
+
+    lastAppliedScrollSeqRef.current = scrollToLineRequest.seq;
     const clamped = Math.min(
       Math.max(1, scrollToLineRequest.line),
       model.getLineCount(),
@@ -390,7 +402,7 @@ export function StudioEditorPane({
     editor.revealLineInCenter(clamped);
     editor.setPosition({ lineNumber: clamped, column: 1 });
     editor.focus();
-  }, [scrollToLineRequest]);
+  }, [scrollToLineRequest, renderedTarget?.file.id, isEditorMounted]);
 
   const openTabs = useMemo(() => {
     const nodeMap = new Map(files.map((node) => [node.id, node]));

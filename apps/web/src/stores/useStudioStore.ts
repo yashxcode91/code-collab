@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ProjectFileDetailDto } from '@codecollab/shared';
 
-export type InspectorTab = 'closed' | 'members' | 'access' | 'settings';
+export type InspectorTab = 'closed' | 'chat' | 'members' | 'access' | 'settings';
 
 export interface FileDraftBuffer {
   fileId: string;
@@ -34,6 +34,9 @@ interface StudioState {
   explorerCollapsed: boolean;
   isWindowExpanded: boolean;
   focusModeEnabled: boolean;
+  consoleOpen: boolean;
+  consoleExpanded: boolean;
+  activeRunId: string | null;
 
   initProjectSession: (projectId: string, defaultBranchId: string | null) => void;
   selectBranch: (branchId: string) => void;
@@ -65,6 +68,10 @@ interface StudioState {
   toggleExplorer: () => void;
   toggleWindowExpanded: () => void;
   toggleFocusMode: () => void;
+  setConsoleOpen: (open: boolean) => void;
+  toggleConsole: () => void;
+  toggleConsoleExpanded: () => void;
+  setActiveRunId: (runId: string | null) => void;
   resetMergedBranchBuffers: (preserveFileId?: string | null) => void;
   resetStudio: () => void;
 }
@@ -82,6 +89,9 @@ const INITIAL_STATE = {
   explorerCollapsed: false,
   isWindowExpanded: false,
   focusModeEnabled: false,
+  consoleOpen: false,
+  consoleExpanded: false,
+  activeRunId: null as string | null,
 };
 
 /**
@@ -118,6 +128,7 @@ export const useStudioStore = create<StudioState>((set) => ({
         expandedFolderIds: {},
         buffers: {},
         conflicts: {},
+        activeRunId: null,
       };
     }),
 
@@ -357,6 +368,16 @@ export const useStudioStore = create<StudioState>((set) => ({
 
   toggleFocusMode: () =>
     set((state) => ({ focusModeEnabled: !state.focusModeEnabled })),
+
+  setConsoleOpen: (consoleOpen) => set({ consoleOpen }),
+
+  toggleConsole: () =>
+    set((state) => ({ consoleOpen: !state.consoleOpen })),
+
+  toggleConsoleExpanded: () =>
+    set((state) => ({ consoleExpanded: !state.consoleExpanded })),
+
+  setActiveRunId: (activeRunId) => set({ activeRunId }),
 
   resetMergedBranchBuffers: (preserveFileId) =>
     set((state) => {

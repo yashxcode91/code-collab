@@ -335,8 +335,7 @@ export function GlassySidebar({
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <Users className="h-3 w-3 text-muted-foreground" />
-                      {hoveredProject.memberCount ?? 1}/
-                      {hoveredProject.maxConcurrentEditors}
+                      {hoveredProject.memberCount ?? 1} · {hoveredProject.maxConcurrentEditors} live
                     </span>
                     <ArrowRight className="ml-auto h-3 w-3 text-primary" />
                   </div>

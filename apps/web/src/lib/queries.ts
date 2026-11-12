@@ -2,9 +2,14 @@ import type {
   AddProjectMemberInput,
   BranchMergePreviewResponse,
   BranchMergeResultResponse,
+  ChatMessageDto,
   CreateBranchInput,
+  CreateChatMessageInput,
+  CreateExecutionRunInput,
   CreateFileNodeInput,
   CreateProjectInput,
+  ExecutionRunDetailDto,
+  ExecutionRunDto,
   HealthCheckResponse,
   MergeBranchInput,
   Project,
@@ -59,6 +64,11 @@ export const queryKeys = {
         fileId,
         'access',
       ] as const,
+    runs: (projectId: string, branchId: string) =>
+      ['projects', projectId, 'branches', branchId, 'runs'] as const,
+    runDetail: (projectId: string, runId: string) =>
+      ['projects', projectId, 'runs', runId] as const,
+    chat: (projectId: string) => ['projects', projectId, 'chat'] as const,
   },
 } as const;
 
@@ -386,4 +396,92 @@ export async function removeFileAccessRule(
     `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/files/${encodeURIComponent(fileId)}/access/${encodeURIComponent(userId)}`,
     { method: 'DELETE' },
   );
+}
+
+// =====================================================================
+// Day 4: Code Execution Runs & Workspace Chat
+// =====================================================================
+
+/** Lists recent execution runs on a branch visible to the caller (respects file ACLs). */
+export async function fetchBranchExecutionRuns(
+  projectId: string,
+  branchId: string,
+): Promise<ExecutionRunDto[]> {
+  const res = await apiRequest<{ runs: ExecutionRunDto[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/runs`,
+  );
+  return res.runs;
+}
+
+/** Enqueues an isolated Docker execution run for a branch snapshot. Owner/Editor only. */
+export async function createExecutionRun(
+  projectId: string,
+  branchId: string,
+  input: CreateExecutionRunInput,
+): Promise<ExecutionRunDetailDto> {
+  const res = await apiRequest<{ run: ExecutionRunDetailDto }>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/runs`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+  return res.run;
+}
+
+/** Retrieves full status, output, and source snapshot for a single run. */
+export async function fetchExecutionRunDetail(
+  projectId: string,
+  runId: string,
+): Promise<ExecutionRunDetailDto> {
+  const res = await apiRequest<{ run: ExecutionRunDetailDto }>(
+    `/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}`,
+  );
+  return res.run;
+}
+
+/** Requests cancellation of a queued or running execution container. */
+export async function cancelExecutionRun(
+  projectId: string,
+  runId: string,
+): Promise<ExecutionRunDto> {
+  const res = await apiRequest<{ run: ExecutionRunDto }>(
+    `/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/cancel`,
+    { method: 'POST' },
+  );
+  return res.run;
+}
+
+export interface ChatHistoryPage {
+  messages: ChatMessageDto[];
+  nextCursor: string | null;
+}
+
+/** Fetches cursor-paginated team chat messages for workspace members. */
+export async function fetchProjectChatMessages(
+  projectId: string,
+  params?: { cursor?: string; limit?: number },
+): Promise<ChatHistoryPage> {
+  const search = new URLSearchParams();
+  if (params?.cursor) search.set('cursor', params.cursor);
+  if (params?.limit) search.set('limit', String(params.limit));
+  const qs = search.toString();
+  return apiRequest<ChatHistoryPage>(
+    `/api/projects/${encodeURIComponent(projectId)}/chat${qs ? `?${qs}` : ''}`,
+  );
+}
+
+/** Persists and broadcasts a new workspace chat message via REST fallback. Owner/Editor only. */
+export async function sendProjectChatMessage(
+  projectId: string,
+  input: CreateChatMessageInput,
+): Promise<ChatMessageDto> {
+  const res = await apiRequest<{ message: ChatMessageDto }>(
+    `/api/projects/${encodeURIComponent(projectId)}/chat`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    },
+  );
+  return res.message;
 }

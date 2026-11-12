@@ -251,6 +251,40 @@ export class YjsRoomManager {
     return member;
   }
 
+  /** Returns project/branch/file metadata for an active in-memory room without hitting Postgres. */
+  getRoomMeta(
+    roomKey: string
+  ): { projectId: string; branchId: string; fileId: string } | null {
+    const room = this.rooms.get(roomKey);
+    if (!room) return null;
+    return {
+      projectId: room.projectId,
+      branchId: room.branchId,
+      fileId: room.fileId,
+    };
+  }
+
+  /** Updates a connected socket's cached room permission after an ACL or role change. */
+  updateSocketMemberPermission(
+    roomKey: string,
+    socketId: string,
+    permission: Exclude<FileAccessPermission, 'denied'>
+  ): RealtimePresenceUser[] | null {
+    const room = this.rooms.get(roomKey);
+    if (!room) return null;
+    const member = room.members.get(socketId);
+    if (!member) return null;
+    if (member.permission === permission) {
+      return null;
+    }
+    member.permission = permission;
+    member.presence = {
+      ...member.presence,
+      permission,
+    };
+    return this.getRoomPresence(roomKey);
+  }
+
   /** Updates ephemeral cursor/focus state for a connected room member, with burst flood protection. */
   updateMemberAwareness(
     roomKey: string,
@@ -337,7 +371,12 @@ export class YjsRoomManager {
       };
     }
 
-    const prevSnapshot = Y.encodeStateAsUpdate(room.doc);
+    const preLength = room.doc.getText(YJS_TEXT_KEY).length;
+    const prevSnapshot =
+      preLength + update.byteLength >
+      COLLAB_LIMITS.MAX_FILE_CONTENT_CHARS * 0.75
+        ? Y.encodeStateAsUpdate(room.doc)
+        : null;
     try {
       Y.applyUpdate(room.doc, update, originSocketId);
     } catch {
@@ -351,16 +390,18 @@ export class YjsRoomManager {
     const currentTextLength = room.doc.getText(YJS_TEXT_KEY).length;
     if (currentTextLength > COLLAB_LIMITS.MAX_FILE_CONTENT_CHARS) {
       // Roll back document cleanly if a single update exceeds max file character ceiling
-      const rollbackDoc = new Y.Doc();
-      Y.applyUpdate(rollbackDoc, prevSnapshot, 'rollback');
-      const diffFromBroken = Y.encodeStateAsUpdate(
-        rollbackDoc,
-        Y.encodeStateVector(room.doc)
-      );
-      if (diffFromBroken.byteLength > 0) {
-        Y.applyUpdate(room.doc, diffFromBroken, 'rollback');
+      if (prevSnapshot) {
+        const rollbackDoc = new Y.Doc();
+        Y.applyUpdate(rollbackDoc, prevSnapshot, 'rollback');
+        const diffFromBroken = Y.encodeStateAsUpdate(
+          rollbackDoc,
+          Y.encodeStateVector(room.doc)
+        );
+        if (diffFromBroken.byteLength > 0) {
+          Y.applyUpdate(room.doc, diffFromBroken, 'rollback');
+        }
+        rollbackDoc.destroy();
       }
-      rollbackDoc.destroy();
       return {
         ok: false,
         code: 'FILE_TOO_LARGE',
@@ -530,6 +571,26 @@ export class YjsRoomManager {
     }
     room.doc.destroy();
     this.rooms.delete(roomKey);
+  }
+
+  /** Drops all in-memory rooms matching a set of deleted file/descendant IDs on a branch. */
+  destroyRoomsByFileIds(branchId: string, fileIds: string[]): void {
+    for (const fileId of fileIds) {
+      this.destroyRoomIfLoaded(branchId, fileId);
+    }
+  }
+
+  /** Drops all in-memory rooms belonging to a deleted workspace project. */
+  destroyProjectRooms(projectId: string): void {
+    for (const [key, room] of Array.from(this.rooms.entries())) {
+      if (room.projectId !== projectId) continue;
+      if (room.flushTimer) {
+        clearTimeout(room.flushTimer);
+        room.flushTimer = null;
+      }
+      room.doc.destroy();
+      this.rooms.delete(key);
+    }
   }
 
   /** Flushes all dirty rooms belonging to a specific branch before diff/merge inspection. */

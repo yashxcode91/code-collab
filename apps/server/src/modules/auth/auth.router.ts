@@ -3,6 +3,7 @@ import { LoginSchema, RegisterSchema } from '@codecollab/shared';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { validateBody } from '../../middleware/validate.middleware';
 import { requireAuth } from '../../middleware/auth.middleware';
+import { createRateLimitMiddleware } from '../../middleware/rateLimit.middleware';
 import {
   loginController,
   logoutController,
@@ -11,6 +12,38 @@ import {
   oauthStartController,
   registerController,
 } from './auth.controller';
+
+const registerIpLimiter = createRateLimitMiddleware({
+  keyPrefix: 'auth:register-ip',
+  maxRequests: 60,
+  windowSec: 60,
+  message: 'Too many registration attempts; please try again shortly',
+});
+
+const loginIpLimiter = createRateLimitMiddleware({
+  keyPrefix: 'auth:login-ip',
+  maxRequests: 60,
+  windowSec: 60,
+  message: 'Too many login attempts; please try again shortly',
+});
+
+const loginAccountLimiter = createRateLimitMiddleware({
+  keyPrefix: 'auth:login-acct',
+  maxRequests: 10,
+  windowSec: 60,
+  message: 'Too many login attempts for this account; please wait a minute',
+  getKeySuffix: (req) => {
+    const body = req.body as { identifier?: unknown; email?: unknown } | undefined;
+    const raw =
+      typeof body?.identifier === 'string'
+        ? body.identifier
+        : typeof body?.email === 'string'
+          ? body.email
+          : null;
+    if (!raw) return null;
+    return `${req.ip || 'unknown'}:${raw.trim().toLowerCase().slice(0, 120)}`;
+  },
+});
 
 /**
  * Authentication & OAuth 2.0 router mounted at `/api/auth`.
@@ -21,13 +54,16 @@ export const authRouter = Router();
 // Local email/username + password authentication
 authRouter.post(
   '/register',
+  registerIpLimiter,
   validateBody(RegisterSchema),
   asyncHandler(registerController)
 );
 
 authRouter.post(
   '/login',
+  loginIpLimiter,
   validateBody(LoginSchema),
+  loginAccountLimiter,
   asyncHandler(loginController)
 );
 

@@ -366,9 +366,12 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
               <GitBranch className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
               {project.branchCount ?? 1}
             </span>
-            <span className="inline-flex items-center gap-1">
+            <span
+              className="inline-flex items-center gap-1"
+              title={`${project.memberCount ?? 1} workspace ${(project.memberCount ?? 1) === 1 ? 'member' : 'members'} · ${project.maxConcurrentEditors} max live editors`}
+            >
               <Users className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
-              {project.memberCount ?? 1}/{project.maxConcurrentEditors}
+              {project.memberCount ?? 1} · {project.maxConcurrentEditors} live
             </span>
             <span className="ml-auto text-[10px]">
               {formatRelativeTime(project.updatedAt)}

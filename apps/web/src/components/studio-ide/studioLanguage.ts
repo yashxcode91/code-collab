@@ -50,6 +50,42 @@ const WORKSPACE_FALLBACK_LANGUAGE: Record<SupportedLanguage, string> = {
   java: 'java',
 };
 
+/** Maps a file name's extension cleanly to one of the 5 supported sandbox runner languages. */
+export function inferExecutionLanguage(
+  filename: string | undefined,
+  workspaceLanguage: SupportedLanguage,
+): SupportedLanguage {
+  if (!filename) return workspaceLanguage;
+  const dotIdx = filename.lastIndexOf('.');
+  if (dotIdx !== -1 && dotIdx < filename.length - 1) {
+    const ext = filename.slice(dotIdx + 1).toLowerCase();
+    if (ext === 'js' || ext === 'mjs' || ext === 'cjs' || ext === 'jsx') {
+      return 'javascript';
+    }
+    if (ext === 'ts' || ext === 'mts' || ext === 'cts' || ext === 'tsx') {
+      return 'typescript';
+    }
+    if (ext === 'py' || ext === 'pyw') {
+      return 'python';
+    }
+    if (
+      ext === 'cpp' ||
+      ext === 'cc' ||
+      ext === 'cxx' ||
+      ext === 'hpp' ||
+      ext === 'hh' ||
+      ext === 'h' ||
+      ext === 'c'
+    ) {
+      return 'cpp';
+    }
+    if (ext === 'java') {
+      return 'java';
+    }
+  }
+  return workspaceLanguage;
+}
+
 /** Maps a file name's extension cleanly to a Monaco syntax highlighting language ID. */
 export function resolveMonacoLanguage(
   filename: string | undefined,

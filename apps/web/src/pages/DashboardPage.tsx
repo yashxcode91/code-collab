@@ -1026,7 +1026,7 @@ export function DashboardPage() {
                 getKey={(project) => project.id}
                 getLabel={(project) => project.name}
                 getSubtitle={(project) =>
-                  `${SHORT_LANG_LABELS[project.language]} · src/${STARTER_ENTRY_FILES[project.language]} · ${project.branchCount ?? 1} ${(project.branchCount ?? 1) === 1 ? 'branch' : 'branches'} · ${project.memberCount ?? 1}/${project.maxConcurrentEditors} seats · ${project.isPublic ? 'Public' : 'Private'}`
+                  `${SHORT_LANG_LABELS[project.language]} · src/${STARTER_ENTRY_FILES[project.language]} · ${project.branchCount ?? 1} ${(project.branchCount ?? 1) === 1 ? 'branch' : 'branches'} · ${project.memberCount ?? 1} ${(project.memberCount ?? 1) === 1 ? 'member' : 'members'} · ${project.maxConcurrentEditors} live ${project.maxConcurrentEditors === 1 ? 'seat' : 'seats'} · ${project.isPublic ? 'Public' : 'Private'}`
                 }
                 activeIndex={activeWorkspaceIndex}
                 onActiveIndexChange={setActiveWorkspaceIndex}

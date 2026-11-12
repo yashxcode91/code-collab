@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { RequestHandler } from 'express';
 import {
   ApiResponse,
@@ -7,6 +8,7 @@ import {
 } from '@codecollab/shared';
 import { AppError } from '../../utils/AppError';
 import { getAllowedOrigin } from '../../middleware/csrf.middleware';
+import { disconnectSocketsByTokenHash } from '../../realtime/socketServer';
 import {
   AUTH_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
@@ -63,8 +65,17 @@ export const loginController: RequestHandler = async (req, res) => {
   res.status(200).json(response);
 };
 
-/** Clears the HttpOnly auth cookie using matching cookie attributes so browsers reliably remove it. */
-export const logoutController: RequestHandler = async (_req, res) => {
+/** Clears the HttpOnly auth cookie and evicts active WebSocket sessions bound to that token. */
+export const logoutController: RequestHandler = async (req, res) => {
+  const token =
+    typeof req.cookies?.[AUTH_COOKIE_NAME] === 'string'
+      ? req.cookies[AUTH_COOKIE_NAME]
+      : null;
+  if (token) {
+    const tokenHash = createHash('sha256').update(token, 'utf8').digest('hex');
+    await disconnectSocketsByTokenHash(tokenHash);
+  }
+
   // Passing exact same { httpOnly, sameSite, path, secure } ensures browsers delete the cookie
   res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
 
