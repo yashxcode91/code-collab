@@ -33,6 +33,7 @@ interface StudioState {
   rightPanelTab: InspectorTab;
   explorerCollapsed: boolean;
   isWindowExpanded: boolean;
+  focusModeEnabled: boolean;
 
   initProjectSession: (projectId: string, defaultBranchId: string | null) => void;
   selectBranch: (branchId: string) => void;
@@ -47,6 +48,11 @@ interface StudioState {
     options?: { forceOverwrite?: boolean },
   ) => void;
   updateDraftContent: (fileId: string, content: string) => void;
+  syncCollabBuffer: (
+    fileId: string,
+    content: string,
+    savedVersion?: number,
+  ) => void;
   markFileSaved: (file: ProjectFileDetailDto) => void;
   discardFileDraft: (fileId: string) => void;
   setCursorPosition: (fileId: string, line: number, column: number) => void;
@@ -58,6 +64,7 @@ interface StudioState {
   setRightPanelTab: (tab: InspectorTab) => void;
   toggleExplorer: () => void;
   toggleWindowExpanded: () => void;
+  toggleFocusMode: () => void;
   resetStudio: () => void;
 }
 
@@ -73,6 +80,7 @@ const INITIAL_STATE = {
   rightPanelTab: 'closed' as InspectorTab,
   explorerCollapsed: false,
   isWindowExpanded: false,
+  focusModeEnabled: false,
 };
 
 /**
@@ -217,6 +225,25 @@ export const useStudioStore = create<StudioState>((set) => ({
       };
     }),
 
+  syncCollabBuffer: (fileId, content, savedVersion) =>
+    set((state) => {
+      const existing = state.buffers[fileId];
+      return {
+        buffers: {
+          ...state.buffers,
+          [fileId]: {
+            fileId,
+            content,
+            lastSyncedContent: content,
+            savedVersion: savedVersion ?? existing?.savedVersion ?? 1,
+            isDirty: false,
+            cursorLine: existing?.cursorLine ?? 1,
+            cursorColumn: existing?.cursorColumn ?? 1,
+          },
+        },
+      };
+    }),
+
   markFileSaved: (file) =>
     set((state) => {
       const existing = state.buffers[file.id];
@@ -326,6 +353,9 @@ export const useStudioStore = create<StudioState>((set) => ({
 
   toggleWindowExpanded: () =>
     set((state) => ({ isWindowExpanded: !state.isWindowExpanded })),
+
+  toggleFocusMode: () =>
+    set((state) => ({ focusModeEnabled: !state.focusModeEnabled })),
 
   resetStudio: () => set({ ...INITIAL_STATE }),
 }));

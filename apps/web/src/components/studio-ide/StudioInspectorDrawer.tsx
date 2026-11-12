@@ -574,24 +574,24 @@ export function StudioInspectorDrawer({
                     placeholder="username or email"
                     className="glass-control h-8 w-full rounded-xl px-2.5 font-mono text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-primary/60 focus:outline-none"
                   />
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <select
                       value={inviteRole}
                       onChange={(e) =>
                         setInviteRole(e.target.value as 'editor' | 'viewer')
                       }
                       aria-label="Collaborator role"
-                      className="glass-control h-8 flex-1 rounded-xl px-2.5 font-mono text-xs text-foreground focus:outline-none"
+                      className="glass-control h-8 min-w-0 flex-1 truncate rounded-xl px-2 font-mono text-[11px] text-foreground focus:outline-none"
                     >
-                      <option value="editor">Editor (read & write)</option>
-                      <option value="viewer">Viewer (read-only)</option>
+                      <option value="editor">Editor (Write)</option>
+                      <option value="viewer">Viewer (Read)</option>
                     </select>
                     <button
                       type="submit"
                       disabled={
                         inviteMutation.isPending || !inviteIdentifier.trim()
                       }
-                      className="btn-studio-primary inline-flex h-8 shrink-0 items-center gap-1 rounded-xl px-3 text-xs font-semibold disabled:opacity-50"
+                      className="btn-studio-primary inline-flex h-8 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-semibold disabled:opacity-50"
                     >
                       {inviteMutation.isPending ? (
                         <Loader2

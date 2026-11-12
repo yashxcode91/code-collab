@@ -38,6 +38,7 @@ import {
   toDtoRole,
 } from './project.auth';
 import { buildStarterWorkspaceNodes } from './project.templates';
+import { yjsRoomManager } from '../../realtime/yjsRoomManager';
 
 // =====================================================================
 // DTO Mappers (DB Rows -> Safe @codecollab/shared Wire Payloads)
@@ -170,7 +171,7 @@ const mapFileNodeDto = (
  * Precedence during the walk: 'denied' short-circuits immediately; 'read_only'
  * is remembered while continuing upward in case a higher folder is 'denied'.
  */
-const resolveInheritedOverride = async (
+export const resolveInheritedOverride = async (
   branchId: string,
   nodeId: string | null,
   userId: string
@@ -1118,7 +1119,9 @@ export const updateFileNode = async (
     ...(input.parentId !== undefined
       ? { parentId: nextParentId, parentKey: nextParentId ?? 'ROOT' }
       : {}),
-    ...(input.content !== undefined ? { content: input.content } : {}),
+    ...(input.content !== undefined
+      ? { content: input.content, yjsState: null }
+      : {}),
     version: { increment: 1 },
   };
 
@@ -1161,6 +1164,16 @@ export const updateFileNode = async (
         include: { lockedBy: { select: { id: true, username: true } } },
       });
     });
+
+    if (input.content !== undefined) {
+      // Keep any live WebSocket Y.Doc aligned if REST saved new plain-text content directly
+      yjsRoomManager.syncFileContentFromRest(
+        branch.id,
+        updated.id,
+        updated.content,
+        updated.version
+      );
+    }
 
     const effective = computeEffectiveFilePermission({
       role,
@@ -1255,6 +1268,7 @@ export const deleteFileNode = async (
   }
 
   await prisma.projectFile.delete({ where: { id: file.id } });
+  yjsRoomManager.destroyRoomIfLoaded(branch.id, file.id);
 };
 
 /**

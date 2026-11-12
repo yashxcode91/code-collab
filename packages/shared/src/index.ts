@@ -11,3 +11,6 @@ export * from './schemas/auth';
 // Export all Project models, roles, collaboration limits, and Zod validation schemas
 export * from './types/project';
 export * from './schemas/project';
+
+// Export all real-time Socket.IO + Yjs event contracts and presence types
+export * from './types/realtime';

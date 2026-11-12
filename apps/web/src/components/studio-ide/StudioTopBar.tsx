@@ -25,11 +25,17 @@ import {
 import { Link } from 'react-router-dom';
 import {
   BranchNameSchema,
+  COLLAB_LIMITS,
   type Project,
   type ProjectBranchDto,
   type ProjectDetailResponse,
   type ProjectFileNodeDto,
+  type RealtimePresenceUser,
 } from '@codecollab/shared';
+import type {
+  RealtimeConnectionStatus,
+  RealtimeSyncStatus,
+} from '@/hooks/useRealtimeCollab';
 import { BrandMark } from '@/components/BrandLogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ApiClientError } from '@/lib/api';
@@ -56,6 +62,11 @@ interface StudioTopBarProps {
   explorerCollapsed: boolean;
   isWindowExpanded: boolean;
   rightPanelTab: InspectorTab;
+  collabConnectionStatus: RealtimeConnectionStatus;
+  collabSyncStatus: RealtimeSyncStatus;
+  collabRoomReady: boolean;
+  presenceUsers: RealtimePresenceUser[];
+  onJumpToCollaboratorLine: (lineNumber: number) => void;
   onToggleExplorer: () => void;
   onToggleWindowExpanded: () => void;
   onSelectBranch: (branchId: string) => void;
@@ -83,6 +94,11 @@ export function StudioTopBar({
   explorerCollapsed,
   isWindowExpanded,
   rightPanelTab,
+  collabConnectionStatus,
+  collabSyncStatus,
+  collabRoomReady,
+  presenceUsers,
+  onJumpToCollaboratorLine,
   onToggleExplorer,
   onToggleWindowExpanded,
   onSelectBranch,
@@ -284,6 +300,38 @@ export function StudioTopBar({
   );
 
   const roleBadge = project.currentUserRole ?? 'viewer';
+  const remotePeers = presenceUsers.filter((u) => u.userId !== currentUserId);
+  const visibleHeaderPeers = remotePeers.slice(
+    0,
+    COLLAB_LIMITS.MAX_HEADER_AVATARS,
+  );
+  const overflowPeerCount = Math.max(
+    0,
+    remotePeers.length - visibleHeaderPeers.length,
+  );
+
+  const syncLabel = !activeFile
+    ? collabConnectionStatus === 'connected'
+      ? 'Ready'
+      : collabConnectionStatus === 'connecting'
+        ? 'Connecting…'
+        : 'Offline'
+    : collabRoomReady
+      ? collabSyncStatus === 'syncing'
+        ? 'Syncing…'
+        : 'CRDT Live'
+      : collabConnectionStatus === 'connecting'
+        ? 'Joining…'
+        : 'REST Mode';
+
+  const syncDotClass =
+    collabRoomReady && collabSyncStatus === 'synced'
+      ? 'bg-emerald-500'
+      : collabSyncStatus === 'syncing' || collabConnectionStatus === 'connecting'
+        ? 'bg-amber-500 animate-pulse'
+        : collabConnectionStatus === 'connected'
+          ? 'bg-emerald-500/80'
+          : 'bg-muted-foreground/50';
 
   return (
     <header className="glass-surface relative z-40 w-full shrink-0 rounded-none border-x-0 border-t-0">
@@ -674,6 +722,110 @@ export function StudioTopBar({
                     ⌘S
                   </kbd>
                 </button>
+
+                <span
+                  aria-hidden="true"
+                  className="mx-0.5 hidden h-4 w-px bg-border/60 md:inline-block"
+                />
+
+                {/* Live CRDT Sync Pill + Up to 4 Colored Presence Avatars */}
+                <div className="hidden items-center gap-2 md:flex">
+                  <span
+                    title={`Real-time status: ${syncLabel}`}
+                    className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 font-mono text-[10.5px] text-muted-foreground"
+                  >
+                    <span
+                      className={cn('h-2 w-2 rounded-full', syncDotClass)}
+                      aria-hidden="true"
+                    />
+                    <span>{syncLabel}</span>
+                  </span>
+
+                  {visibleHeaderPeers.length > 0 && (
+                    <div
+                      className="flex items-center -space-x-1.5 pr-1"
+                      aria-label="Active file collaborators"
+                    >
+                      {visibleHeaderPeers.map((peer) => {
+                        const initial =
+                          peer.username.slice(0, 1).toUpperCase() || '?';
+                        const jumpLine =
+                          peer.focusLine ?? peer.cursor?.headLine ?? null;
+                        return (
+                          <div key={peer.userId} className="group/peer relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (jumpLine !== null) {
+                                  onJumpToCollaboratorLine(jumpLine);
+                                }
+                              }}
+                              aria-label={`@${peer.username} (${peer.permission === 'edit' ? 'editor' : 'viewer'})${jumpLine ? `, Line ${jumpLine}` : ''}`}
+                              style={{
+                                borderColor: peer.color,
+                                backgroundColor: `${peer.color}24`,
+                                color: peer.color,
+                              }}
+                              className={cn(
+                                'relative inline-flex h-6 w-6 items-center justify-center rounded-full border-2 bg-card font-mono text-[10px] font-bold shadow-sm transition-transform hover:z-20 hover:scale-110 focus:z-20 focus:outline-none',
+                                peer.isTyping && 'ring-2 ring-offset-1 ring-offset-card',
+                              )}
+                            >
+                              {peer.avatarUrl ? (
+                                <img
+                                  src={peer.avatarUrl}
+                                  alt={peer.username}
+                                  className="h-full w-full rounded-full object-cover"
+                                />
+                              ) : (
+                                <span>{initial}</span>
+                              )}
+                              {peer.isTyping && (
+                                <span
+                                  style={{ backgroundColor: peer.color }}
+                                  className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-1 ring-card animate-pulse"
+                                />
+                              )}
+                            </button>
+
+                            {/* Floating frosted glass hover bubble matching live editor cursors */}
+                            <div
+                              role="tooltip"
+                              style={{
+                                borderColor: `${peer.color}88`,
+                                boxShadow: `0 12px 26px -8px rgba(0,0,0,0.45), 0 0 14px -4px ${peer.color}55`,
+                              }}
+                              className="glass-surface pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 font-mono text-[10.5px] font-medium text-foreground group-hover/peer:flex group-focus-within/peer:flex"
+                            >
+                              <span
+                                style={{
+                                  backgroundColor: peer.color,
+                                  boxShadow: `0 0 8px ${peer.color}`,
+                                }}
+                                className={cn(
+                                  'h-2 w-2 shrink-0 rounded-full',
+                                  peer.isTyping && 'animate-pulse',
+                                )}
+                              />
+                              <span className="font-semibold">
+                                @{peer.username}
+                              </span>
+                              <span className="text-[9.5px] text-muted-foreground">
+                                {peer.permission === 'edit' ? 'editor' : 'viewer'}
+                                {jumpLine !== null ? ` · Ln ${jumpLine}` : ''}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {overflowPeerCount > 0 && (
+                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-border bg-card px-1 font-mono text-[10px] font-semibold text-muted-foreground">
+                          +{overflowPeerCount}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>

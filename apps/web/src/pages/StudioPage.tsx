@@ -23,6 +23,7 @@ import { StudioTopBar } from '@/components/studio-ide/StudioTopBar';
 import { StudioBackdrop } from '@/components/studio-ui/StudioBackdrop';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/context/AuthContext';
+import { useRealtimeCollab } from '@/hooks/useRealtimeCollab';
 import { ApiClientError } from '@/lib/api';
 import {
   fetchBranchFiles,
@@ -52,6 +53,10 @@ export function StudioPage() {
   const { user } = useAuth();
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [scrollToLineRequest, setScrollToLineRequest] = useState<{
+    line: number;
+    seq: number;
+  } | null>(null);
   const autoOpenedBranchRef = useRef<string | null>(null);
 
   // Ephemeral Zustand IDE state
@@ -66,6 +71,7 @@ export function StudioPage() {
   const rightPanelTab = useStudioStore((s) => s.rightPanelTab);
   const explorerCollapsed = useStudioStore((s) => s.explorerCollapsed);
   const isWindowExpanded = useStudioStore((s) => s.isWindowExpanded);
+  const focusModeEnabled = useStudioStore((s) => s.focusModeEnabled);
 
   const initProjectSession = useStudioStore((s) => s.initProjectSession);
   const selectBranch = useStudioStore((s) => s.selectBranch);
@@ -76,6 +82,7 @@ export function StudioPage() {
   const setFolderExpanded = useStudioStore((s) => s.setFolderExpanded);
   const hydrateFileBuffer = useStudioStore((s) => s.hydrateFileBuffer);
   const updateDraftContent = useStudioStore((s) => s.updateDraftContent);
+  const syncCollabBuffer = useStudioStore((s) => s.syncCollabBuffer);
   const markFileSaved = useStudioStore((s) => s.markFileSaved);
   const discardFileDraft = useStudioStore((s) => s.discardFileDraft);
   const setCursorPosition = useStudioStore((s) => s.setCursorPosition);
@@ -84,6 +91,7 @@ export function StudioPage() {
   const setRightPanelTab = useStudioStore((s) => s.setRightPanelTab);
   const toggleExplorer = useStudioStore((s) => s.toggleExplorer);
   const toggleWindowExpanded = useStudioStore((s) => s.toggleWindowExpanded);
+  const toggleFocusMode = useStudioStore((s) => s.toggleFocusMode);
   const resetStudio = useStudioStore((s) => s.resetStudio);
 
   // Reset ephemeral IDE store and dispose stale Monaco models when switching/leaving Studio
@@ -222,14 +230,41 @@ export function StudioPage() {
     ),
   });
 
+  // 3b. Real-Time Socket.IO + Yjs CRDT Room Session
+  const handleCollabPermissionChanged = useCallback(
+    (payload: { branchId: string; fileId: string }) => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.projects.files(projectId, payload.branchId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.projects.fileDetail(
+          projectId,
+          payload.branchId,
+          payload.fileId,
+        ),
+      });
+    },
+    [projectId, queryClient],
+  );
+
+  const collab = useRealtimeCollab({
+    projectId: project?.id ?? '',
+    branchId: activeBranch?.id ?? null,
+    fileId: activeFile?.id ?? null,
+    enabled: Boolean(project && user),
+    onContentSynced: syncCollabBuffer,
+    onPermissionChanged: handleCollabPermissionChanged,
+  });
+
   useEffect(() => {
     if (
       activeFileDetailQuery.data &&
-      activeFileDetailQuery.data.id === activeFile?.id
+      activeFileDetailQuery.data.id === activeFile?.id &&
+      !collab.roomReady
     ) {
       hydrateFileBuffer(activeFileDetailQuery.data);
     }
-  }, [activeFileDetailQuery.data, activeFile?.id, hydrateFileBuffer]);
+  }, [activeFileDetailQuery.data, activeFile?.id, collab.roomReady, hydrateFileBuffer]);
 
   // Clear save banner when switching active file
   useEffect(() => {
@@ -262,6 +297,18 @@ export function StudioPage() {
 
       const draft = useStudioStore.getState().buffers[targetId];
       if (!draft) return false;
+
+      // When live CRDT is active and synced cleanly, avoid stale REST `expectedVersion` collisions
+      if (collab.roomReady && targetId === activeFileId && !draft.isDirty) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.fileDetail(
+            projectId,
+            activeBranch.id,
+            targetId,
+          ),
+        });
+        return true;
+      }
 
       setSaveError(null);
 
@@ -334,6 +381,7 @@ export function StudioPage() {
     [
       activeFileId,
       activeBranch?.id,
+      collab.roomReady,
       projectId,
       saveFileMutation,
       markFileSaved,
@@ -636,12 +684,18 @@ export function StudioPage() {
     project.currentUserRole === 'owner' || project.currentUserRole === 'editor';
   const activeDraft = activeFile ? (buffers[activeFile.id] ?? null) : null;
   const activeConflict = activeFile ? (conflicts[activeFile.id] ?? null) : null;
+  const effectiveActivePermission =
+    collab.roomReady && collab.serverPermission
+      ? collab.serverPermission
+      : activeFile?.effectivePermission;
   const canEditActiveFile = Boolean(
     activeFile &&
       activeFile.nodeType === 'file' &&
       isEditorOrOwner &&
-      activeFile.effectivePermission === 'edit',
+      effectiveActivePermission === 'edit',
   );
+  const resolvedPreventSameLineEdit =
+    collab.preventSameLineEdit ?? project.preventSameLineEdit;
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground">
@@ -662,6 +716,13 @@ export function StudioPage() {
         explorerCollapsed={explorerCollapsed}
         isWindowExpanded={isWindowExpanded}
         rightPanelTab={rightPanelTab}
+        collabConnectionStatus={collab.connectionStatus}
+        collabSyncStatus={collab.syncStatus}
+        collabRoomReady={collab.roomReady}
+        presenceUsers={collab.presenceUsers}
+        onJumpToCollaboratorLine={(line) =>
+          setScrollToLineRequest((prev) => ({ line, seq: (prev?.seq ?? 0) + 1 }))
+        }
         onToggleExplorer={toggleExplorer}
         onToggleWindowExpanded={toggleWindowExpanded}
         onSelectBranch={handleSelectBranch}
@@ -734,6 +795,16 @@ export function StudioPage() {
             canEditActiveFile={canEditActiveFile}
             buffers={buffers}
             currentUserId={currentUserId}
+            collabConnectionStatus={collab.connectionStatus}
+            collabSyncStatus={collab.syncStatus}
+            collabRoomReady={collab.roomReady}
+            collabActiveRoomKey={collab.activeRoomKey}
+            collabYText={collab.ytext}
+            presenceUsers={collab.presenceUsers}
+            preventSameLineEdit={resolvedPreventSameLineEdit}
+            realtimeError={collab.realtimeError}
+            focusModeEnabled={focusModeEnabled}
+            scrollToLineRequest={scrollToLineRequest}
             onSelectTab={openFileTab}
             onCloseTab={closeFileTab}
             onChangeContent={updateDraftContent}
@@ -743,6 +814,9 @@ export function StudioPage() {
             onResolveConflictReload={handleResolveConflictReload}
             onResolveConflictOverwrite={handleResolveConflictOverwrite}
             onDismissSaveError={() => setSaveError(null)}
+            onDismissRealtimeError={collab.clearRealtimeError}
+            onToggleFocusMode={toggleFocusMode}
+            onPublishAwareness={collab.publishAwareness}
             onRetryFileLoad={() => void activeFileDetailQuery.refetch()}
           />
 

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type Monaco } from '@monaco-editor/react';
 import type { editor as MonacoEditorNamespace } from 'monaco-editor';
+import { MonacoBinding } from 'y-monaco';
+import type * as Y from 'yjs';
 import {
   AlertTriangle,
   ChevronRight,
   Code2,
+  Crosshair,
   Eye,
   FileCode2,
   GitBranch,
@@ -20,7 +23,13 @@ import type {
   Project,
   ProjectBranchDto,
   ProjectFileNodeDto,
+  RealtimeCursorSelection,
+  RealtimePresenceUser,
 } from '@codecollab/shared';
+import {
+  MonacoCollabOverlay,
+  resolveGuardedLines,
+} from '@/components/studio-ide/monacoCollabDecorations';
 import {
   disposeStudioModels,
   ensureMonacoConfigured,
@@ -33,6 +42,11 @@ import {
   resolveMonacoLanguage,
 } from '@/components/studio-ide/studioLanguage';
 import { useTheme } from '@/context/ThemeContext';
+import type {
+  RealtimeConnectionStatus,
+  RealtimeErrorState,
+  RealtimeSyncStatus,
+} from '@/hooks/useRealtimeCollab';
 import { cn } from '@/lib/utils';
 import type {
   FileDraftBuffer,
@@ -64,6 +78,16 @@ interface StudioEditorPaneProps {
   canEditActiveFile: boolean;
   buffers: Record<string, FileDraftBuffer>;
   currentUserId: string;
+  collabConnectionStatus: RealtimeConnectionStatus;
+  collabSyncStatus: RealtimeSyncStatus;
+  collabRoomReady: boolean;
+  collabActiveRoomKey: string | null;
+  collabYText: Y.Text | null;
+  presenceUsers: RealtimePresenceUser[];
+  preventSameLineEdit: boolean;
+  realtimeError: RealtimeErrorState | null;
+  focusModeEnabled: boolean;
+  scrollToLineRequest: { line: number; seq: number } | null;
   onSelectTab: (fileId: string) => void;
   onCloseTab: (fileId: string) => void;
   onChangeContent: (fileId: string, value: string) => void;
@@ -73,6 +97,13 @@ interface StudioEditorPaneProps {
   onResolveConflictReload: (fileId: string, conflict: FileVersionConflict) => void;
   onResolveConflictOverwrite: (fileId: string, serverVersion: number) => void;
   onDismissSaveError: () => void;
+  onDismissRealtimeError: () => void;
+  onToggleFocusMode: () => void;
+  onPublishAwareness: (payload: {
+    cursor: RealtimeCursorSelection | null;
+    focusLine: number | null;
+    isTyping: boolean;
+  }) => void;
   onRetryFileLoad: () => void;
 }
 
@@ -96,6 +127,16 @@ export function StudioEditorPane({
   canEditActiveFile,
   buffers,
   currentUserId,
+  collabConnectionStatus,
+  collabSyncStatus,
+  collabRoomReady,
+  collabActiveRoomKey,
+  collabYText,
+  presenceUsers,
+  preventSameLineEdit,
+  realtimeError,
+  focusModeEnabled,
+  scrollToLineRequest,
   onSelectTab,
   onCloseTab,
   onChangeContent,
@@ -105,6 +146,9 @@ export function StudioEditorPane({
   onResolveConflictReload,
   onResolveConflictOverwrite,
   onDismissSaveError,
+  onDismissRealtimeError,
+  onToggleFocusMode,
+  onPublishAwareness,
   onRetryFileLoad,
 }: StudioEditorPaneProps) {
   const { theme } = useTheme();
@@ -114,12 +158,18 @@ export function StudioEditorPane({
     null,
   );
   const [closingAfterSave, setClosingAfterSave] = useState(false);
+  const [activeModelUri, setActiveModelUri] = useState<string | null>(null);
+  const [isEditorMounted, setIsEditorMounted] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const editorRef = useRef<MonacoEditorNamespace.IStandaloneCodeEditor | null>(
     null,
   );
   const monacoRef = useRef<Monaco | null>(null);
-  const cursorListenerRef = useRef<{ dispose: () => void } | null>(null);
+  const overlayRef = useRef<MonacoCollabOverlay | null>(null);
+  const editorListenersRef = useRef<Array<{ dispose: () => void }>>([]);
+  const isTypingRef = useRef(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Refs prevent stale closures inside Monaco event listeners & keyboard bindings
   const onSaveRef = useRef(onSaveFile);
@@ -128,8 +178,14 @@ export function StudioEditorPane({
   const onChangeCursorRef = useRef(onChangeCursor);
   onChangeCursorRef.current = onChangeCursor;
 
+  const onPublishAwarenessRef = useRef(onPublishAwareness);
+  onPublishAwarenessRef.current = onPublishAwareness;
+
   const activeFileRef = useRef(activeFile);
   activeFileRef.current = activeFile;
+
+  const collabRoomReadyRef = useRef(collabRoomReady);
+  collabRoomReadyRef.current = collabRoomReady;
 
   // Snapshot last fully hydrated target so switching to an unhydrated tab shows a loading veil
   // instead of initializing a blank `""` Monaco model that pollutes the Ctrl+Z undo stack.
@@ -177,11 +233,19 @@ export function StudioEditorPane({
   const isWaitingForNewBufferRef = useRef(isWaitingForNewBuffer);
   isWaitingForNewBufferRef.current = isWaitingForNewBuffer;
 
-  // Dispose all Studio Monaco models only when leaving the Studio workspace cleanly
+  // Dispose Monaco listeners, overlay, and Studio models on unmount
   useEffect(() => {
     return () => {
-      cursorListenerRef.current?.dispose();
-      cursorListenerRef.current = null;
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+      for (const listener of editorListenersRef.current) {
+        listener.dispose();
+      }
+      editorListenersRef.current = [];
+      overlayRef.current?.dispose();
+      overlayRef.current = null;
       disposeStudioModels('inmemory://studio/');
     };
   }, []);
@@ -192,6 +256,141 @@ export function StudioEditorPane({
       setPendingCloseTabId(null);
     }
   }, [openTabIds, pendingCloseTabId]);
+
+  // Keep a lightweight 1s tick while remote collaborators are active so cursor pills & line guards expire cleanly
+  const hasRemotePeers = useMemo(
+    () => presenceUsers.some((u) => u.userId !== currentUserId),
+    [presenceUsers, currentUserId],
+  );
+
+  useEffect(() => {
+    if (!hasRemotePeers) return;
+    const timer = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [hasRemotePeers]);
+
+  // Bind `y-monaco` to the active Monaco model once both model path and Yjs room are ready
+  useEffect(() => {
+    const editor = editorRef.current;
+    const model = editor?.getModel() ?? null;
+    if (
+      !isEditorMounted ||
+      !collabRoomReady ||
+      !collabYText ||
+      !editor ||
+      !model ||
+      !expectedModelPath
+    ) {
+      return;
+    }
+
+    if (model.uri.toString() !== expectedModelPath) {
+      return;
+    }
+
+    const binding = new MonacoBinding(collabYText, model, new Set([editor]));
+
+    // Publish initial cursor coordinates as soon as the CRDT room & model bind cleanly
+    const sel = editor.getSelection();
+    const pos = editor.getPosition();
+    if (pos) {
+      onPublishAwarenessRef.current({
+        cursor: {
+          anchorLine: sel?.selectionStartLineNumber ?? pos.lineNumber,
+          anchorColumn: sel?.selectionStartColumn ?? pos.column,
+          headLine: pos.lineNumber,
+          headColumn: pos.column,
+        },
+        focusLine: pos.lineNumber,
+        isTyping: false,
+      });
+    }
+
+    return () => {
+      binding.destroy();
+    };
+  }, [
+    isEditorMounted,
+    collabRoomReady,
+    collabActiveRoomKey,
+    collabYText,
+    expectedModelPath,
+    activeModelUri,
+  ]);
+
+  // Fallback sync when NOT in an active CRDT room (e.g., offline REST conflict reload)
+  useEffect(() => {
+    if (collabRoomReady) return;
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!editor || !model || !renderedTarget || !expectedModelPath) return;
+    if (model.uri.toString() !== expectedModelPath) return;
+    if (model.getValue() !== renderedTarget.draft.content) {
+      model.setValue(renderedTarget.draft.content);
+    }
+  }, [collabRoomReady, renderedTarget, expectedModelPath, activeModelUri]);
+
+  const guardedLines = useMemo(
+    () =>
+      resolveGuardedLines({
+        presenceUsers,
+        currentUserId,
+        preventSameLineEdit,
+        now: nowTick,
+      }),
+    [presenceUsers, currentUserId, preventSameLineEdit, nowTick],
+  );
+
+  const localCursorLine = activeDraft?.cursorLine ?? 1;
+  const activeGuardedLineInfo = useMemo(
+    () => (activeFile ? (guardedLines.get(localCursorLine) ?? null) : null),
+    [activeFile, guardedLines, localCursorLine],
+  );
+
+  // Sync live remote cursors, Focus Mode line dimming, and Same-Line Edit Guard decorations
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay || !isEditorMounted) return;
+
+    if (!activeFile) {
+      overlay.clear();
+      return;
+    }
+
+    overlay.update({
+      presenceUsers,
+      currentUserId,
+      focusModeEnabled,
+      localCursorLine,
+      guardedLines,
+      now: nowTick,
+    });
+  }, [
+    isEditorMounted,
+    activeFile,
+    presenceUsers,
+    currentUserId,
+    focusModeEnabled,
+    localCursorLine,
+    guardedLines,
+    nowTick,
+    activeModelUri,
+  ]);
+
+  // Jump editor viewport to a teammate's line when clicking their avatar in TopBar
+  useEffect(() => {
+    if (!scrollToLineRequest || !editorRef.current) return;
+    const editor = editorRef.current;
+    const model = editor.getModel();
+    if (!model) return;
+    const clamped = Math.min(
+      Math.max(1, scrollToLineRequest.line),
+      model.getLineCount(),
+    );
+    editor.revealLineInCenter(clamped);
+    editor.setPosition({ lineNumber: clamped, column: 1 });
+    editor.focus();
+  }, [scrollToLineRequest]);
 
   const openTabs = useMemo(() => {
     const nodeMap = new Map(files.map((node) => [node.id, node]));
@@ -246,6 +445,16 @@ export function StudioEditorPane({
       editorRef.current = editorInstance;
       monacoRef.current = monacoInstance;
 
+      overlayRef.current?.dispose();
+      overlayRef.current = new MonacoCollabOverlay(
+        editorInstance,
+        monacoInstance,
+      );
+
+      for (const listener of editorListenersRef.current) {
+        listener.dispose();
+      }
+
       // Bind Ctrl/Cmd + S directly inside Monaco command palette
       editorInstance.addCommand(
         monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
@@ -254,8 +463,24 @@ export function StudioEditorPane({
         },
       );
 
-      cursorListenerRef.current?.dispose();
-      cursorListenerRef.current = editorInstance.onDidChangeCursorPosition(
+      const emitSelectionAwareness = () => {
+        if (!editorInstance.hasTextFocus()) return;
+        const sel = editorInstance.getSelection();
+        const pos = editorInstance.getPosition();
+        if (!sel || !pos) return;
+        onPublishAwarenessRef.current({
+          cursor: {
+            anchorLine: sel.selectionStartLineNumber,
+            anchorColumn: sel.selectionStartColumn,
+            headLine: sel.positionLineNumber,
+            headColumn: sel.positionColumn,
+          },
+          focusLine: pos.lineNumber,
+          isTyping: isTypingRef.current,
+        });
+      };
+
+      const cursorPosListener = editorInstance.onDidChangeCursorPosition(
         (event) => {
           const current = activeFileRef.current;
           if (!current || current.nodeType !== 'file') return;
@@ -264,8 +489,70 @@ export function StudioEditorPane({
             event.position.lineNumber,
             event.position.column,
           );
+          emitSelectionAwareness();
         },
       );
+
+      const selectionListener = editorInstance.onDidChangeCursorSelection(() => {
+        emitSelectionAwareness();
+      });
+
+      const contentListener = editorInstance.onDidChangeModelContent(
+        (event) => {
+          if (event.changes.length === 0 || !editorInstance.hasTextFocus()) {
+            return;
+          }
+          isTypingRef.current = true;
+          emitSelectionAwareness();
+
+          if (typingTimerRef.current) {
+            clearTimeout(typingTimerRef.current);
+          }
+          typingTimerRef.current = setTimeout(() => {
+            typingTimerRef.current = null;
+            isTypingRef.current = false;
+            emitSelectionAwareness();
+          }, 1200);
+        },
+      );
+
+      const blurListener = editorInstance.onDidBlurEditorWidget(() => {
+        if (typingTimerRef.current) {
+          clearTimeout(typingTimerRef.current);
+          typingTimerRef.current = null;
+        }
+        isTypingRef.current = false;
+        const sel = editorInstance.getSelection();
+        const pos = editorInstance.getPosition();
+        // Keep last resting cursor visible to teammates instead of erasing it on tab/window switch
+        if (pos) {
+          onPublishAwarenessRef.current({
+            cursor: {
+              anchorLine: sel?.selectionStartLineNumber ?? pos.lineNumber,
+              anchorColumn: sel?.selectionStartColumn ?? pos.column,
+              headLine: pos.lineNumber,
+              headColumn: pos.column,
+            },
+            focusLine: pos.lineNumber,
+            isTyping: false,
+          });
+        }
+      });
+
+      const modelListener = editorInstance.onDidChangeModel(() => {
+        setActiveModelUri(editorInstance.getModel()?.uri.toString() ?? null);
+      });
+
+      editorListenersRef.current = [
+        cursorPosListener,
+        selectionListener,
+        contentListener,
+        blurListener,
+        modelListener,
+      ];
+
+      setActiveModelUri(editorInstance.getModel()?.uri.toString() ?? null);
+      setIsEditorMounted(true);
     },
     [],
   );
@@ -273,6 +560,9 @@ export function StudioEditorPane({
   const handleEditorChange = useCallback(
     (nextValue: string | undefined) => {
       if (nextValue === undefined || isWaitingForNewBufferRef.current) return;
+      // When live CRDT `MonacoBinding` owns the buffer, sync/dirty state flows via `useRealtimeCollab`
+      if (collabRoomReadyRef.current) return;
+
       const target = activeFileRef.current;
       if (!target || target.nodeType !== 'file') return;
 
@@ -478,6 +768,25 @@ export function StudioEditorPane({
           </div>
 
           <div className="flex items-center gap-2 text-[10.5px]">
+            <button
+              type="button"
+              onClick={onToggleFocusMode}
+              title={
+                focusModeEnabled
+                  ? 'Exit Focus Mode (show all remote cursors & full brightness)'
+                  : 'Focus Mode (dim distant lines & hide inline cursor labels)'
+              }
+              className={cn(
+                'inline-flex items-center gap-1 rounded-lg px-2 py-0.5 transition-colors',
+                focusModeEnabled
+                  ? 'bg-primary/15 text-primary ring-1 ring-primary/35'
+                  : 'glass-control text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Crosshair className="h-3 w-3" aria-hidden="true" />
+              <span>{focusModeEnabled ? 'Focus On' : 'Focus Mode'}</span>
+            </button>
+
             {activeDraft?.isDirty && canEditActiveFile && (
               <button
                 type="button"
@@ -520,6 +829,33 @@ export function StudioEditorPane({
             <strong className="font-medium text-foreground">Read-only mode:</strong>{' '}
             {readOnlyReason}
           </span>
+        </div>
+      )}
+
+      {/* 3b. Same-Line Edit Guard Banner */}
+      {canEditActiveFile && activeGuardedLineInfo && (
+        <div className="flex items-center gap-2 border-b border-amber-500/35 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+          <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>
+            <strong>Same-Line Guard:</strong> Line{' '}
+            {activeGuardedLineInfo.lineNumber} is actively edited by @
+            {activeGuardedLineInfo.user.username}. Move to another line to edit.
+          </span>
+        </div>
+      )}
+
+      {/* 3c. Realtime Gateway Error Banner (Seat cap / ACL revocation / Frame error) */}
+      {realtimeError && (
+        <div className="flex items-center justify-between gap-2 border-b border-destructive/35 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
+          <span>{realtimeError.message}</span>
+          <button
+            type="button"
+            onClick={onDismissRealtimeError}
+            aria-label="Dismiss collaboration error"
+            className="hover:opacity-80"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
         </div>
       )}
 
@@ -636,7 +972,7 @@ export function StudioEditorPane({
                 width="100%"
                 path={expectedModelPath}
                 language={monacoLanguage}
-                value={renderedTarget.draft.content}
+                defaultValue={renderedTarget.draft.content}
                 theme={theme === 'dark' ? STUDIO_DARK_THEME : STUDIO_LIGHT_THEME}
                 keepCurrentModel={true}
                 saveViewState={true}
@@ -653,8 +989,19 @@ export function StudioEditorPane({
                   </div>
                 }
                 options={{
-                  readOnly: !renderedTarget.canEdit || isWaitingForNewBuffer,
-                  domReadOnly: !renderedTarget.canEdit || isWaitingForNewBuffer,
+                  readOnly:
+                    !renderedTarget.canEdit ||
+                    isWaitingForNewBuffer ||
+                    (collabConnectionStatus === 'connecting' &&
+                      !collabRoomReady) ||
+                    Boolean(renderedTarget.canEdit && activeGuardedLineInfo),
+                  domReadOnly:
+                    !renderedTarget.canEdit ||
+                    isWaitingForNewBuffer ||
+                    (collabConnectionStatus === 'connecting' &&
+                      !collabRoomReady) ||
+                    Boolean(renderedTarget.canEdit && activeGuardedLineInfo),
+                  glyphMargin: true,
                   minimap: { enabled: true },
                   fontSize: 13.5,
                   fontFamily:
@@ -668,7 +1015,7 @@ export function StudioEditorPane({
                   wordWrap: 'on',
                   automaticLayout: true,
                   renderLineHighlight: 'all',
-                  padding: { top: 18, bottom: 18 },
+                  padding: { top: 24, bottom: 24 },
                 }}
               />
             )}
@@ -709,17 +1056,31 @@ export function StudioEditorPane({
         <div className="flex items-center gap-3">
           {activeFile && activeDraft && (
             <>
+              {presenceUsers.length > 0 && (
+                <span>
+                  {presenceUsers.length}{' '}
+                  {presenceUsers.length === 1 ? 'collaborator' : 'collaborators'}
+                </span>
+              )}
               <span>v{activeDraft.savedVersion}</span>
               <span
                 className={cn(
-                  activeDraft.isDirty ? 'font-medium text-primary' : '',
+                  activeDraft.isDirty || collabSyncStatus === 'syncing'
+                    ? 'font-medium text-primary'
+                    : collabRoomReady
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : '',
                 )}
               >
                 {isSaving
                   ? 'Saving…'
-                  : activeDraft.isDirty
-                    ? 'Unsaved draft'
-                    : 'Saved'}
+                  : collabRoomReady
+                    ? collabSyncStatus === 'syncing'
+                      ? 'CRDT Syncing…'
+                      : 'CRDT Synced'
+                    : activeDraft.isDirty
+                      ? 'Unsaved draft'
+                      : 'Saved'}
               </span>
             </>
           )}
