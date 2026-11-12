@@ -56,6 +56,7 @@ interface IndexedLiveNode {
   path: string;
   depth: number;
   overrideForCaller: FileAccessPermission | null;
+  deniedUserIds: string[];
 }
 
 interface IndexedSnapshotFileRow {
@@ -67,6 +68,7 @@ interface IndexedSnapshotFileRow {
   nodeType: DbFileNodeType;
   content: string;
   sizeBytes: number;
+  deniedUserIds: string[];
 }
 
 type SnapshotHeaderRow = {
@@ -195,21 +197,24 @@ const buildLiveBranchPathIndex = (
     let aclCursor: string | null = row.id;
     let inheritedReadOnly = false;
     let overrideForCaller: FileAccessPermission | null = null;
+    const deniedUsers = new Set<string>();
     let aclSteps = 0;
 
     while (aclCursor && aclSteps < 100) {
       aclSteps += 1;
       const node = rawById.get(aclCursor);
       if (!node) break;
-      const rule = node.accessRules.find((r) => r.userId === callerId);
-      if (rule) {
-        const perm = toDtoAccessPermission(rule.permission);
-        if (perm === 'denied') {
-          overrideForCaller = 'denied';
-          break;
+      for (const r of node.accessRules) {
+        if (r.permission === 'DENIED') {
+          deniedUsers.add(r.userId);
         }
-        if (perm === 'read_only') {
-          inheritedReadOnly = true;
+        if (r.userId === callerId) {
+          const perm = toDtoAccessPermission(r.permission);
+          if (perm === 'denied') {
+            overrideForCaller = 'denied';
+          } else if (perm === 'read_only') {
+            inheritedReadOnly = true;
+          }
         }
       }
       aclCursor = node.parentId;
@@ -225,6 +230,7 @@ const buildLiveBranchPathIndex = (
       path,
       depth: segments.length,
       overrideForCaller,
+      deniedUserIds: Array.from(deniedUsers).sort(),
     };
     entries.push(indexed);
     byPath.set(path, indexed);
@@ -236,19 +242,33 @@ const buildLiveBranchPathIndex = (
 };
 
 /**
- * Checks whether a historical snapshot path or `originalFileId` maps to any
- * currently `'denied'` node or folder ancestor on the live branch.
+ * Checks whether a historical snapshot path or `originalFileId` is `'denied'` for
+ * the caller either on the live branch OR at snapshot-capture time.
  */
 const isPathDeniedForCaller = (params: {
   role: ProjectRole | null;
+  callerId: string;
   path: string;
   originalFileId: string | null;
+  snapshotDeniedUserIds?: string[];
   liveByPath: Map<string, IndexedLiveNode>;
   liveById: Map<string, IndexedLiveNode>;
 }): boolean => {
-  const { role, path, originalFileId, liveByPath, liveById } = params;
+  const {
+    role,
+    callerId,
+    path,
+    originalFileId,
+    snapshotDeniedUserIds,
+    liveByPath,
+    liveById,
+  } = params;
   if (role === 'owner') {
     return false;
+  }
+
+  if (snapshotDeniedUserIds?.includes(callerId)) {
+    return true;
   }
 
   if (originalFileId) {
@@ -308,6 +328,9 @@ const createSnapshotInTx = async (
     isSafetyBackup?: boolean;
   }
 ): Promise<BranchSnapshotSummaryDto> => {
+  // Serialize concurrent snapshot quota checks & restores on the parent branch row
+  await tx.$queryRaw`SELECT "id" FROM "project_branches" WHERE "id" = ${params.branchId} FOR UPDATE`;
+
   const existingCount = await tx.branchSnapshot.count({
     where: { branchId: params.branchId },
   });
@@ -351,6 +374,7 @@ const createSnapshotInTx = async (
       nodeType: entry.row.nodeType,
       content,
       sizeBytes,
+      deniedUserIds: entry.deniedUserIds,
     };
   });
 
@@ -385,6 +409,7 @@ const createSnapshotInTx = async (
         nodeType: f.nodeType,
         content: f.content,
         sizeBytes: f.sizeBytes,
+        deniedUserIds: f.deniedUserIds,
       })),
     });
   }
@@ -412,6 +437,7 @@ const assertSnapshotInBranch = async (
           nodeType: true,
           content: true,
           sizeBytes: true,
+          deniedUserIds: true,
         },
       },
     },
@@ -481,6 +507,7 @@ export const listBranchSnapshots = async (params: {
 }): Promise<{
   snapshots: BranchSnapshotSummaryDto[];
   nextCursor: string | null;
+  totalCount: number;
 }> => {
   const projectId = assertValidUuid(params.projectId, 'project');
   const branchId = assertValidUuid(params.branchId, 'branch');
@@ -504,28 +531,33 @@ export const listBranchSnapshots = async (params: {
     cursorId = anchor.id;
   }
 
-  const rows = await prisma.branchSnapshot.findMany({
-    where: {
-      projectId,
-      branchId,
-      ...(cursorCreatedAt && cursorId
-        ? {
-            OR: [
-              { createdAt: { lt: cursorCreatedAt } },
-              {
-                AND: [
-                  { createdAt: cursorCreatedAt },
-                  { id: { lt: cursorId } },
-                ],
-              },
-            ],
-          }
-        : {}),
-    },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: params.limit + 1,
-    select: SNAPSHOT_HEADER_SELECT,
-  });
+  const [rows, totalCount] = await Promise.all([
+    prisma.branchSnapshot.findMany({
+      where: {
+        projectId,
+        branchId,
+        ...(cursorCreatedAt && cursorId
+          ? {
+              OR: [
+                { createdAt: { lt: cursorCreatedAt } },
+                {
+                  AND: [
+                    { createdAt: cursorCreatedAt },
+                    { id: { lt: cursorId } },
+                  ],
+                },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: params.limit + 1,
+      select: SNAPSHOT_HEADER_SELECT,
+    }),
+    prisma.branchSnapshot.count({
+      where: { projectId, branchId },
+    }),
+  ]);
 
   const hasMore = rows.length > params.limit;
   const pageRows = hasMore ? rows.slice(0, params.limit) : rows;
@@ -534,12 +566,13 @@ export const listBranchSnapshots = async (params: {
   return {
     snapshots: pageRows.map(mapSnapshotSummaryDto),
     nextCursor,
+    totalCount,
   };
 };
 
 /**
  * Fetches full file listing and contents for a specific snapshot, omitting any
- * nodes governed by a `'denied'` per-file/folder ACL on the live branch.
+ * nodes governed by a `'denied'` per-file/folder ACL on the live branch or at capture time.
  */
 export const getBranchSnapshotDetail = async (params: {
   projectId: string;
@@ -570,8 +603,10 @@ export const getBranchSnapshotDetail = async (params: {
     if (
       isPathDeniedForCaller({
         role,
+        callerId: params.userId,
         path: file.path,
         originalFileId: file.originalFileId,
+        snapshotDeniedUserIds: file.deniedUserIds,
         liveByPath: liveIndex.byPath,
         liveById: liveIndex.byId,
       })
@@ -619,9 +654,10 @@ export const diffBranchSnapshot = async (params: {
   const { role } = await assertProjectAccess(projectId, params.userId);
   const branch = await assertBranchInProject(projectId, branchId);
 
-  if (!targetSnapshotId) {
-    await yjsRoomManager.flushBranchRooms(branchId);
-  }
+  // Read-only diff inspection reads live Yjs room text in RAM without flushing/bumping DB versions
+  const liveYjsTextByFileId = targetSnapshotId
+    ? null
+    : yjsRoomManager.getBranchLiveTextMap(branchId);
 
   const [baseSnapshot, targetSnapshot, liveRows] = await Promise.all([
     assertSnapshotInBranch(projectId, branchId, snapshotId),
@@ -641,6 +677,7 @@ export const diffBranchSnapshot = async (params: {
     originalFileId: string | null;
     nodeType: DbFileNodeType;
     content: string;
+    deniedUserIds: string[];
     liveNode?: IndexedLiveNode;
   };
 
@@ -651,6 +688,7 @@ export const diffBranchSnapshot = async (params: {
       originalFileId: f.originalFileId,
       nodeType: f.nodeType,
       content: f.content,
+      deniedUserIds: f.deniedUserIds,
     });
   }
 
@@ -662,15 +700,21 @@ export const diffBranchSnapshot = async (params: {
         originalFileId: f.originalFileId,
         nodeType: f.nodeType,
         content: f.content,
+        deniedUserIds: f.deniedUserIds,
       });
     }
   } else {
     for (const entry of liveIndex.entries) {
+      const inMemoryText = liveYjsTextByFileId?.get(entry.row.id);
       targetMap.set(entry.path, {
         path: entry.path,
         originalFileId: entry.row.id,
         nodeType: entry.row.nodeType,
-        content: entry.row.content,
+        content:
+          entry.row.nodeType === 'FILE' && inMemoryText !== undefined
+            ? inMemoryText
+            : entry.row.content,
+        deniedUserIds: entry.deniedUserIds,
         liveNode: entry,
       });
     }
@@ -722,17 +766,21 @@ export const diffBranchSnapshot = async (params: {
     const denied =
       isPathDeniedForCaller({
         role,
+        callerId: params.userId,
         path,
         originalFileId:
           targetNode?.originalFileId ?? baseNode?.originalFileId ?? null,
+        snapshotDeniedUserIds: targetNode?.deniedUserIds,
         liveByPath: liveIndex.byPath,
         liveById: liveIndex.byId,
       }) ||
       (baseNode &&
         isPathDeniedForCaller({
           role,
+          callerId: params.userId,
           path,
           originalFileId: baseNode.originalFileId,
+          snapshotDeniedUserIds: baseNode.deniedUserIds,
           liveByPath: liveIndex.byPath,
           liveById: liveIndex.byId,
         }));
@@ -844,7 +892,11 @@ export const restoreBranchSnapshot = async (params: {
   const branchId = assertValidUuid(params.branchId, 'branch');
   const snapshotId = assertValidUuid(params.snapshotId, 'snapshot');
 
-  const { role } = await assertProjectAccess(projectId, params.userId, 'editor');
+  const { project, role } = await assertProjectAccess(
+    projectId,
+    params.userId,
+    'editor'
+  );
   const resolvedRole: ProjectRole = role ?? 'editor';
   const branch = await assertBranchInProject(projectId, branchId);
 
@@ -862,9 +914,6 @@ export const restoreBranchSnapshot = async (params: {
     snapshotId
   );
 
-  // Flush dirty in-memory Yjs edits first so any pre-restore safety snapshot captures latest state
-  await yjsRoomManager.flushBranchRooms(branchId);
-
   const actor = await prisma.user.findUnique({
     where: { id: params.userId },
     select: { username: true },
@@ -873,222 +922,300 @@ export const restoreBranchSnapshot = async (params: {
 
   const syncedFiles: Array<{ id: string; content: string; version: number }> =
     [];
+  const restSyncDeltas: Array<{ fileId: string; delta: Uint8Array | null }> =
+    [];
   const deletedFileIds: string[] = [];
   let createdNodes = 0;
   let updatedFiles = 0;
   let deletedNodes = 0;
   let safetySnapshot: BranchSnapshotSummaryDto | null = null;
 
-  await prisma.$transaction(async (tx) => {
-    const snap = await tx.branchSnapshot.findUnique({
-      where: { id: snapshotId },
-      select: {
-        id: true,
-        projectId: true,
-        branchId: true,
-        files: {
-          orderBy: { path: 'asc' },
-          select: {
-            id: true,
-            snapshotId: true,
-            originalFileId: true,
-            path: true,
-            nodeType: true,
-            content: true,
-            sizeBytes: true,
+  // Serialize concurrent restores, drain in-flight Yjs room cold loads, and guard DB writes across the restore window
+  await yjsRoomManager.beginBranchRestore(branchId);
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "project_branches" WHERE "id" = ${branchId} FOR UPDATE`;
+
+      const snap = await tx.branchSnapshot.findUnique({
+        where: { id: snapshotId },
+        select: {
+          id: true,
+          projectId: true,
+          branchId: true,
+          files: {
+            orderBy: { path: 'asc' },
+            select: {
+              id: true,
+              snapshotId: true,
+              originalFileId: true,
+              path: true,
+              nodeType: true,
+              content: true,
+              sizeBytes: true,
+              deniedUserIds: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!snap || snap.projectId !== projectId || snap.branchId !== branchId) {
-      throw new AppError(
-        404,
-        'SNAPSHOT_NOT_FOUND',
-        'Snapshot not found on this branch'
-      );
-    }
-
-    if (params.input.createSafetySnapshot) {
-      const autoTitle =
-        params.input.safetySnapshotTitle ??
-        `Auto-backup before restoring "${targetSnapshot.title}"`.slice(
-          0,
-          SNAPSHOT_LIMITS.MAX_TITLE_CHARS
+      if (!snap || snap.projectId !== projectId || snap.branchId !== branchId) {
+        throw new AppError(
+          404,
+          'SNAPSHOT_NOT_FOUND',
+          'Snapshot not found on this branch'
         );
-      safetySnapshot = await createSnapshotInTx(tx, {
-        projectId,
-        branchId,
-        userId: params.userId,
-        title: autoTitle,
-        restoredFromSnapshotId: snap.id,
-        isSafetyBackup: true,
-      });
-    }
-
-    const liveRows = await tx.projectFile.findMany({
-      where: { branchId },
-      select: LIVE_FILE_SELECT,
-    });
-    const liveIndex = buildLiveBranchPathIndex(liveRows, params.userId);
-
-    const sortedSnapFiles: IndexedSnapshotFileRow[] = snap.files
-      .map((f) => ({
-        ...f,
-        depth: f.path.split('/').length,
-      }))
-      .sort((a, b) => a.depth - b.depth || a.path.localeCompare(b.path));
-
-    const snapByPath = new Map<string, IndexedSnapshotFileRow>();
-    for (const f of sortedSnapFiles) {
-      snapByPath.set(f.path, f);
-    }
-
-    // Determine nodes to remove (absent in snapshot, OR different nodeType)
-    const removedNodes: IndexedLiveNode[] = [];
-    const removedIds = new Set<string>();
-
-    for (const liveEntry of liveIndex.entries) {
-      const snapMatch = snapByPath.get(liveEntry.path);
-      if (!snapMatch || snapMatch.nodeType !== liveEntry.row.nodeType) {
-        removedNodes.push(liveEntry);
-        removedIds.add(liveEntry.row.id);
-      }
-    }
-
-    // Security & concurrency pre-flight on every affected node
-    for (const removed of removedNodes) {
-      assertCanWriteFileNode({
-        role: resolvedRole,
-        userId: params.userId,
-        branchIsProtected: branch.isProtected,
-        fileLockedById: removed.row.lockedById,
-        lockedByUsername: removed.row.lockedBy?.username,
-        override: removed.overrideForCaller,
-      });
-      if (removed.row.nodeType === 'FILE') {
-        deletedFileIds.push(removed.row.id);
-      }
-      deletedNodes += 1;
-    }
-
-    for (const snapFile of sortedSnapFiles) {
-      const liveEntry = liveIndex.byPath.get(snapFile.path);
-      if (liveEntry && !removedIds.has(liveEntry.row.id)) {
-        if (
-          snapFile.nodeType === 'FILE' &&
-          liveEntry.row.content !== snapFile.content
-        ) {
-          assertCanWriteFileNode({
-            role: resolvedRole,
-            userId: params.userId,
-            branchIsProtected: branch.isProtected,
-            fileLockedById: liveEntry.row.lockedById,
-            lockedByUsername: liveEntry.row.lockedBy?.username,
-            override: liveEntry.overrideForCaller,
-          });
-        }
-      } else {
-        const ancestor = resolveDeepestLiveAncestor(
-          snapFile.path,
-          liveIndex.byPath
-        );
-        if (ancestor && !removedIds.has(ancestor.row.id)) {
-          assertCanWriteFileNode({
-            role: resolvedRole,
-            userId: params.userId,
-            branchIsProtected: branch.isProtected,
-            fileLockedById: ancestor.row.lockedById,
-            lockedByUsername: ancestor.row.lockedBy?.username,
-            override: ancestor.overrideForCaller,
-          });
-        }
-      }
-    }
-
-    // 1. Delete removed top-most nodes (child descendants cascade in PostgreSQL)
-    const deleteRootIds = removedNodes
-      .filter((n) => !n.row.parentId || !removedIds.has(n.row.parentId))
-      .map((n) => n.row.id);
-
-    if (deleteRootIds.length > 0) {
-      await tx.projectFile.deleteMany({
-        where: { id: { in: deleteRootIds } },
-      });
-    }
-
-    // 2. Track kept node IDs and apply updates / recreations top-down
-    const activeIdByPath = new Map<string, string>();
-    for (const liveEntry of liveIndex.entries) {
-      if (!removedIds.has(liveEntry.row.id)) {
-        activeIdByPath.set(liveEntry.path, liveEntry.row.id);
-      }
-    }
-
-    for (const snapFile of sortedSnapFiles) {
-      const existingId = activeIdByPath.get(snapFile.path);
-      if (existingId) {
-        const liveEntry = liveIndex.byId.get(existingId);
-        if (
-          snapFile.nodeType === 'FILE' &&
-          liveEntry &&
-          liveEntry.row.content !== snapFile.content
-        ) {
-          const updated = await tx.projectFile.update({
-            where: { id: existingId },
-            data: {
-              content: snapFile.content,
-              yjsState: null,
-              version: { increment: 1 },
-            },
-          });
-          updatedFiles += 1;
-          syncedFiles.push({
-            id: updated.id,
-            content: updated.content,
-            version: updated.version,
-          });
-        }
-        continue;
       }
 
-      const parts = snapFile.path.split('/');
-      const name = parts[parts.length - 1] ?? snapFile.path;
-      const parentPath = parts.slice(0, -1).join('/');
-      const parentId = parentPath ? activeIdByPath.get(parentPath) ?? null : null;
-
-      const created = await tx.projectFile.create({
-        data: {
+      if (params.input.createSafetySnapshot) {
+        const autoTitle =
+          params.input.safetySnapshotTitle ??
+          `Auto-backup before restoring "${targetSnapshot.title}"`.slice(
+            0,
+            SNAPSHOT_LIMITS.MAX_TITLE_CHARS
+          );
+        safetySnapshot = await createSnapshotInTx(tx, {
+          projectId,
           branchId,
-          parentId,
-          parentKey: parentId ?? 'ROOT',
-          name,
-          nodeType: snapFile.nodeType,
-          content: snapFile.nodeType === 'FILE' ? snapFile.content : '',
-          version: 1,
-        },
-      });
-      activeIdByPath.set(snapFile.path, created.id);
-      createdNodes += 1;
-    }
-  });
+          userId: params.userId,
+          title: autoTitle,
+          restoredFromSnapshotId: snap.id,
+          isSafetyBackup: true,
+        });
+      }
 
-  // 3. Synchronize or evict active in-memory Yjs rooms & notify live collaborators
-  if (deletedFileIds.length > 0) {
-    yjsRoomManager.destroyRoomsByFileIds(branchId, deletedFileIds);
+      const liveRows = await tx.projectFile.findMany({
+        where: { branchId },
+        select: LIVE_FILE_SELECT,
+      });
+      const liveIndex = buildLiveBranchPathIndex(liveRows, params.userId);
+
+      const sortedSnapFiles: IndexedSnapshotFileRow[] = snap.files
+        .map((f) => ({
+          ...f,
+          depth: f.path.split('/').length,
+        }))
+        .sort((a, b) => a.depth - b.depth || a.path.localeCompare(b.path));
+
+      const snapByPath = new Map<string, IndexedSnapshotFileRow>();
+      for (const f of sortedSnapFiles) {
+        snapByPath.set(f.path, f);
+      }
+
+      // Determine nodes to remove (absent in snapshot, OR different nodeType)
+      const removedNodes: IndexedLiveNode[] = [];
+      const removedIds = new Set<string>();
+
+      for (const liveEntry of liveIndex.entries) {
+        const snapMatch = snapByPath.get(liveEntry.path);
+        if (!snapMatch || snapMatch.nodeType !== liveEntry.row.nodeType) {
+          removedNodes.push(liveEntry);
+          removedIds.add(liveEntry.row.id);
+        }
+      }
+
+      // Security & concurrency pre-flight on every affected node
+      for (const removed of removedNodes) {
+        assertCanWriteFileNode({
+          role: resolvedRole,
+          userId: params.userId,
+          branchIsProtected: branch.isProtected,
+          fileLockedById: removed.row.lockedById,
+          lockedByUsername: removed.row.lockedBy?.username,
+          override: removed.overrideForCaller,
+        });
+        if (removed.row.nodeType === 'FILE') {
+          deletedFileIds.push(removed.row.id);
+        }
+        deletedNodes += 1;
+      }
+
+      for (const snapFile of sortedSnapFiles) {
+        const liveEntry = liveIndex.byPath.get(snapFile.path);
+        const deniedAtSnapshot =
+          resolvedRole !== 'owner' &&
+          snapFile.deniedUserIds.includes(params.userId);
+
+        if (liveEntry && !removedIds.has(liveEntry.row.id)) {
+          if (
+            snapFile.nodeType === 'FILE' &&
+            liveEntry.row.content !== snapFile.content
+          ) {
+            if (deniedAtSnapshot) {
+              throw new AppError(
+                403,
+                'FILE_ACCESS_DENIED',
+                'You do not have access to restore a restricted file'
+              );
+            }
+            assertCanWriteFileNode({
+              role: resolvedRole,
+              userId: params.userId,
+              branchIsProtected: branch.isProtected,
+              fileLockedById: liveEntry.row.lockedById,
+              lockedByUsername: liveEntry.row.lockedBy?.username,
+              override: liveEntry.overrideForCaller,
+            });
+          }
+        } else {
+          if (deniedAtSnapshot) {
+            throw new AppError(
+              403,
+              'FILE_ACCESS_DENIED',
+              'Snapshot contains files restricted by access controls'
+            );
+          }
+          const ancestor = resolveDeepestLiveAncestor(
+            snapFile.path,
+            liveIndex.byPath
+          );
+          if (ancestor && !removedIds.has(ancestor.row.id)) {
+            assertCanWriteFileNode({
+              role: resolvedRole,
+              userId: params.userId,
+              branchIsProtected: branch.isProtected,
+              fileLockedById: ancestor.row.lockedById,
+              lockedByUsername: ancestor.row.lockedBy?.username,
+              override: ancestor.overrideForCaller,
+            });
+          }
+        }
+      }
+
+      // Resolve valid non-owner user IDs referenced in snapshot denial lists before recreating nodes
+      const allSnapshotDeniedIds = Array.from(
+        new Set(sortedSnapFiles.flatMap((f) => f.deniedUserIds))
+      ).filter((uid) => uid !== project.ownerId);
+
+      const activeDeniedUserIds = new Set<string>(
+        allSnapshotDeniedIds.length > 0
+          ? (
+              await tx.projectMember.findMany({
+                where: {
+                  projectId,
+                  userId: { in: allSnapshotDeniedIds },
+                },
+                select: { userId: true },
+              })
+            ).map((m) => m.userId)
+          : []
+      );
+
+      // 1. Delete removed top-most nodes (child descendants cascade in PostgreSQL)
+      const deleteRootIds = removedNodes
+        .filter((n) => !n.row.parentId || !removedIds.has(n.row.parentId))
+        .map((n) => n.row.id);
+
+      if (deleteRootIds.length > 0) {
+        await tx.projectFile.deleteMany({
+          where: { id: { in: deleteRootIds } },
+        });
+      }
+
+      // 2. Track kept node IDs and apply updates / recreations top-down
+      const activeIdByPath = new Map<string, string>();
+      for (const liveEntry of liveIndex.entries) {
+        if (!removedIds.has(liveEntry.row.id)) {
+          activeIdByPath.set(liveEntry.path, liveEntry.row.id);
+        }
+      }
+
+      for (const snapFile of sortedSnapFiles) {
+        const existingId = activeIdByPath.get(snapFile.path);
+        if (existingId) {
+          const liveEntry = liveIndex.byId.get(existingId);
+          if (
+            snapFile.nodeType === 'FILE' &&
+            liveEntry &&
+            liveEntry.row.content !== snapFile.content
+          ) {
+            const updated = await tx.projectFile.update({
+              where: { id: existingId },
+              data: {
+                content: snapFile.content,
+                yjsState: null,
+                version: { increment: 1 },
+              },
+            });
+            updatedFiles += 1;
+            syncedFiles.push({
+              id: updated.id,
+              content: updated.content,
+              version: updated.version,
+            });
+          }
+          continue;
+        }
+
+        const parts = snapFile.path.split('/');
+        const name = parts[parts.length - 1] ?? snapFile.path;
+        const parentPath = parts.slice(0, -1).join('/');
+        let parentId: string | null = null;
+        if (parentPath) {
+          const resolvedParentId = activeIdByPath.get(parentPath);
+          if (!resolvedParentId) {
+            throw new AppError(
+              409,
+              'SNAPSHOT_TREE_CORRUPT',
+              `Missing parent directory "${parentPath}" while restoring "${snapFile.path}"`
+            );
+          }
+          parentId = resolvedParentId;
+        }
+
+        const created = await tx.projectFile.create({
+          data: {
+            branchId,
+            parentId,
+            parentKey: parentId ?? 'ROOT',
+            name,
+            nodeType: snapFile.nodeType,
+            content: snapFile.nodeType === 'FILE' ? snapFile.content : '',
+            version: 1,
+          },
+        });
+
+        const restoreDeniedIds = snapFile.deniedUserIds.filter((uid) =>
+          activeDeniedUserIds.has(uid)
+        );
+        if (restoreDeniedIds.length > 0) {
+          await tx.projectFileAccess.createMany({
+            data: restoreDeniedIds.map((uid) => ({
+              fileId: created.id,
+              userId: uid,
+              permission: 'DENIED',
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        activeIdByPath.set(snapFile.path, created.id);
+        createdNodes += 1;
+      }
+    });
+
+    // 3. Synchronize or evict active in-memory Yjs rooms before releasing restore barrier
+    if (deletedFileIds.length > 0) {
+      yjsRoomManager.destroyRoomsByFileIds(branchId, deletedFileIds);
+    }
+
+    for (const synced of syncedFiles) {
+      const delta = yjsRoomManager.syncFileContentFromRest(
+        branchId,
+        synced.id,
+        synced.content,
+        synced.version
+      );
+      restSyncDeltas.push({ fileId: synced.id, delta });
+    }
+  } finally {
+    yjsRoomManager.endBranchRestore(branchId);
   }
 
-  for (const synced of syncedFiles) {
-    const delta = yjsRoomManager.syncFileContentFromRest(
-      branchId,
-      synced.id,
-      synced.content,
-      synced.version
-    );
+  for (const syncItem of restSyncDeltas) {
     broadcastRestFileSync({
       branchId,
-      fileId: synced.id,
-      delta,
+      fileId: syncItem.fileId,
+      delta: syncItem.delta,
       senderId: 'system:snapshot-restore',
     });
   }
