@@ -10,12 +10,14 @@ import {
   MergeBranchSchema,
   RestoreSnapshotSchema,
   SetFileAccessSchema,
+  SNAPSHOT_LIMITS,
   UpdateBranchSchema,
   UpdateFileNodeSchema,
   UpdateProjectMemberRoleSchema,
   UpdateProjectSchema,
 } from '@codecollab/shared';
 import { requireAuth } from '../../middleware/auth.middleware';
+import { createRateLimitMiddleware } from '../../middleware/rateLimit.middleware';
 import { validateBody } from '../../middleware/validate.middleware';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
@@ -208,29 +210,59 @@ projectRouter.post(
 );
 
 // --- Day 5: Branch Snapshots & Version History ---
+const snapshotReadLimiter = createRateLimitMiddleware({
+  keyPrefix: 'snapshot:read',
+  maxRequests: SNAPSHOT_LIMITS.RATE_LIMIT_MAX_READS,
+  windowSec: SNAPSHOT_LIMITS.RATE_LIMIT_WINDOW_SEC,
+  message: `Too many snapshot reads (max ${SNAPSHOT_LIMITS.RATE_LIMIT_MAX_READS} per ${SNAPSHOT_LIMITS.RATE_LIMIT_WINDOW_SEC}s)`,
+  getKeySuffix: (req) => req.user?.id ?? null,
+});
+
+const snapshotDiffLimiter = createRateLimitMiddleware({
+  keyPrefix: 'snapshot:diff',
+  maxRequests: SNAPSHOT_LIMITS.RATE_LIMIT_MAX_DIFFS,
+  windowSec: SNAPSHOT_LIMITS.RATE_LIMIT_WINDOW_SEC,
+  message: `Too many snapshot diffs (max ${SNAPSHOT_LIMITS.RATE_LIMIT_MAX_DIFFS} per ${SNAPSHOT_LIMITS.RATE_LIMIT_WINDOW_SEC}s)`,
+  getKeySuffix: (req) => req.user?.id ?? null,
+});
+
+const snapshotMutationLimiter = createRateLimitMiddleware({
+  keyPrefix: 'snapshot:write',
+  maxRequests: SNAPSHOT_LIMITS.RATE_LIMIT_MAX_MUTATIONS,
+  windowSec: SNAPSHOT_LIMITS.RATE_LIMIT_WINDOW_SEC,
+  message: `Snapshot write rate limit exceeded (max ${SNAPSHOT_LIMITS.RATE_LIMIT_MAX_MUTATIONS} operations per ${SNAPSHOT_LIMITS.RATE_LIMIT_WINDOW_SEC}s)`,
+  getKeySuffix: (req) => req.user?.id ?? null,
+});
+
 projectRouter.get(
   '/:projectId/branches/:branchId/snapshots',
+  snapshotReadLimiter,
   asyncHandler(listBranchSnapshotsController)
 );
 projectRouter.post(
   '/:projectId/branches/:branchId/snapshots',
+  snapshotMutationLimiter,
   validateBody(CreateSnapshotSchema),
   asyncHandler(createBranchSnapshotController)
 );
 projectRouter.get(
   '/:projectId/branches/:branchId/snapshots/:snapshotId',
+  snapshotReadLimiter,
   asyncHandler(getBranchSnapshotDetailController)
 );
 projectRouter.get(
   '/:projectId/branches/:branchId/snapshots/:snapshotId/diff',
+  snapshotDiffLimiter,
   asyncHandler(diffBranchSnapshotController)
 );
 projectRouter.post(
   '/:projectId/branches/:branchId/snapshots/:snapshotId/restore',
+  snapshotMutationLimiter,
   validateBody(RestoreSnapshotSchema),
   asyncHandler(restoreBranchSnapshotController)
 );
 projectRouter.delete(
   '/:projectId/branches/:branchId/snapshots/:snapshotId',
+  snapshotMutationLimiter,
   asyncHandler(deleteBranchSnapshotController)
 );
