@@ -1,3 +1,9 @@
+import type { ChatMessageDto } from './chat';
+import type {
+  ExecutionFailureKind,
+  ExecutionRunDto,
+  ExecutionStatus,
+} from './execution';
 import { COLLAB_LIMITS, FileAccessPermission } from './project';
 
 /**
@@ -35,6 +41,7 @@ export const getCollaboratorColor = (userId: string): string => {
 export type RealtimeErrorCode =
   | 'UNAUTHORIZED'
   | 'INVALID_ID'
+  | 'INVALID_PAYLOAD'
   | 'PROJECT_NOT_FOUND'
   | 'PROJECT_FORBIDDEN'
   | 'BRANCH_NOT_FOUND'
@@ -49,11 +56,22 @@ export type RealtimeErrorCode =
   | 'PAYLOAD_TOO_LARGE'
   | 'FILE_TOO_LARGE'
   | 'NOT_IN_ROOM'
+  | 'EXECUTION_NOT_FOUND'
+  | 'EXECUTION_FORBIDDEN'
+  | 'EXECUTION_NOT_RUNNING'
+  | 'RATE_LIMIT_EXCEEDED'
+  | 'CHAT_FORBIDDEN'
   | 'INTERNAL_ERROR';
 
 export interface RealtimeErrorDetail {
   code: RealtimeErrorCode;
   message: string;
+}
+
+export interface RealtimeAck<T = undefined> {
+  ok: boolean;
+  error?: RealtimeErrorDetail;
+  data?: T;
 }
 
 /**
@@ -153,6 +171,8 @@ export interface FilePermissionChangedPayload extends FileRoomTarget {
 
 export interface RealtimeErrorPayload extends RealtimeErrorDetail {
   fileId?: string;
+  runId?: string;
+  projectId?: string;
 }
 
 /** Canonical Socket.IO room identifier isolating files across branches. */
@@ -162,6 +182,87 @@ export const buildFileRoomKey = (branchId: string, fileId: string): string =>
 /** Shared ceiling on incoming Yjs update frames (matches `COLLAB_LIMITS`). */
 export const REALTIME_MAX_FRAME_BYTES = COLLAB_LIMITS.MAX_YJS_UPDATE_BYTES;
 
+// =====================================================================
+// Day 4: Live Code Execution & Workspace Chat Socket Contracts
+// =====================================================================
+
+export interface ExecutionJoinPayload {
+  projectId: string;
+  runId: string;
+}
+
+export interface ExecutionJoinAckData {
+  run: ExecutionRunDto;
+  /** Highest contiguous output chunk sequence persisted/buffered at join time for deduplication. */
+  lastChunkSeq: number;
+}
+
+export type ExecutionJoinAck = RealtimeAck<ExecutionJoinAckData>;
+
+export interface ExecutionLeavePayload {
+  runId: string;
+}
+
+export interface ExecutionStdinPayload {
+  runId: string;
+  data: string;
+}
+
+export interface ExecutionStreamChunkPayload {
+  runId: string;
+  projectId: string;
+  branchId: string;
+  /** Monotonic per-run sequence index to deduplicate DB catch-up vs. live Pub/Sub frames. */
+  seq: number;
+  chunk: string;
+  truncated: boolean;
+  timestamp: number;
+}
+
+export interface ExecutionLifecyclePayload {
+  runId: string;
+  projectId: string;
+  branchId: string;
+  fileId: string | null;
+  status: ExecutionStatus;
+  exitCode: number | null;
+  failureKind: ExecutionFailureKind | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  stdoutTruncated: boolean;
+  stderrTruncated: boolean;
+}
+
+export interface ChatRoomPayload {
+  projectId: string;
+}
+
+export type ChatJoinAck = RealtimeAck;
+
+export interface ChatSendPayload {
+  projectId: string;
+  branchId?: string | null;
+  content: string;
+  fileId?: string | null;
+  lineNumber?: number | null;
+}
+
+export type ChatSendAck = RealtimeAck<ChatMessageDto>;
+
+export interface ChatTypingPayload {
+  projectId: string;
+  isTyping: boolean;
+}
+
+export interface ChatTypingServerPayload {
+  projectId: string;
+  userId: string;
+  username: string;
+  isTyping: boolean;
+}
+
 /** Typed Socket.IO events accepted by the server from connected clients. */
 export interface ClientToServerEvents {
   'file:join': (
@@ -170,13 +271,38 @@ export interface ClientToServerEvents {
   ) => void;
   'file:leave': (
     payload: FileRoomTarget,
-    callback?: (ack: { ok: boolean }) => void
+    callback?: (ack: RealtimeAck) => void
   ) => void;
   'yjs:update': (
     payload: YjsUpdateClientPayload,
     callback?: (ack: YjsUpdateAck) => void
   ) => void;
   'awareness:update': (payload: AwarenessUpdateClientPayload) => void;
+  'execution:join': (
+    payload: ExecutionJoinPayload,
+    callback?: (ack: ExecutionJoinAck) => void
+  ) => void;
+  'execution:leave': (
+    payload: ExecutionLeavePayload,
+    callback?: (ack: RealtimeAck) => void
+  ) => void;
+  'execution:stdin': (
+    payload: ExecutionStdinPayload,
+    callback?: (ack: RealtimeAck) => void
+  ) => void;
+  'chat:join': (
+    payload: ChatRoomPayload,
+    callback?: (ack: ChatJoinAck) => void
+  ) => void;
+  'chat:leave': (
+    payload: ChatRoomPayload,
+    callback?: (ack: RealtimeAck) => void
+  ) => void;
+  'chat:send': (
+    payload: ChatSendPayload,
+    callback?: (ack: ChatSendAck) => void
+  ) => void;
+  'chat:typing': (payload: ChatTypingPayload) => void;
 }
 
 /** Typed Socket.IO events emitted by the server to connected clients. */
@@ -186,4 +312,14 @@ export interface ServerToClientEvents {
   'presence:state': (payload: PresenceStatePayload) => void;
   'file:permission': (payload: FilePermissionChangedPayload) => void;
   'realtime:error': (payload: RealtimeErrorPayload) => void;
+  'execution:queued': (payload: ExecutionRunDto) => void;
+  'execution:started': (payload: ExecutionLifecyclePayload) => void;
+  'execution:stdout': (payload: ExecutionStreamChunkPayload) => void;
+  'execution:stderr': (payload: ExecutionStreamChunkPayload) => void;
+  'execution:completed': (payload: ExecutionLifecyclePayload) => void;
+  'execution:failed': (payload: ExecutionLifecyclePayload) => void;
+  'execution:timeout': (payload: ExecutionLifecyclePayload) => void;
+  'execution:cancelled': (payload: ExecutionLifecyclePayload) => void;
+  'chat:message': (payload: ChatMessageDto) => void;
+  'chat:typing': (payload: ChatTypingServerPayload) => void;
 }

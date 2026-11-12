@@ -54,6 +54,22 @@ enum FileAccessPermission {
   DENIED
 }
 
+// Authoritative lifecycle state for sandboxed Docker code executions
+enum ExecutionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  TIMEOUT
+  CANCELLED
+}
+
+// Distinguishes collaborator chat messages from automatic workspace system events
+enum ChatMessageType {
+  USER
+  SYSTEM
+}
+
 // Core user identity; supports password auth, OAuth-only accounts, or both
 model User {
   id           String   @id @default(uuid())
@@ -71,6 +87,8 @@ model User {
   createdBranches ProjectBranch[]     @relation("BranchCreator")
   lockedFiles     ProjectFile[]       @relation("FileLockHolder")
   fileAccesses    ProjectFileAccess[]
+  executionRuns   ExecutionRun[]
+  chatMessages    ChatMessage[]
 
   @@map("users")
 }
@@ -104,9 +122,11 @@ model Project {
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
-  owner    User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members  ProjectMember[]
-  branches ProjectBranch[]
+  owner         User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members       ProjectMember[]
+  branches      ProjectBranch[]
+  executionRuns ExecutionRun[]
+  chatMessages  ChatMessage[]
 
   @@index([ownerId])
   @@map("projects")
@@ -146,6 +166,8 @@ model ProjectBranch {
   childBranches ProjectBranch[] @relation("BranchParent")
   createdBy     User?           @relation("BranchCreator", fields: [createdById], references: [id], onDelete: SetNull)
   files         ProjectFile[]
+  executionRuns ExecutionRun[]
+  chatMessages  ChatMessage[]
 
   @@unique([projectId, name])
   @@index([projectId])
@@ -168,11 +190,13 @@ model ProjectFile {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
-  branch      ProjectBranch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  parent      ProjectFile?        @relation("FileTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children    ProjectFile[]       @relation("FileTree")
-  lockedBy    User?               @relation("FileLockHolder", fields: [lockedById], references: [id], onDelete: SetNull)
-  accessRules ProjectFileAccess[]
+  branch        ProjectBranch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  parent        ProjectFile?        @relation("FileTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children      ProjectFile[]       @relation("FileTree")
+  lockedBy      User?               @relation("FileLockHolder", fields: [lockedById], references: [id], onDelete: SetNull)
+  accessRules   ProjectFileAccess[]
+  executionRuns ExecutionRun[]
+  chatMessages  ChatMessage[]
 
   @@unique([branchId, parentKey, name])
   @@index([branchId, parentId])
@@ -194,4 +218,62 @@ model ProjectFileAccess {
   @@unique([fileId, userId])
   @@index([userId])
   @@map("project_file_accesses")
+}
+
+// Persistent record for an isolated Docker code execution run (source of truth over Redis/BullMQ)
+model ExecutionRun {
+  id              String            @id @default(uuid())
+  projectId       String
+  branchId        String
+  fileId          String?
+  userId          String
+  language        SupportedLanguage
+  status          ExecutionStatus   @default(QUEUED)
+  entryFileName   String
+  sourceCode      String            @db.Text
+  initialStdin    String?           @db.Text
+  stdout          String            @default("") @db.Text
+  stderr          String            @default("") @db.Text
+  stdoutTruncated Boolean           @default(false)
+  stderrTruncated Boolean           @default(false)
+  exitCode        Int?
+  failureKind     String?
+  errorMessage    String?
+  durationMs      Int?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch  ProjectBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  file    ProjectFile?  @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, branchId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("execution_runs")
+}
+
+// Persistent real-time workspace chat message with optional code location anchor (`file:line`)
+model ChatMessage {
+  id         String          @id @default(uuid())
+  projectId  String
+  branchId   String?
+  userId     String?
+  fileId     String?
+  type       ChatMessageType @default(USER)
+  content    String          @db.Text
+  fileName   String?
+  lineNumber Int?
+  createdAt  DateTime        @default(now())
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch  ProjectBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  user    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  file    ProjectFile?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("chat_messages")
 }

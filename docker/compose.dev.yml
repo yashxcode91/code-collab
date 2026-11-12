@@ -10,9 +10,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_password
       POSTGRES_DB: codecollab_dev
-    # Map host 5433 -> container 5432 so local macOS PostgreSQL (5432) never conflicts
+    # Map loopback 127.0.0.1:5433 -> container 5432 so local macOS PostgreSQL never conflicts and LAN hosts cannot reach DB
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     # Persist database files across `docker compose down/up` restarts
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -33,7 +33,7 @@ services:
     container_name: codecollab-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

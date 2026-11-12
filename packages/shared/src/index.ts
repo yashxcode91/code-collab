@@ -14,3 +14,9 @@ export * from './schemas/project';
 
 // Export all real-time Socket.IO + Yjs event contracts and presence types
 export * from './types/realtime';
+
+// Export Day 4 code execution & workspace chat contracts and Zod schemas
+export * from './types/execution';
+export * from './schemas/execution';
+export * from './types/chat';
+export * from './schemas/chat';
