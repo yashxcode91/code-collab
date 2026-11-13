@@ -105,6 +105,9 @@ interface StudioEditorPaneProps {
     isTyping: boolean;
   }) => void;
   onRetryFileLoad: () => void;
+  onChangeSelection?: (
+    selection: { startLine: number; endLine: number; text: string } | null,
+  ) => void;
 }
 
 /**
@@ -150,6 +153,7 @@ export function StudioEditorPane({
   onToggleFocusMode,
   onPublishAwareness,
   onRetryFileLoad,
+  onChangeSelection,
 }: StudioEditorPaneProps) {
   const { theme } = useTheme();
   const branchId = branch?.id ?? 'default';
@@ -177,6 +181,9 @@ export function StudioEditorPane({
 
   const onChangeCursorRef = useRef(onChangeCursor);
   onChangeCursorRef.current = onChangeCursor;
+
+  const onChangeSelectionRef = useRef(onChangeSelection);
+  onChangeSelectionRef.current = onChangeSelection;
 
   const onPublishAwarenessRef = useRef(onPublishAwareness);
   onPublishAwarenessRef.current = onPublishAwareness;
@@ -490,6 +497,20 @@ export function StudioEditorPane({
           focusLine: pos.lineNumber,
           isTyping: isTypingRef.current,
         });
+
+        if (onChangeSelectionRef.current) {
+          if (!sel.isEmpty()) {
+            const model = editorInstance.getModel();
+            const text = model ? model.getValueInRange(sel) : '';
+            onChangeSelectionRef.current({
+              startLine: Math.min(sel.startLineNumber, sel.endLineNumber),
+              endLine: Math.max(sel.startLineNumber, sel.endLineNumber),
+              text,
+            });
+          } else {
+            onChangeSelectionRef.current(null);
+          }
+        }
       };
 
       const cursorPosListener = editorInstance.onDidChangeCursorPosition(

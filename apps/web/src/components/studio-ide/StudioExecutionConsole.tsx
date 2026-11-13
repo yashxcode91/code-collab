@@ -12,6 +12,7 @@ import {
   Loader2,
   Play,
   Send,
+  Sparkles,
   Square,
   Terminal,
   X,
@@ -84,6 +85,7 @@ interface StudioExecutionConsoleProps {
   onDismissError: () => void;
   onToggleExpanded: () => void;
   onClose: () => void;
+  onDebugWithAi?: (errorText: string, runId?: string) => void;
 }
 
 /**
@@ -117,6 +119,7 @@ export function StudioExecutionConsole({
   onDismissError,
   onToggleExpanded,
   onClose,
+  onDebugWithAi,
 }: StudioExecutionConsoleProps) {
   const [tab, setTab] = useState<ConsoleTab>('output');
   const [stdinValue, setStdinValue] = useState('');
@@ -394,6 +397,32 @@ export function StudioExecutionConsole({
               </button>
             </>
           )}
+
+          {onDebugWithAi &&
+            (activeRun?.status === 'FAILED' ||
+              stderrCount > 0 ||
+              consoleError) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const errText =
+                    activeRun?.errorMessage ||
+                    activeRun?.stderr ||
+                    consoleError ||
+                    visibleSegments
+                      .filter((s) => s.stream === 'stderr')
+                      .map((s) => s.text)
+                      .join('') ||
+                    'Execution failed with runtime error';
+                  onDebugWithAi(errText, activeRun?.id);
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-purple-500/35 bg-purple-500/15 px-2 py-0.5 text-[11px] font-medium text-purple-600 transition-colors hover:bg-purple-500/25 dark:text-purple-300"
+                title="Send runtime error to AI Assistant to diagnose and patch"
+              >
+                <Sparkles className="h-3 w-3 text-purple-500" />
+                <span>Debug with AI</span>
+              </button>
+            )}
 
           <button
             type="button"

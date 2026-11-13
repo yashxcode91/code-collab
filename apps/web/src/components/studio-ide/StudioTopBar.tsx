@@ -21,6 +21,7 @@ import {
   Shield,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Square,
   Terminal,
   Trash2,
@@ -998,6 +999,25 @@ export function StudioTopBar({
                 )}
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() =>
+                onSetRightPanelTab(
+                  rightPanelTab === 'ai' ? 'closed' : 'ai',
+                )
+              }
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors',
+                rightPanelTab === 'ai'
+                  ? 'bg-purple-500/20 text-purple-600 dark:text-purple-300'
+                  : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground',
+              )}
+              title="AI Assistant (Explain, Debug, Tests, Refactor)"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-purple-500" aria-hidden="true" />
+              <span className="hidden lg:inline">AI</span>
+            </button>
 
             <button
               type="button"
