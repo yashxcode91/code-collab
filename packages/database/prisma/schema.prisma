@@ -70,6 +70,23 @@ enum ChatMessageType {
   SYSTEM
 }
 
+// Participant role inside an AI conversation turn
+enum AiMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// Interactive capability/action requested from the AI assistant
+enum AiActionKind {
+  CHAT
+  EXPLAIN
+  DEBUG
+  GENERATE_TESTS
+  REVIEW
+  REFACTOR
+}
+
 // Core user identity; supports password auth, OAuth-only accounts, or both
 model User {
   id           String   @id @default(uuid())
@@ -90,6 +107,7 @@ model User {
   executionRuns    ExecutionRun[]
   chatMessages     ChatMessage[]
   createdSnapshots BranchSnapshot[] @relation("SnapshotCreator")
+  aiConversations  AiConversation[] @relation("AiConversationOwner")
 
   @@map("users")
 }
@@ -129,6 +147,9 @@ model Project {
   executionRuns ExecutionRun[]
   chatMessages  ChatMessage[]
   snapshots     BranchSnapshot[]
+  chatMessages    ChatMessage[]
+  snapshots       BranchSnapshot[]
+  aiConversations AiConversation[]
 
   @@index([ownerId])
   @@map("projects")
@@ -171,6 +192,9 @@ model ProjectBranch {
   executionRuns ExecutionRun[]
   chatMessages  ChatMessage[]
   snapshots     BranchSnapshot[]
+  chatMessages    ChatMessage[]
+  snapshots       BranchSnapshot[]
+  aiConversations AiConversation[]
 
   @@unique([projectId, name])
   @@index([projectId])
@@ -200,6 +224,7 @@ model ProjectFile {
   accessRules   ProjectFileAccess[]
   executionRuns ExecutionRun[]
   chatMessages  ChatMessage[]
+  aiMessages    AiMessage[]
 
   @@unique([branchId, parentKey, name])
   @@index([branchId, parentId])
@@ -320,4 +345,49 @@ model BranchSnapshotFile {
   @@unique([snapshotId, path])
   @@index([snapshotId])
   @@map("branch_snapshot_files")
+}
+
+// Multi-turn AI assistant conversation anchored to a workspace project and branch
+model AiConversation {
+  id        String   @id @default(uuid())
+  projectId String
+  branchId  String
+  userId    String
+  title     String   @default("New Conversation")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch   ProjectBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  user     User          @relation("AiConversationOwner", fields: [userId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([projectId, branchId, updatedAt(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("ai_conversations")
+}
+
+// Single prompt, response, or reasoning turn inside an AI assistant conversation
+model AiMessage {
+  id               String        @id @default(uuid())
+  conversationId   String
+  role             AiMessageRole @default(USER)
+  actionKind       AiActionKind  @default(CHAT)
+  content          String        @db.Text
+  model            String?
+  promptTokens     Int?
+  completionTokens Int?
+  fileId           String?
+  fileName         String?
+  lineStart        Int?
+  lineEnd          Int?
+  suggestedCode    String?       @db.Text
+  createdAt        DateTime      @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  file         ProjectFile?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt(sort: Asc)])
+  @@index([fileId])
+  @@map("ai_messages")
 }
