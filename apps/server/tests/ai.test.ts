@@ -447,4 +447,114 @@ describe('Day 6 CodeCollab AI Assistant (SSE & Provider Harness)', () => {
 
     expect(getRes.status).toBe(404);
   });
+
+  describe('Day 6 Security Audit: AI Boundaries, ACLs, Quota & Abuse Prevention', () => {
+    it('11. Security Audit: Unauthenticated request to AI stream is rejected with 401', async () => {
+      const unauthRes = await request(app)
+        .post(`/api/projects/${projectId}/branches/${branchId}/ai/stream`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({
+          actionKind: 'chat',
+          prompt: 'Hello without credentials',
+        });
+
+      expect(unauthRes.status).toBe(401);
+    });
+
+    it('12. Security Audit: Prompt exceeding MAX_PROMPT_LENGTH (4,000 chars) is rejected with 400', async () => {
+      const oversizedPrompt = 'A'.repeat(AI_LIMITS.MAX_PROMPT_LENGTH + 1);
+
+      const res = await owner.agent
+        .post(`/api/projects/${projectId}/branches/${branchId}/ai/stream`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({
+          actionKind: 'chat',
+          prompt: oversizedPrompt,
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('13. Security Audit: Foreign fileId from outside project is safely rejected with 404', async () => {
+      const foreignFileRes = await owner.agent
+        .post(`/api/projects/${projectId}/branches/${branchId}/ai/stream`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({
+          actionKind: 'explain',
+          prompt: 'Explain foreign file',
+          context: {
+            fileId: '00000000-0000-0000-0000-000000000000',
+          },
+        });
+
+      expect(foreignFileRes.status).toBe(404);
+      expect(foreignFileRes.body.error.code).toBe('FILE_NOT_FOUND');
+    });
+
+    it('14. Security Audit: Sliding-window rate limiter trips on 21st prompt in 60s window (429)', async () => {
+      // Create a fresh test session so other tests are not rate-limited
+      const rateLimitUser = await registerSession('rate_limit_tester', 'ratelimituser');
+      const addRes = await owner.agent
+        .post(`/api/projects/${projectId}/members`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({
+          identifier: rateLimitUser.email,
+          role: 'editor',
+        });
+      expect(addRes.status).toBe(201);
+
+      // Hit rate limit (AI_LIMITS.RATE_LIMIT_MAX_PROMPTS = 20)
+      for (let i = 0; i < AI_LIMITS.RATE_LIMIT_MAX_PROMPTS; i++) {
+        const streamRes = await rateLimitUser.agent
+          .post(`/api/projects/${projectId}/branches/${branchId}/ai/stream`)
+          .set('Origin', TRUSTED_ORIGIN)
+          .send({
+            actionKind: 'chat',
+            prompt: `Prompt burst check #${i + 1}`,
+          });
+        expect(streamRes.status).toBe(200);
+      }
+
+      // 21st request must trigger HTTP 429
+      const overLimitRes = await rateLimitUser.agent
+        .post(`/api/projects/${projectId}/branches/${branchId}/ai/stream`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({
+          actionKind: 'chat',
+          prompt: 'Exceeding rate limit burst',
+        });
+
+      expect(overLimitRes.status).toBe(429);
+      expect(overLimitRes.body.error.code).toBe('RATE_LIMIT_EXCEEDED');
+    });
+
+    it('15. Security Audit: Input tampering (malformed actionKind & invalid conversationId) is blocked by schema', async () => {
+      // 1. Invalid actionKind injection attempt
+      const badActionRes = await owner.agent
+        .post(`/api/projects/${projectId}/branches/${branchId}/ai/stream`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({
+          actionKind: 'system_prompt_override',
+          prompt: 'Attempting invalid action',
+        });
+
+      expect(badActionRes.status).toBe(400);
+      expect(badActionRes.body.error.code).toBe('VALIDATION_ERROR');
+
+      // 2. Path traversal in conversationId
+      const badConvRes = await owner.agent
+        .post(`/api/projects/${projectId}/branches/${branchId}/ai/stream`)
+        .set('Origin', TRUSTED_ORIGIN)
+        .send({
+          conversationId: '../../../etc/passwd',
+          actionKind: 'chat',
+          prompt: 'Attempting path traversal in conversationId',
+        });
+
+      expect(badConvRes.status).toBe(400);
+      expect(badConvRes.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
 });
