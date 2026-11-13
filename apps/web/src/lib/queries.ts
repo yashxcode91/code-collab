@@ -1,5 +1,7 @@
 import type {
   AddProjectMemberInput,
+  AiConversationDetailDto,
+  AiConversationSummaryDto,
   BranchMergePreviewResponse,
   BranchMergeResultResponse,
   BranchSnapshotDetailDto,
@@ -92,6 +94,22 @@ export const queryKeys = {
         snapshotId,
         'diff',
         targetSnapshotId ?? 'live',
+      ] as const,
+    aiConversations: (projectId: string, branchId: string) =>
+      ['projects', projectId, 'branches', branchId, 'ai', 'conversations'] as const,
+    aiConversationDetail: (
+      projectId: string,
+      branchId: string,
+      conversationId: string,
+    ) =>
+      [
+        'projects',
+        projectId,
+        'branches',
+        branchId,
+        'ai',
+        'conversations',
+        conversationId,
       ] as const,
   },
 } as const;
@@ -602,6 +620,44 @@ export async function deleteBranchSnapshot(
 ): Promise<{ deleted: boolean }> {
   return apiRequest<{ deleted: boolean }>(
     `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/snapshots/${encodeURIComponent(snapshotId)}`,
+    { method: 'DELETE' },
+  );
+}
+
+// =====================================================================
+// Day 6: AI Assistant Conversations & Stream
+// =====================================================================
+
+/** Fetches AI conversations on a specific branch for the current user. */
+export async function fetchAiConversations(
+  projectId: string,
+  branchId: string,
+): Promise<AiConversationSummaryDto[]> {
+  const res = await apiRequest<{ conversations: AiConversationSummaryDto[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/ai/conversations`,
+  );
+  return res.conversations;
+}
+
+/** Fetches full message history of an AI conversation. */
+export async function fetchAiConversationDetail(
+  projectId: string,
+  branchId: string,
+  conversationId: string,
+): Promise<AiConversationDetailDto> {
+  return apiRequest<AiConversationDetailDto>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/ai/conversations/${encodeURIComponent(conversationId)}`,
+  );
+}
+
+/** Deletes an AI conversation. */
+export async function deleteAiConversation(
+  projectId: string,
+  branchId: string,
+  conversationId: string,
+): Promise<void> {
+  await apiRequest<void>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/ai/conversations/${encodeURIComponent(conversationId)}`,
     { method: 'DELETE' },
   );
 }

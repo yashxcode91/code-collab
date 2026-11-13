@@ -7,7 +7,14 @@ export type InspectorTab =
   | 'chat'
   | 'members'
   | 'access'
-  | 'settings';
+  | 'settings'
+  | 'ai';
+
+export interface ActiveCodeSelection {
+  startLine: number;
+  endLine: number;
+  text: string;
+}
 
 export interface FileDraftBuffer {
   fileId: string;
@@ -43,12 +50,14 @@ interface StudioState {
   consoleOpen: boolean;
   consoleExpanded: boolean;
   activeRunId: string | null;
+  activeSelection: ActiveCodeSelection | null;
 
   initProjectSession: (projectId: string, defaultBranchId: string | null) => void;
   selectBranch: (branchId: string) => void;
   openFileTab: (fileId: string) => void;
   closeFileTab: (fileId: string) => void;
   setActiveFileId: (fileId: string | null) => void;
+  setActiveSelection: (selection: ActiveCodeSelection | null) => void;
   setAclTargetNodeId: (nodeId: string | null) => void;
   toggleFolder: (folderId: string) => void;
   setFolderExpanded: (folderId: string, expanded: boolean) => void;
@@ -98,6 +107,7 @@ const INITIAL_STATE = {
   consoleOpen: false,
   consoleExpanded: false,
   activeRunId: null as string | null,
+  activeSelection: null as ActiveCodeSelection | null,
 };
 
 /**
@@ -173,6 +183,8 @@ export const useStudioStore = create<StudioState>((set) => ({
     }),
 
   setActiveFileId: (fileId) => set({ activeFileId: fileId }),
+
+  setActiveSelection: (selection) => set({ activeSelection: selection }),
 
   setAclTargetNodeId: (nodeId) => set({ aclTargetNodeId: nodeId }),
 
