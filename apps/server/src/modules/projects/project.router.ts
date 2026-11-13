@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
   AddProjectMemberSchema,
+  AI_LIMITS,
+  AiPromptRequestSchema,
   CreateBranchSchema,
   CreateChatMessageSchema,
   CreateExecutionRunSchema,
@@ -20,6 +22,12 @@ import { requireAuth } from '../../middleware/auth.middleware';
 import { createRateLimitMiddleware } from '../../middleware/rateLimit.middleware';
 import { validateBody } from '../../middleware/validate.middleware';
 import { asyncHandler } from '../../utils/asyncHandler';
+import {
+  deleteAiConversationController,
+  getAiConversationDetailController,
+  listAiConversationsController,
+  streamAiPromptController,
+} from '../ai/ai.controller';
 import {
   createProjectChatMessageController,
   listProjectChatMessagesController,
@@ -265,4 +273,46 @@ projectRouter.delete(
   '/:projectId/branches/:branchId/snapshots/:snapshotId',
   snapshotMutationLimiter,
   asyncHandler(deleteBranchSnapshotController)
+);
+
+// --- Day 6: AI Assistant (SSE Stream & Conversations) ---
+const aiPromptLimiter = createRateLimitMiddleware({
+  keyPrefix: 'ai:prompt',
+  maxRequests: AI_LIMITS.RATE_LIMIT_MAX_PROMPTS,
+  windowSec: AI_LIMITS.RATE_LIMIT_WINDOW_SEC,
+  message: `Too many AI requests (max ${AI_LIMITS.RATE_LIMIT_MAX_PROMPTS} per ${AI_LIMITS.RATE_LIMIT_WINDOW_SEC}s)`,
+  getKeySuffix: (req) => req.user?.id ?? null,
+});
+
+const aiReadLimiter = createRateLimitMiddleware({
+  keyPrefix: 'ai:read',
+  maxRequests: 60,
+  windowSec: 60,
+  message: 'Too many AI read requests',
+  getKeySuffix: (req) => req.user?.id ?? null,
+});
+
+projectRouter.post(
+  '/:projectId/branches/:branchId/ai/stream',
+  aiPromptLimiter,
+  validateBody(AiPromptRequestSchema),
+  asyncHandler(streamAiPromptController)
+);
+
+projectRouter.get(
+  '/:projectId/branches/:branchId/ai/conversations',
+  aiReadLimiter,
+  asyncHandler(listAiConversationsController)
+);
+
+projectRouter.get(
+  '/:projectId/branches/:branchId/ai/conversations/:conversationId',
+  aiReadLimiter,
+  asyncHandler(getAiConversationDetailController)
+);
+
+projectRouter.delete(
+  '/:projectId/branches/:branchId/ai/conversations/:conversationId',
+  aiPromptLimiter,
+  asyncHandler(deleteAiConversationController)
 );
