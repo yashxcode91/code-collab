@@ -18,6 +18,7 @@ import {
   Shield,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   UserMinus,
   UserPlus,
@@ -40,6 +41,7 @@ import {
 } from '@codecollab/shared';
 import { StudioChatPanel } from '@/components/studio-ide/StudioChatPanel';
 import { StudioHistoryPanel } from '@/components/studio-ide/StudioHistoryPanel';
+import { StudioAiDrawer } from '@/components/studio-ide/StudioAiDrawer';
 import { buildNodeBreadcrumb } from '@/components/studio-ide/studioLanguage';
 import type { TypingPeer } from '@/hooks/useWorkspaceChat';
 import { ApiClientError } from '@/lib/api';
@@ -115,6 +117,12 @@ interface StudioInspectorDrawerProps {
     onClearError: () => void;
     onClearRestoreNotice: () => void;
   };
+  aiState?: {
+    activeFileId: string | null;
+    activeFileName?: string | null;
+    activeSelection?: { startLine: number; endLine: number; text: string } | null;
+    onApplyCode?: (code: string) => Promise<void> | void;
+  };
   onChangeTab: (tab: InspectorTab) => void;
   onSelectAclTarget: (nodeId: string | null) => void;
   onWorkspaceLeftOrDeleted: () => void;
@@ -139,6 +147,7 @@ export function StudioInspectorDrawer({
   canSendChat,
   chatState,
   historyState,
+  aiState,
   onChangeTab,
   onSelectAclTarget,
   onWorkspaceLeftOrDeleted,
@@ -562,7 +571,24 @@ export function StudioInspectorDrawer({
                   </span>
                 </>
               )}
+              {resolvedTab === 'ai' && (
+                <>
+                  <Sparkles
+                    className="h-3.5 w-3.5 shrink-0 text-purple-500"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+                    AI Assistant
+                  </span>
+                </>
+              )}
             </div>
+
+            {resolvedTab === 'ai' && (
+              <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-purple-600 dark:text-purple-300">
+                Ready
+              </span>
+            )}
 
             {resolvedTab === 'history' && (
               <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-primary">
@@ -636,6 +662,20 @@ export function StudioInspectorDrawer({
 
             <button
               type="button"
+              onClick={() => onChangeTab('ai')}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-medium transition-colors',
+                resolvedTab === 'ai'
+                  ? 'border border-purple-500/45 bg-purple-500/15 text-purple-600 dark:text-purple-300'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>AI</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => onChangeTab('members')}
               className={cn(
                 'inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-medium transition-colors',
@@ -693,12 +733,24 @@ export function StudioInspectorDrawer({
         {/* Scrollable Panel Body */}
         <div
           className={cn(
-            'relative z-10 min-h-0 flex-1 p-3.5',
-            resolvedTab === 'chat' || resolvedTab === 'history'
-              ? 'flex flex-col overflow-hidden'
-              : 'space-y-4 overflow-y-auto',
+            'relative z-10 min-h-0 flex-1',
+            resolvedTab === 'chat' || resolvedTab === 'history' || resolvedTab === 'ai'
+              ? 'flex flex-col overflow-hidden p-0'
+              : 'space-y-4 overflow-y-auto p-3.5',
           )}
         >
+          {/* ==================== -2. AI ASSISTANT TAB ==================== */}
+          {resolvedTab === 'ai' && branch && (
+            <StudioAiDrawer
+              projectId={project.id}
+              branchId={branch.id}
+              activeFileId={aiState?.activeFileId ?? activeFileId}
+              activeFileName={aiState?.activeFileName ?? activeFile?.name}
+              activeSelection={aiState?.activeSelection}
+              onApplyCode={aiState?.onApplyCode}
+            />
+          )}
+
           {/* ==================== -1. VERSION HISTORY TAB ==================== */}
           {resolvedTab === 'history' && (
             <StudioHistoryPanel

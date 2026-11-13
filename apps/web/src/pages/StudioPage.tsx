@@ -97,6 +97,8 @@ export function StudioPage() {
   const consoleOpen = useStudioStore((s) => s.consoleOpen);
   const consoleExpanded = useStudioStore((s) => s.consoleExpanded);
   const activeRunId = useStudioStore((s) => s.activeRunId);
+  const activeSelection = useStudioStore((s) => s.activeSelection);
+  const setActiveSelection = useStudioStore((s) => s.setActiveSelection);
 
   const initProjectSession = useStudioStore((s) => s.initProjectSession);
   const selectBranch = useStudioStore((s) => s.selectBranch);
@@ -363,6 +365,58 @@ export function StudioPage() {
     enabled: Boolean(project && user),
     onBranchRestored: handleBranchRestored,
   });
+
+  const handleApplyAiCode = useCallback(
+    async (suggestedCode: string) => {
+      const draft = activeFile ? (buffers[activeFile.id] ?? null) : null;
+      if (!activeFile || !draft) return;
+
+      // 1. Day 5 Safety Snapshot Integration
+      try {
+        await snapshots.createSnapshot({
+          title: `Pre-AI Patch: ${activeFile.name}`,
+          description: `Automatic safety checkpoint before applying CodeCollab AI suggestion`,
+        });
+      } catch {
+        // Best effort safety snapshot
+      }
+
+      // 2. Replace active selection or entire file content
+      if (activeSelection && activeSelection.text) {
+        const lines = draft.content.split('\n');
+        const before = lines.slice(0, Math.max(0, activeSelection.startLine - 1));
+        const after = lines.slice(Math.min(lines.length, activeSelection.endLine));
+        const newContent = [...before, suggestedCode, ...after].join('\n');
+        updateDraftContent(activeFile.id, newContent);
+        if (collab.activeRoomKey && collab.ytext) {
+          collab.ytext.delete(0, collab.ytext.length);
+          collab.ytext.insert(0, newContent);
+        }
+      } else {
+        updateDraftContent(activeFile.id, suggestedCode);
+        if (collab.activeRoomKey && collab.ytext) {
+          collab.ytext.delete(0, collab.ytext.length);
+          collab.ytext.insert(0, suggestedCode);
+        }
+      }
+    },
+    [
+      activeFile,
+      activeSelection,
+      buffers,
+      collab.activeRoomKey,
+      collab.ytext,
+      snapshots,
+      updateDraftContent,
+    ],
+  );
+
+  const handleDebugWithAi = useCallback(
+    (_errorText: string, _runId?: string) => {
+      setRightPanelTab('ai');
+    },
+    [setRightPanelTab],
+  );
 
   // Reset manual language override when switching active file
   useEffect(() => {
@@ -1062,6 +1116,7 @@ export function StudioPage() {
               onToggleFocusMode={toggleFocusMode}
               onPublishAwareness={collab.publishAwareness}
               onRetryFileLoad={() => void activeFileDetailQuery.refetch()}
+              onChangeSelection={setActiveSelection}
             />
 
             <StudioExecutionConsole
@@ -1090,6 +1145,7 @@ export function StudioPage() {
               onDismissError={execution.clearConsoleError}
               onToggleExpanded={toggleConsoleExpanded}
               onClose={() => setConsoleOpen(false)}
+              onDebugWithAi={handleDebugWithAi}
             />
           </div>
 
@@ -1106,6 +1162,12 @@ export function StudioPage() {
             activeCursorLine={activeDraft?.cursorLine ?? 1}
             isWorkspaceMember={isWorkspaceMember}
             canSendChat={isEditorOrOwner}
+            aiState={{
+              activeFileId,
+              activeFileName: activeFile?.name,
+              activeSelection,
+              onApplyCode: handleApplyAiCode,
+            }}
             chatState={{
               messages: chat.messages,
               nextCursor: chat.nextCursor,
