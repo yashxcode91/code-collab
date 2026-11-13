@@ -24,3 +24,7 @@ export * from './schemas/chat';
 // Export Day 5 branch snapshot & version history contracts and Zod schemas
 export * from './types/snapshot';
 export * from './schemas/snapshot';
+
+// Export Day 6 CodeCollab AI Assistant contracts and Zod schemas
+export * from './types/ai';
+export * from './schemas/ai';
