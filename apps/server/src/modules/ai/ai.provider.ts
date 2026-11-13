@@ -290,11 +290,14 @@ Let me know if you would like me to generate code or clarify any specific functi
 // =====================================================================
 
 export class GeminiAiProvider implements AiProviderAdapter {
-  public readonly name = 'gemini-1.5-flash';
+  public readonly name: string;
   private readonly apiKey: string;
+  private readonly model: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, model: string = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite') {
     this.apiKey = apiKey;
+    this.model = model;
+    this.name = model;
   }
 
   public async streamCompletion(
@@ -318,7 +321,7 @@ Branch: ${payload.branchName ?? 'main'}`;
       .filter(Boolean)
       .join('\n\n');
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -376,7 +379,7 @@ Branch: ${payload.branchName ?? 'main'}`;
 
     return {
       content: fullText,
-      model: 'gemini-1.5-flash',
+      model: this.model,
       promptTokens: Math.ceil(userPrompt.length / 4),
       completionTokens: Math.ceil(fullText.length / 4),
       suggestedCode: extractSuggestedCode(fullText),
@@ -498,6 +501,10 @@ Branch: ${payload.branchName ?? 'main'}`,
  * falls back to the intelligent offline simulation provider when keys are absent.
  */
 export const getAiProvider = (): AiProviderAdapter => {
+  if (process.env.NODE_ENV === 'test') {
+    return new OfflineMockAiProvider();
+  }
+
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   if (geminiKey) {
     return new GeminiAiProvider(geminiKey);
