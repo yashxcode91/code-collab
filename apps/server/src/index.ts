@@ -1,20 +1,5 @@
 // Load environment variables BEFORE importing `app`, so startup config validation sees `.env` values
-import fs from 'node:fs';
-import path from 'node:path';
-import dotenv from 'dotenv';
-
-// Load from local apps/server/.env and monorepo root .env
-for (const envCandidate of [
-  path.resolve(process.cwd(), '.env'),
-  path.resolve(process.cwd(), '../../.env'),
-  path.resolve(__dirname, '../.env'),
-  path.resolve(__dirname, '../../../.env'),
-]) {
-  if (fs.existsSync(envCandidate)) {
-    dotenv.config({ path: envCandidate });
-  }
-}
-dotenv.config();
+import 'dotenv/config';
 import http from 'node:http';
 import { prisma } from '@codecollab/database';
 import { app } from './app';
