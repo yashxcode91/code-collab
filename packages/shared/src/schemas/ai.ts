@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AI_LIMITS } from '../types/ai';
+import { AI_LIMITS, RAG_LIMITS } from '../types/ai';
 import { hasDisallowedChatControlChars } from './chat';
 import { getUtf8ByteLength } from './execution';
 
@@ -39,6 +39,7 @@ export const AiPromptContextSchema = z
       .string()
       .max(5_000, 'Terminal error output too large')
       .optional(),
+    ragMode: z.boolean().optional(),
   })
   .optional();
 
@@ -91,4 +92,42 @@ export type ListAiConversationsQueryInput = z.infer<
 >;
 export type ListAiMessagesQueryInput = z.infer<
   typeof ListAiMessagesQuerySchema
+>;
+
+export const SemanticSearchRequestSchema = z.object({
+  query: z
+    .string()
+    .trim()
+    .min(1, 'Search query cannot be empty')
+    .max(1_000, 'Search query cannot exceed 1,000 characters'),
+  topK: z.coerce
+    .number()
+    .int('topK must be an integer')
+    .min(1, 'topK must be at least 1')
+    .max(
+      RAG_LIMITS.MAX_SIMILARITY_TOP_K,
+      `topK cannot exceed ${RAG_LIMITS.MAX_SIMILARITY_TOP_K}`
+    )
+    .default(RAG_LIMITS.DEFAULT_SIMILARITY_TOP_K),
+  minScore: z.coerce
+    .number()
+    .min(0.0)
+    .max(1.0)
+    .default(RAG_LIMITS.MIN_SIMILARITY_SCORE),
+  fileExtensionFilter: z
+    .array(z.string().regex(/^\.[a-zA-Z0-9]+$/))
+    .max(10)
+    .optional(),
+});
+
+export type SemanticSearchRequestInput = z.infer<
+  typeof SemanticSearchRequestSchema
+>;
+
+export const CodebaseIndexRequestSchema = z.object({
+  forceReindex: z.boolean().default(false),
+});
+
+export type CodebaseIndexRequestInput = z.infer<
+  typeof CodebaseIndexRequestSchema
 >;

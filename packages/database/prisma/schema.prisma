@@ -5,12 +5,14 @@
 // =====================================================================
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 // Global platform role (user vs site admin)
@@ -87,6 +89,14 @@ enum AiActionKind {
   REFACTOR
 }
 
+// Processing state of an asynchronous codebase embedding indexing job
+enum IndexTaskStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 // Core user identity; supports password auth, OAuth-only accounts, or both
 model User {
   id           String   @id @default(uuid())
@@ -98,16 +108,17 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  accounts        Account[]
-  ownedProjects   Project[]           @relation("ProjectOwner")
-  projectMembers  ProjectMember[]
-  createdBranches ProjectBranch[]     @relation("BranchCreator")
-  lockedFiles     ProjectFile[]       @relation("FileLockHolder")
-  fileAccesses    ProjectFileAccess[]
-  executionRuns    ExecutionRun[]
-  chatMessages     ChatMessage[]
-  createdSnapshots BranchSnapshot[] @relation("SnapshotCreator")
-  aiConversations  AiConversation[] @relation("AiConversationOwner")
+  accounts            Account[]
+  ownedProjects       Project[]           @relation("ProjectOwner")
+  projectMembers      ProjectMember[]
+  createdBranches     ProjectBranch[]     @relation("BranchCreator")
+  lockedFiles         ProjectFile[]       @relation("FileLockHolder")
+  fileAccesses        ProjectFileAccess[]
+  executionRuns       ExecutionRun[]
+  chatMessages        ChatMessage[]
+  createdSnapshots    BranchSnapshot[]    @relation("SnapshotCreator")
+  aiConversations     AiConversation[]    @relation("AiConversationOwner")
+  requestedIndexTasks CodebaseIndexTask[] @relation("IndexTaskRequester")
 
   @@map("users")
 }
@@ -141,15 +152,15 @@ model Project {
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
-  owner         User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members       ProjectMember[]
-  branches      ProjectBranch[]
-  executionRuns ExecutionRun[]
-  chatMessages  ChatMessage[]
-  snapshots     BranchSnapshot[]
-  chatMessages    ChatMessage[]
-  snapshots       BranchSnapshot[]
+  owner           User                @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members         ProjectMember[]
+  branches        ProjectBranch[]
+  executionRuns   ExecutionRun[]
   aiConversations AiConversation[]
+  embeddings      CodebaseEmbedding[]
+  indexTasks      CodebaseIndexTask[]
+  ChatMessage     ChatMessage[]
+  BranchSnapshot  BranchSnapshot[]
 
   @@index([ownerId])
   @@map("projects")
@@ -184,19 +195,20 @@ model ProjectBranch {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parentBranch  ProjectBranch?  @relation("BranchParent", fields: [parentBranchId], references: [id], onDelete: SetNull)
-  childBranches ProjectBranch[] @relation("BranchParent")
-  createdBy     User?           @relation("BranchCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  files         ProjectFile[]
-  executionRuns ExecutionRun[]
-  chatMessages  ChatMessage[]
-  snapshots     BranchSnapshot[]
-  chatMessages    ChatMessage[]
-  snapshots       BranchSnapshot[]
+  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentBranch    ProjectBranch?      @relation("BranchParent", fields: [parentBranchId], references: [id], onDelete: SetNull)
+  childBranches   ProjectBranch[]     @relation("BranchParent")
+  createdBy       User?               @relation("BranchCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  files           ProjectFile[]
+  executionRuns   ExecutionRun[]
   aiConversations AiConversation[]
+  embeddings      CodebaseEmbedding[]
+  indexTasks      CodebaseIndexTask[]
+  ChatMessage     ChatMessage[]
+  BranchSnapshot  BranchSnapshot[]
 
   @@unique([projectId, name])
+  @@unique([id, projectId])
   @@index([projectId])
   @@map("project_branches")
 }
@@ -225,8 +237,10 @@ model ProjectFile {
   executionRuns ExecutionRun[]
   chatMessages  ChatMessage[]
   aiMessages    AiMessage[]
+  embeddings    CodebaseEmbedding[]
 
   @@unique([branchId, parentKey, name])
+  @@unique([id, branchId])
   @@index([branchId, parentId])
   @@map("project_files")
 }
@@ -390,4 +404,58 @@ model AiMessage {
   @@index([conversationId, createdAt(sort: Asc)])
   @@index([fileId])
   @@map("ai_messages")
+}
+
+// Semantic vector embedding for a chunk of code in a project file
+model CodebaseEmbedding {
+  id          String                      @id @default(uuid())
+  projectId   String
+  branchId    String
+  fileId      String
+  filePath    String
+  chunkIndex  Int
+  startLine   Int
+  endLine     Int
+  content     String                      @db.Text
+  contentHash String                      @db.VarChar(64)
+  tokenCount  Int
+  embedding   Unsupported("vector(768)")?
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch  ProjectBranch @relation(fields: [branchId, projectId], references: [id, projectId], onDelete: Cascade)
+  file    ProjectFile   @relation(fields: [fileId, branchId], references: [id, branchId], onDelete: Cascade)
+
+  @@unique([fileId, chunkIndex])
+  @@index([projectId, branchId])
+  @@index([fileId])
+  @@index([contentHash])
+  @@map("codebase_embeddings")
+}
+
+// Asynchronous indexing task tracker for multi-file semantic embeddings
+model CodebaseIndexTask {
+  id            String          @id @default(uuid())
+  projectId     String
+  branchId      String
+  requestedById String
+  status        IndexTaskStatus @default(PENDING)
+  totalFiles    Int             @default(0)
+  indexedFiles  Int             @default(0)
+  totalChunks   Int             @default(0)
+  errorMessage  String?         @db.Text
+  startedAt     DateTime?
+  completedAt   DateTime?
+  retryCount    Int             @default(0)
+  maxRetries    Int             @default(3)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch      ProjectBranch @relation(fields: [branchId, projectId], references: [id, projectId], onDelete: Cascade)
+  requestedBy User          @relation("IndexTaskRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@index([projectId, branchId, createdAt(sort: Desc)])
+  @@map("codebase_index_tasks")
 }

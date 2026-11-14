@@ -3,7 +3,7 @@ services:
   # 1. PostgreSQL Database Service
   # ============================================================
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: codecollab-postgres
     restart: unless-stopped
     environment:

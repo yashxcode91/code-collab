@@ -10,6 +10,84 @@ export const AI_LIMITS = {
   RATE_LIMIT_MAX_PROMPTS: 20, // 20 AI prompts per minute per user
 } as const;
 
+export const RAG_LIMITS = {
+  CHUNK_TARGET_LINES: 60,
+  CHUNK_OVERLAP_LINES: 15,
+  MAX_CHUNK_CHARS: 3_000,
+  EMBEDDING_DIMENSION: 768,
+  DEFAULT_SIMILARITY_TOP_K: 5,
+  MAX_SIMILARITY_TOP_K: 20,
+  MIN_SIMILARITY_SCORE: 0.35,
+  MAX_INDEX_FILES_PER_PROJECT: 500,
+  MAX_FILE_BYTES_FOR_INDEXING: 250 * 1024, // 250 KB max per file
+} as const;
+
+export type IndexTaskStatusDto = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface CodebaseChunkDto {
+  fileId: string;
+  filePath: string;
+  chunkIndex: number;
+  startLine: number;
+  endLine: number;
+  content: string;
+  contentHash: string;
+  tokenCount: number;
+}
+
+export interface SemanticSearchResultDto {
+  id: string;
+  fileId: string;
+  filePath: string;
+  startLine: number;
+  endLine: number;
+  content: string;
+  similarity: number; // 0.0 - 1.0 (1.0 = identical)
+}
+
+export interface SemanticSearchRequestDto {
+  query: string;
+  topK?: number;
+  minScore?: number;
+  fileExtensionFilter?: string[];
+}
+
+export interface SemanticSearchResponseDto {
+  query: string;
+  results: SemanticSearchResultDto[];
+  totalMatches: number;
+  latencyMs: number;
+}
+
+export interface CodebaseIndexTaskDto {
+  id: string;
+  projectId: string;
+  branchId: string;
+  status: IndexTaskStatusDto;
+  totalFiles: number;
+  indexedFiles: number;
+  totalChunks: number;
+  errorMessage?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CodebaseIndexStatusDto {
+  taskId?: string;
+  status: IndexTaskStatusDto | 'IDLE';
+  totalFiles: number;
+  indexedFiles: number;
+  totalChunks: number;
+  lastIndexedAt?: string;
+  errorMessage?: string | null;
+}
+
+export interface CodebaseIndexRequestDto {
+  forceReindex?: boolean;
+}
+
 export type AiMessageRole = 'user' | 'assistant' | 'system';
 
 export type AiActionKind =
@@ -69,6 +147,8 @@ export interface AiPromptContext {
   selection?: AiPromptSelectionContext;
   executionRunId?: string;
   terminalError?: string;
+  ragMode?: boolean;
+  ragCitations?: SemanticSearchResultDto[];
 }
 
 export interface AiPromptRequest {
@@ -92,6 +172,10 @@ export type AiStreamChunkDto =
   | {
       type: 'token';
       token: string;
+    }
+  | {
+      type: 'citations';
+      citations: SemanticSearchResultDto[];
     }
   | {
       type: 'action';
