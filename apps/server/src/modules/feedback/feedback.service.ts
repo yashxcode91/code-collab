@@ -15,6 +15,7 @@ interface StoredFeedbackItem {
   authorName?: string;
   createdAt: string;
   voterIds: string[];
+  downvoterIds?: string[];
 }
 
 interface StoredFeedbackData {
@@ -31,6 +32,7 @@ const DEFAULT_FEEDBACK_ITEMS: StoredFeedbackItem[] = [
     authorName: 'Core Architecture',
     createdAt: '2026-11-10T12:00:00.000Z',
     voterIds: [],
+    downvoterIds: [],
   },
   {
     id: 'f-2',
@@ -41,6 +43,7 @@ const DEFAULT_FEEDBACK_ITEMS: StoredFeedbackItem[] = [
     authorName: 'Core Architecture',
     createdAt: '2026-11-10T13:00:00.000Z',
     voterIds: [],
+    downvoterIds: [],
   },
   {
     id: 'f-3',
@@ -51,6 +54,7 @@ const DEFAULT_FEEDBACK_ITEMS: StoredFeedbackItem[] = [
     authorName: 'Core Architecture',
     createdAt: '2026-11-11T09:00:00.000Z',
     voterIds: [],
+    downvoterIds: [],
   },
   {
     id: 'f-4',
@@ -61,6 +65,7 @@ const DEFAULT_FEEDBACK_ITEMS: StoredFeedbackItem[] = [
     authorName: 'AI Subsystem',
     createdAt: '2026-11-11T14:30:00.000Z',
     voterIds: [],
+    downvoterIds: [],
   },
   {
     id: 'f-5',
@@ -71,6 +76,7 @@ const DEFAULT_FEEDBACK_ITEMS: StoredFeedbackItem[] = [
     authorName: 'Dev Experience',
     createdAt: '2026-11-12T10:15:00.000Z',
     voterIds: [],
+    downvoterIds: [],
   },
   {
     id: 'f-6',
@@ -81,6 +87,7 @@ const DEFAULT_FEEDBACK_ITEMS: StoredFeedbackItem[] = [
     authorName: 'Security Ops',
     createdAt: '2026-11-12T16:00:00.000Z',
     voterIds: [],
+    downvoterIds: [],
   },
 ];
 
@@ -139,6 +146,7 @@ export class FeedbackService {
     this.memoryCache = DEFAULT_FEEDBACK_ITEMS.map((it) => ({
       ...it,
       voterIds: [],
+      downvoterIds: [],
     }));
     this.saveItems(this.memoryCache);
   }
@@ -147,16 +155,23 @@ export class FeedbackService {
     const items = this.loadItems();
 
     return items
-      .map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        category: item.category,
-        votes: item.voterIds.length,
-        userVoted: voterId ? item.voterIds.includes(voterId) : false,
-        authorName: item.authorName,
-        createdAt: item.createdAt,
-      }))
+      .map((item) => {
+        const upvoted = voterId ? item.voterIds.includes(voterId) : false;
+        const downvoted = voterId && Array.isArray(item.downvoterIds) ? item.downvoterIds.includes(voterId) : false;
+        const totalVotes = item.voterIds.length - (item.downvoterIds?.length || 0);
+
+        return {
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          category: item.category,
+          votes: totalVotes,
+          userVoted: upvoted || downvoted,
+          userVoteDirection: upvoted ? ('up' as const) : downvoted ? ('down' as const) : null,
+          authorName: item.authorName,
+          createdAt: item.createdAt,
+        };
+      })
       .sort((a, b) => b.votes - a.votes);
   }
 
@@ -177,6 +192,7 @@ export class FeedbackService {
       authorName: authorName ?? 'Community Contributor',
       createdAt: new Date().toISOString(),
       voterIds,
+      downvoterIds: [],
     };
 
     const updated = [newItem, ...items];
@@ -189,6 +205,7 @@ export class FeedbackService {
       category: newItem.category,
       votes: newItem.voterIds.length,
       userVoted: Boolean(voterId),
+      userVoteDirection: voterId ? 'up' : null,
       authorName: newItem.authorName,
       createdAt: newItem.createdAt,
     };
@@ -197,6 +214,7 @@ export class FeedbackService {
   public async toggleVote(
     proposalId: string,
     voterId: string,
+    direction: 'up' | 'down' = 'up',
   ): Promise<VoteFeedbackResponse> {
     const items = this.loadItems();
     const target = items.find((it) => it.id === proposalId);
@@ -205,19 +223,48 @@ export class FeedbackService {
       throw new Error(`Proposal with ID "${proposalId}" not found`);
     }
 
-    const hasVoted = target.voterIds.includes(voterId);
-    if (hasVoted) {
-      target.voterIds = target.voterIds.filter((id) => id !== voterId);
+    if (!Array.isArray(target.downvoterIds)) {
+      target.downvoterIds = [];
+    }
+
+    const hasUpvoted = target.voterIds.includes(voterId);
+    const hasDownvoted = target.downvoterIds.includes(voterId);
+
+    let nextDirection: 'up' | 'down' | null = null;
+
+    if (direction === 'up') {
+      if (hasUpvoted) {
+        // Toggle off upvote
+        target.voterIds = target.voterIds.filter((id) => id !== voterId);
+        nextDirection = null;
+      } else {
+        // Add upvote, remove any previous downvote
+        target.voterIds.push(voterId);
+        target.downvoterIds = target.downvoterIds.filter((id) => id !== voterId);
+        nextDirection = 'up';
+      }
     } else {
-      target.voterIds.push(voterId);
+      if (hasDownvoted) {
+        // Toggle off downvote
+        target.downvoterIds = target.downvoterIds.filter((id) => id !== voterId);
+        nextDirection = null;
+      } else {
+        // Add downvote, remove any previous upvote
+        target.downvoterIds.push(voterId);
+        target.voterIds = target.voterIds.filter((id) => id !== voterId);
+        nextDirection = 'down';
+      }
     }
 
     this.saveItems(items);
 
+    const totalVotes = target.voterIds.length - target.downvoterIds.length;
+
     return {
       id: target.id,
-      votes: target.voterIds.length,
-      userVoted: !hasVoted,
+      votes: totalVotes,
+      userVoted: nextDirection !== null,
+      userVoteDirection: nextDirection,
     };
   }
 }

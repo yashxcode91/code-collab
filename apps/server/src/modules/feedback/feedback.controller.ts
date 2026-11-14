@@ -93,9 +93,10 @@ export async function voteFeedbackHandler(req: Request, res: Response) {
     const id = String(rawId);
     const bodyParsed = voteFeedbackSchema.safeParse(req.body);
     const customVoterId = bodyParsed.success ? bodyParsed.data.voterId : undefined;
+    const direction = bodyParsed.success && bodyParsed.data.direction ? bodyParsed.data.direction : 'up';
     const voterId = customVoterId ? `client:${customVoterId}` : resolveVoterId(req);
 
-    const result = await feedbackService.toggleVote(id, voterId);
+    const result = await feedbackService.toggleVote(id, voterId, direction);
 
     return res.status(200).json({
       success: true,

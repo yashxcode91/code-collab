@@ -603,6 +603,7 @@ export function RoadmapPage() {
       category: f.category,
       votes: 0,
       userVoted: false,
+      userVoteDirection: null,
       createdAt: '2026-11-12T00:00:00.000Z',
     })),
   });
@@ -610,10 +611,11 @@ export function RoadmapPage() {
   // Display only official curated roadmap features for community voting (user submissions are sent directly to backend)
   const features = (feedbackQuery.data ?? []).filter((f) => f.id.startsWith('f-'));
 
-  // Live Upvote / Downvote Mutation with Optimistic Updates
+  // Live Upvote / Downvote Mutation with Optimistic Updates (Up = Green, Down = Red)
   const voteMutation = useMutation({
-    mutationFn: (featureId: string) => voteFeedback(featureId, clientVoterId),
-    onMutate: async (featureId) => {
+    mutationFn: ({ featureId, direction }: { featureId: string; direction: 'up' | 'down' }) =>
+      voteFeedback(featureId, direction, clientVoterId),
+    onMutate: async ({ featureId, direction }) => {
       const qk = [...queryKeys.feedback.all, clientVoterId, user?.id];
       await queryClient.cancelQueries({ queryKey: qk });
       const previous = queryClient.getQueryData<FeedbackItem[]>(qk);
@@ -622,18 +624,46 @@ export function RoadmapPage() {
           qk,
           previous.map((item) => {
             if (item.id !== featureId) return item;
-            const nextVoted = !item.userVoted;
+            const currentDir = item.userVoteDirection ?? (item.userVoted ? 'up' : null);
+            let nextDir: 'up' | 'down' | null = null;
+            let voteDelta = 0;
+
+            if (direction === 'up') {
+              if (currentDir === 'up') {
+                nextDir = null;
+                voteDelta = -1;
+              } else if (currentDir === 'down') {
+                nextDir = 'up';
+                voteDelta = 2;
+              } else {
+                nextDir = 'up';
+                voteDelta = 1;
+              }
+            } else {
+              if (currentDir === 'down') {
+                nextDir = null;
+                voteDelta = 1;
+              } else if (currentDir === 'up') {
+                nextDir = 'down';
+                voteDelta = -2;
+              } else {
+                nextDir = 'down';
+                voteDelta = -1;
+              }
+            }
+
             return {
               ...item,
-              userVoted: nextVoted,
-              votes: nextVoted ? item.votes + 1 : Math.max(0, item.votes - 1),
+              userVoted: nextDir !== null,
+              userVoteDirection: nextDir,
+              votes: item.votes + voteDelta,
             };
           }),
         );
       }
       return { previous, qk };
     },
-    onError: (_err, _id, context) => {
+    onError: (_err, _vars, context) => {
       if (context?.previous && context.qk) {
         queryClient.setQueryData(context.qk, context.previous);
       }
@@ -642,6 +672,10 @@ export function RoadmapPage() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.feedback.all });
     },
   });
+
+  const handleVote = (featureId: string, direction: 'up' | 'down') => {
+    voteMutation.mutate({ featureId, direction });
+  };
 
   // Proposal Creation Mutation — sends directly to backend engineering backlog
   const createProposalMutation = useMutation({
@@ -659,10 +693,6 @@ export function RoadmapPage() {
   const [suggestDesc, setSuggestDesc] = useState('');
   const [suggestCategory, setSuggestCategory] = useState<FeedbackCategory>('Editor');
   const [suggestSubmitted, setSuggestSubmitted] = useState(false);
-
-  const toggleUpvote = (featureId: string) => {
-    voteMutation.mutate(featureId);
-  };
 
   const handleSuggestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1101,7 +1131,9 @@ export function RoadmapPage() {
           {/* Voting Grid */}
           <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => {
-              const hasVoted = Boolean(feature.userVoted);
+              const userVoteDirection =
+                feature.userVoteDirection ?? (feature.userVoted ? 'up' : null);
+
               return (
                 <div
                   key={feature.id}
@@ -1112,8 +1144,17 @@ export function RoadmapPage() {
                       <span className="rounded-md bg-foreground/[0.06] px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
                         {feature.category}
                       </span>
-                      <span className="font-mono text-xs font-semibold text-primary">
-                        {feature.votes} {feature.votes === 1 ? 'vote' : 'votes'}
+                      <span
+                        className={`font-mono text-xs font-semibold ${
+                          feature.votes > 0
+                            ? 'text-emerald-400'
+                            : feature.votes < 0
+                              ? 'text-rose-400'
+                              : 'text-muted-foreground'
+                        }`}
+                      >
+                        {feature.votes > 0 ? `+${feature.votes}` : feature.votes}{' '}
+                        {Math.abs(feature.votes) === 1 ? 'vote' : 'votes'}
                       </span>
                     </div>
                     <h3 className="font-semibold text-foreground text-sm">
@@ -1129,27 +1170,38 @@ export function RoadmapPage() {
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleUpvote(feature.id)}
-                    className={`flex h-8.5 w-full items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-all ${
-                      hasVoted
-                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                        : 'glass-control text-foreground hover:bg-foreground/[0.08]'
-                    }`}
-                  >
-                    {hasVoted ? (
-                      <>
-                        <ThumbsDown className="h-3.5 w-3.5" />
-                        <span>Downvote</span>
-                      </>
-                    ) : (
-                      <>
-                        <ThumbsUp className="h-3.5 w-3.5" />
-                        <span>Upvote</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Dual Action Voting: Upvote (Green) & Downvote (Red) */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleVote(feature.id, 'up')}
+                      className={`flex-1 flex h-8.5 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                        userVoteDirection === 'up'
+                          ? 'bg-emerald-600 border-emerald-500 text-white shadow-sm shadow-emerald-600/30'
+                          : 'glass-control border-border/60 text-muted-foreground hover:text-emerald-400 hover:border-emerald-500/40 hover:bg-emerald-500/10'
+                      }`}
+                      title={userVoteDirection === 'up' ? 'Remove Upvote' : 'Upvote Feature'}
+                      aria-label={userVoteDirection === 'up' ? 'Remove Upvote' : 'Upvote Feature'}
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" />
+                      <span>Upvote</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleVote(feature.id, 'down')}
+                      className={`flex-1 flex h-8.5 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                        userVoteDirection === 'down'
+                          ? 'bg-rose-600 border-rose-500 text-white shadow-sm shadow-rose-600/30'
+                          : 'glass-control border-border/60 text-muted-foreground hover:text-rose-400 hover:border-rose-500/40 hover:bg-rose-500/10'
+                      }`}
+                      title={userVoteDirection === 'down' ? 'Remove Downvote' : 'Downvote Feature'}
+                      aria-label={userVoteDirection === 'down' ? 'Remove Downvote' : 'Downvote Feature'}
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" />
+                      <span>Downvote</span>
+                    </button>
+                  </div>
                 </div>
               );
             })}

@@ -754,9 +754,10 @@ export async function createFeedback(
   });
 }
 
-/** Toggles an upvote on a community feature proposal. */
+/** Toggles an upvote or downvote on a community feature proposal. */
 export async function voteFeedback(
   proposalId: string,
+  direction: 'up' | 'down' = 'up',
   voterId?: string,
 ): Promise<VoteFeedbackResponse> {
   const headers: Record<string, string> = {};
@@ -768,7 +769,7 @@ export async function voteFeedback(
     {
       method: 'POST',
       headers,
-      body: JSON.stringify({ voterId }),
+      body: JSON.stringify({ voterId, direction }),
     },
   );
 }

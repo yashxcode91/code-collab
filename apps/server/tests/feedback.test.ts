@@ -51,4 +51,28 @@ describe('FeedbackService', () => {
     expect(res2.userVoted).toBe(initialVoted);
     expect(res2.votes).toBe(initialVotes);
   });
+
+  it('handles downvotes correctly and switches between up and down', async () => {
+    const list = await feedbackService.getProposals('user:voter-xyz');
+    const first = list[0];
+    expect(first.votes).toBe(0);
+
+    // Downvote
+    const resDown = await feedbackService.toggleVote(first.id, 'user:voter-xyz', 'down');
+    expect(resDown.votes).toBe(-1);
+    expect(resDown.userVoted).toBe(true);
+    expect(resDown.userVoteDirection).toBe('down');
+
+    // Switch to upvote
+    const resUp = await feedbackService.toggleVote(first.id, 'user:voter-xyz', 'up');
+    expect(resUp.votes).toBe(1);
+    expect(resUp.userVoted).toBe(true);
+    expect(resUp.userVoteDirection).toBe('up');
+
+    // Toggle off upvote
+    const resOff = await feedbackService.toggleVote(first.id, 'user:voter-xyz', 'up');
+    expect(resOff.votes).toBe(0);
+    expect(resOff.userVoted).toBe(false);
+    expect(resOff.userVoteDirection).toBeNull();
+  });
 });

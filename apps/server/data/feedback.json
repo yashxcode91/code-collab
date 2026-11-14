@@ -7,7 +7,8 @@
       "category": "Infrastructure",
       "authorName": "Core Architecture",
       "createdAt": "2026-11-10T12:00:00.000Z",
-      "voterIds": []
+      "voterIds": [],
+      "downvoterIds": []
     },
     {
       "id": "f-2",
@@ -16,7 +17,8 @@
       "category": "Collaboration",
       "authorName": "Core Architecture",
       "createdAt": "2026-11-10T13:00:00.000Z",
-      "voterIds": []
+      "voterIds": [],
+      "downvoterIds": []
     },
     {
       "id": "f-3",
@@ -25,7 +27,8 @@
       "category": "Competitive",
       "authorName": "Core Architecture",
       "createdAt": "2026-11-11T09:00:00.000Z",
-      "voterIds": []
+      "voterIds": [],
+      "downvoterIds": []
     },
     {
       "id": "f-4",
@@ -34,7 +37,8 @@
       "category": "AI",
       "authorName": "AI Subsystem",
       "createdAt": "2026-11-11T14:30:00.000Z",
-      "voterIds": []
+      "voterIds": [],
+      "downvoterIds": []
     },
     {
       "id": "f-5",
@@ -43,7 +47,8 @@
       "category": "Collaboration",
       "authorName": "Dev Experience",
       "createdAt": "2026-11-12T10:15:00.000Z",
-      "voterIds": []
+      "voterIds": [],
+      "downvoterIds": []
     },
     {
       "id": "f-6",
@@ -52,7 +57,8 @@
       "category": "AI",
       "authorName": "Security Ops",
       "createdAt": "2026-11-12T16:00:00.000Z",
-      "voterIds": []
+      "voterIds": [],
+      "downvoterIds": []
     }
   ]
 }

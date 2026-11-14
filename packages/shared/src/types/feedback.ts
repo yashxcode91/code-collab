@@ -5,6 +5,8 @@ export type FeedbackCategory =
   | 'Collaboration'
   | 'Competitive';
 
+export type VoteDirection = 'up' | 'down';
+
 export interface FeedbackItem {
   id: string;
   title: string;
@@ -12,6 +14,7 @@ export interface FeedbackItem {
   category: FeedbackCategory;
   votes: number;
   userVoted?: boolean;
+  userVoteDirection?: VoteDirection | null;
   authorName?: string;
   createdAt: string;
 }
@@ -26,4 +29,5 @@ export interface VoteFeedbackResponse {
   id: string;
   votes: number;
   userVoted: boolean;
+  userVoteDirection?: VoteDirection | null;
 }

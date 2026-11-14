@@ -24,4 +24,5 @@ export const createFeedbackSchema = z.object({
 
 export const voteFeedbackSchema = z.object({
   voterId: z.string().trim().optional(),
+  direction: z.enum(['up', 'down']).optional(),
 });
