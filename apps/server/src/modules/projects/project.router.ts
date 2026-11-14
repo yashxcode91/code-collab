@@ -18,6 +18,8 @@ import {
   SemanticSearchRequestSchema,
   SetFileAccessSchema,
   SNAPSHOT_LIMITS,
+  StartSandboxSchema,
+  StopSandboxSchema,
   UpdateBranchSchema,
   UpdateFileNodeSchema,
   UpdateProjectMemberRoleSchema,
@@ -88,6 +90,12 @@ import {
   updateMemberRoleController,
   updateProjectController,
 } from './project.controller';
+import {
+  startSandboxController,
+  stopSandboxController,
+  getSandboxStatusController,
+  getSandboxLogsController,
+} from '../sandbox';
 
 /**
  * Express router mounted at `/api/projects`.
@@ -394,4 +402,30 @@ projectRouter.post(
   '/:projectId/branches/:branchId/agent/sessions/:sessionId/cancel',
   aiPromptLimiter,
   asyncHandler(cancelAgentSessionController)
+);
+
+// =====================================================================
+// Day 9: Developer Sandboxes & Preview Environments
+// =====================================================================
+
+projectRouter.post(
+  '/:projectId/sandbox/start',
+  validateBody(StartSandboxSchema),
+  asyncHandler(startSandboxController)
+);
+
+projectRouter.post(
+  '/:projectId/sandbox/stop',
+  validateBody(StopSandboxSchema),
+  asyncHandler(stopSandboxController)
+);
+
+projectRouter.get(
+  '/:projectId/sandbox/status',
+  asyncHandler(getSandboxStatusController)
+);
+
+projectRouter.get(
+  '/:projectId/sandbox/logs',
+  asyncHandler(getSandboxLogsController)
 );

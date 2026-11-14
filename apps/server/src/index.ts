@@ -7,12 +7,18 @@ import { redis } from './lib/redis';
 import { closeExecutionQueue } from './modules/execution/execution.queue';
 import { createRealtimeServer } from './realtime/socketServer';
 import { yjsRoomManager } from './realtime/yjsRoomManager';
+import { handlePreviewWebSocketUpgrade } from './modules/sandbox/previewWebSocket';
 
 const PORT = process.env.PORT || 4000;
 
 // Wrap Express inside a shared HTTP server so Socket.IO upgrades and REST share one port
 const httpServer = http.createServer(app);
 const io = createRealtimeServer(httpServer, yjsRoomManager);
+
+// Route Vite HMR and preview WebSocket upgrades directly to isolated sandbox containers
+httpServer.on('upgrade', (req, socket, head) => {
+  handlePreviewWebSocketUpgrade(req, socket, head);
+});
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 CodeCollab API server running at http://localhost:${PORT}`);

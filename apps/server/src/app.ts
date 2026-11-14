@@ -11,6 +11,7 @@ import {
   notFoundHandler,
 } from './middleware/error.middleware';
 import { validateJwtConfig } from './utils/jwt';
+import { previewGatewayRouter } from './modules/sandbox/previewGateway.middleware';
 
 // Fail fast on startup if security config is missing or malformed
 getAllowedOrigin();
@@ -20,6 +21,12 @@ if (process.env.NODE_ENV !== 'test') {
 
 export const app: Application = express();
 app.disable('x-powered-by');
+
+// 0. Dedicated Preview Gateway Data Plane
+// Mounted BEFORE securityHeaders and express.json() to allow framing and preserve body streams
+app.use('/preview', previewGatewayRouter);
+app.use('/api/preview', previewGatewayRouter);
+
 app.use(securityHeaders);
 
 // 1. Credentialed CORS locked to our validated frontend origin
