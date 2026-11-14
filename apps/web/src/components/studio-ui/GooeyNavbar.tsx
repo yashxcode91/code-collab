@@ -12,7 +12,7 @@ import { BrandLogo } from '@/components/BrandLogo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { SidebarToggleIcon } from '@/components/unlumen-ui/sidebar-toggle-icon';
 
-export type NavSectionId = 'workspaces' | 'templates' | 'activity';
+export type NavSectionId = 'workspaces' | 'templates' | 'activity' | 'roadmap';
 
 interface NavTab {
   id: NavSectionId;
@@ -23,6 +23,7 @@ const NAV_TABS: NavTab[] = [
   { id: 'workspaces', label: 'Workspaces' },
   { id: 'templates', label: 'Templates' },
   { id: 'activity', label: 'Activity' },
+  { id: 'roadmap', label: 'Roadmap' },
 ];
 
 interface GooeyNavbarProps {

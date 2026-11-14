@@ -22,7 +22,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   Project,
   ProjectDetailResponse,
@@ -190,6 +190,7 @@ function MiniCodeFrame({
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<NavSectionId>('workspaces');
@@ -461,6 +462,10 @@ export function DashboardPage() {
   );
 
   const handleSelectSection = (tab: NavSectionId) => {
+    if (tab === 'roadmap') {
+      navigate('/roadmap');
+      return;
+    }
     setActiveTab(tab);
     const targetMap = {
       workspaces: workspacesRef.current,
@@ -469,6 +474,13 @@ export function DashboardPage() {
     };
     targetMap[tab]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  useEffect(() => {
+    const section = searchParams.get('section');
+    if (section === 'workspaces' || section === 'templates' || section === 'activity') {
+      handleSelectSection(section);
+    }
+  }, [searchParams]);
 
   const openCreateModal = (preset: TemplatePreset | null = null) => {
     setSelectedPreset(preset);

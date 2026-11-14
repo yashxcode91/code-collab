@@ -384,7 +384,12 @@ export function StudioTopBar({
     <header className="glass-surface relative z-40 w-full shrink-0 rounded-none border-x-0 border-t-0">
       <div className="px-3 py-1.5 sm:px-5 flex flex-col gap-1.5">
         {/* Tier 1: Workspace Breadcrumbs & Runtime Operations */}
-        <div className="relative z-20 flex items-center justify-between gap-2 min-w-0">
+        <div
+          className={cn(
+            'relative flex items-center justify-between gap-2 min-w-0',
+            branchMenuOpen ? 'z-50' : 'z-30',
+          )}
+        >
           {/* Group 1 (Left): Navigation, Brand, Explorer Toggle, Workspace Title & Branch Switcher */}
           <div className="flex min-w-0 items-center gap-1.5 shrink-0">
             <Link
@@ -447,7 +452,10 @@ export function StudioTopBar({
             </span>
 
             {/* Git-style Branch Switcher Dropdown */}
-            <div className="relative" ref={branchPopoverRef}>
+            <div
+              className={cn('relative', branchMenuOpen && 'z-50')}
+              ref={branchPopoverRef}
+            >
               <button
                 type="button"
                 onClick={() => setBranchMenuOpen((prev) => !prev)}
@@ -482,7 +490,7 @@ export function StudioTopBar({
               </button>
 
               {branchMenuOpen && (
-                <div className="absolute left-0 top-10 z-50 w-72 rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-2xl ring-1 ring-black/5 dark:ring-white/10 sm:w-80">
+                <div className="absolute left-0 top-full mt-1.5 z-50 w-72 rounded-2xl border border-border/80 bg-card dark:bg-[#151821] p-3 text-card-foreground shadow-2xl ring-1 ring-border/50 sm:w-80">
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between border-b border-border/60 pb-2">
                       <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -969,7 +977,7 @@ export function StudioTopBar({
         </div>
 
         {/* Tier 2: Workspace Feature Drawers (Left) & Management/Theme Utilities (Right) */}
-        <div className="relative z-20 flex items-center justify-between gap-2 border-t border-border/40 pt-1.5 min-w-0">
+        <div className="relative z-10 flex items-center justify-between gap-2 border-t border-border/40 pt-1.5 min-w-0">
           {/* Left: Tools & Feature Drawers */}
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar min-w-0">
             <button

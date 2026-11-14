@@ -1,0 +1,58 @@
+{
+  "items": [
+    {
+      "id": "f-1",
+      "title": "WebContainers In-Browser Node.js Execution",
+      "description": "Run Node.js, npm, and dev servers 100% on client hardware without cloud container spin-up time.",
+      "category": "Infrastructure",
+      "authorName": "Core Architecture",
+      "createdAt": "2026-11-10T12:00:00.000Z",
+      "voterIds": []
+    },
+    {
+      "id": "f-2",
+      "title": "GitHub Bi-Directional Commit & PR Sync",
+      "description": "Link your GitHub account to push commits, create pull requests, and pull remote updates directly inside Studio.",
+      "category": "Collaboration",
+      "authorName": "Core Architecture",
+      "createdAt": "2026-11-10T13:00:00.000Z",
+      "voterIds": []
+    },
+    {
+      "id": "f-3",
+      "title": "Competitive Coding Arena 1v1 PvP Battles",
+      "description": "Challenge team members to timed algorithmic duels with live dual-editor views and automated test judges.",
+      "category": "Competitive",
+      "authorName": "Core Architecture",
+      "createdAt": "2026-11-11T09:00:00.000Z",
+      "voterIds": []
+    },
+    {
+      "id": "f-4",
+      "title": "Multi-Thread AI Conversation Popover Drawer",
+      "description": "Restore multi-thread chat switching with a clean popover drawer, search history, and export capabilities.",
+      "category": "AI",
+      "authorName": "AI Subsystem",
+      "createdAt": "2026-11-11T14:30:00.000Z",
+      "voterIds": []
+    },
+    {
+      "id": "f-5",
+      "title": "WebRTC In-Editor Audio Huddle Rooms",
+      "description": "Hop into low-latency voice channels and share screens with workspace collaborators without third-party apps.",
+      "category": "Collaboration",
+      "authorName": "Dev Experience",
+      "createdAt": "2026-11-12T10:15:00.000Z",
+      "voterIds": []
+    },
+    {
+      "id": "f-6",
+      "title": "AI Automated Security Audits on Branch Diffs",
+      "description": "Receive instant vulnerability, memory leak, and SQL injection audits on any uncommitted branch changes.",
+      "category": "AI",
+      "authorName": "Security Ops",
+      "createdAt": "2026-11-12T16:00:00.000Z",
+      "voterIds": []
+    }
+  ]
+}

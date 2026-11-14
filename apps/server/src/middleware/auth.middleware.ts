@@ -53,3 +53,27 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
     next(err);
   }
 };
+
+/**
+ * Non-blocking optional authentication middleware:
+ * Attaches req.user if a valid JWT cookie is present; continues anonymously otherwise.
+ */
+export const optionalAuth: RequestHandler = async (req, _res, next) => {
+  const token = req.cookies?.[AUTH_COOKIE_NAME];
+  if (!token || typeof token !== 'string') {
+    next();
+    return;
+  }
+
+  try {
+    const payload = verifyAccessToken(token);
+    const user = await getUserById(payload.sub);
+    if (user) {
+      req.user = user;
+    }
+  } catch {
+    // Ignore invalid/expired tokens for optional endpoints
+  }
+
+  next();
+};

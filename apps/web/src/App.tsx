@@ -9,6 +9,7 @@ import { StudioBackdrop } from '@/components/studio-ui/StudioBackdrop';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { RoadmapPage } from '@/pages/RoadmapPage';
 
 // Lazy-load Monaco + Studio IDE workers ONLY when navigating into `/studio/:projectId`
 const StudioPage = lazy(() => import('@/pages/StudioPage'));
@@ -55,6 +56,9 @@ export default function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
               </Route>
+
+              {/* Publicly accessible Roadmap & Architecture portal */}
+              <Route path="/roadmap" element={<RoadmapPage />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<DashboardPage />} />

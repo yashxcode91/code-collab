@@ -170,6 +170,15 @@ export function GlassySidebar({
                     onClose();
                   }}
                 />
+                <SidebarDashLink
+                  label="Roadmap & Architecture"
+                  active={activeTab === 'roadmap'}
+                  badge="v0.12"
+                  onClick={() => {
+                    onSelectTab('roadmap');
+                    onClose();
+                  }}
+                />
               </div>
 
               {/* Recent Workspaces List + Spring Preview Emitter */}

@@ -41,3 +41,8 @@ export * from './schemas/sandbox';
 export * from './types/terminal';
 export * from './schemas/terminal';
 
+// Export Community Feedback & Voting contracts and Zod schemas
+export * from './types/feedback';
+export * from './schemas/feedback';
+
+

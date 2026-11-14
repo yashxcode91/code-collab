@@ -11,11 +11,13 @@ import type {
   CreateBranchInput,
   CreateChatMessageInput,
   CreateExecutionRunInput,
+  CreateFeedbackInput,
   CreateFileNodeInput,
   CreateProjectInput,
   CreateSnapshotInput,
   ExecutionRunDetailDto,
   ExecutionRunDto,
+  FeedbackItem,
   HealthCheckResponse,
   MergeBranchInput,
   Project,
@@ -35,6 +37,7 @@ import type {
   UpdateFileNodeInput,
   UpdateProjectInput,
   UpdateProjectMemberRoleInput,
+  VoteFeedbackResponse,
 } from '@codecollab/shared';
 import { apiRequest } from '@/lib/api';
 
@@ -116,6 +119,9 @@ export const queryKeys = {
       ] as const,
     codebaseIndexStatus: (projectId: string, branchId: string) =>
       ['projects', projectId, 'branches', branchId, 'ai', 'index-status'] as const,
+  },
+  feedback: {
+    all: ['feedback'] as const,
   },
 } as const;
 
@@ -722,3 +728,48 @@ export async function searchCodebaseSemantic(
     },
   );
 }
+
+/** Fetches community feature feedback & vote counts. */
+export async function fetchFeedback(voterId?: string): Promise<FeedbackItem[]> {
+  const headers: Record<string, string> = {};
+  if (voterId) {
+    headers['x-voter-id'] = voterId;
+  }
+  return apiRequest<FeedbackItem[]>('/api/feedback', { headers });
+}
+
+/** Submits a new community feature proposal. */
+export async function createFeedback(
+  input: CreateFeedbackInput,
+  voterId?: string,
+): Promise<FeedbackItem> {
+  const headers: Record<string, string> = {};
+  if (voterId) {
+    headers['x-voter-id'] = voterId;
+  }
+  return apiRequest<FeedbackItem>('/api/feedback', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(input),
+  });
+}
+
+/** Toggles an upvote on a community feature proposal. */
+export async function voteFeedback(
+  proposalId: string,
+  voterId?: string,
+): Promise<VoteFeedbackResponse> {
+  const headers: Record<string, string> = {};
+  if (voterId) {
+    headers['x-voter-id'] = voterId;
+  }
+  return apiRequest<VoteFeedbackResponse>(
+    `/api/feedback/${encodeURIComponent(proposalId)}/vote`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ voterId }),
+    },
+  );
+}
+
