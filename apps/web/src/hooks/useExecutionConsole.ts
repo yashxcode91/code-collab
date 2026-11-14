@@ -367,8 +367,15 @@ export function useExecutionConsole({
         ((err.runId && err.runId === activeRunIdRef.current) ||
           (err.fileId && err.fileId === activeRunFileIdRef.current))
       ) {
+        const deniedRunId = err.runId || activeRunIdRef.current;
+        if (deniedRunId && branchId) {
+          queryClient.setQueryData<ExecutionRunDto[]>(
+            queryKeys.projects.runs(projectId, branchId),
+            (prev) => prev?.filter((r) => r.id !== deniedRunId) ?? [],
+          );
+        }
         activeRunIdRef.current = null;
-        seededRunIdRef.current = null;
+        seededRunIdRef.current = deniedRunId;
         setActiveRun(null);
         setSegments([]);
         setElapsedMs(0);

@@ -10,11 +10,13 @@ import type {
 import { useStudioAi } from '@/hooks/useStudioAi';
 
 const {
+  createAiConversationMock,
   fetchAiConversationsMock,
   fetchAiConversationDetailMock,
   deleteAiConversationMock,
   fetchCodebaseIndexStatusMock,
 } = vi.hoisted(() => ({
+  createAiConversationMock: vi.fn(),
   fetchAiConversationsMock: vi.fn(),
   fetchAiConversationDetailMock: vi.fn(),
   deleteAiConversationMock: vi.fn(),
@@ -30,6 +32,7 @@ vi.mock('@/lib/queries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/queries')>();
   return {
     ...actual,
+    createAiConversation: createAiConversationMock,
     fetchAiConversations: fetchAiConversationsMock,
     fetchAiConversationDetail: fetchAiConversationDetailMock,
     deleteAiConversation: deleteAiConversationMock,
@@ -96,6 +99,9 @@ describe('Day 6 useStudioAi Hook & SSE Stream Client', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    createAiConversationMock.mockImplementation(async (_p, _b, title) =>
+      makeConversationSummary('c-new-thread', title ?? 'New Conversation', 0)
+    );
     fetchAiConversationsMock.mockResolvedValue([]);
     fetchAiConversationDetailMock.mockResolvedValue({ conversation: null, messages: [] });
     deleteAiConversationMock.mockResolvedValue(undefined);
@@ -291,5 +297,63 @@ describe('Day 6 useStudioAi Hook & SSE Stream Client', () => {
       expect(deleteAiConversationMock).toHaveBeenCalledWith('proj-1', 'branch-1', 'c-to-delete');
       expect(result.current.activeConversationId).toBeNull();
     });
+  });
+
+  it('6. Allows starting a new conversation and stays in new conversation mode without reverting', async () => {
+    const conv1 = makeConversationSummary('c-existing', 'Existing chat');
+    fetchAiConversationsMock.mockResolvedValue([conv1]);
+    fetchAiConversationDetailMock.mockResolvedValue(
+      makeConversationDetail(conv1, [
+        {
+          id: 'm-1',
+          conversationId: 'c-existing',
+          role: 'user',
+          actionKind: 'chat',
+          content: 'Hello',
+          model: null,
+          promptTokens: null,
+          completionTokens: null,
+          codeContext: null,
+          suggestedCode: null,
+          createdAt: '2026-11-13T12:00:00.000Z',
+        },
+      ])
+    );
+
+    const { result } = renderHook(
+      () =>
+        useStudioAi({
+          projectId: 'proj-1',
+          branchId: 'branch-1',
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    await waitFor(() => {
+      expect(result.current.activeConversationId).toBe('c-existing');
+      expect(result.current.messages).toHaveLength(1);
+    });
+
+    // Explicitly start new conversation / clear chat
+    act(() => {
+      result.current.startNewConversation();
+    });
+
+    // Should reset to fresh session and clear messages
+    expect(result.current.activeConversationId).toBeNull();
+    expect(result.current.messages).toHaveLength(0);
+
+    // Switch back to existing conversation
+    act(() => {
+      result.current.setActiveConversationId('c-existing');
+    });
+    expect(result.current.activeConversationId).toBe('c-existing');
+
+    // Test clearing again
+    act(() => {
+      result.current.setActiveConversationId(null);
+    });
+    expect(result.current.activeConversationId).toBeNull();
+    expect(result.current.messages).toHaveLength(0);
   });
 });

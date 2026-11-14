@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AiActionKind,
+  AiConversationSummaryDto,
   AiPromptContext,
   AiStreamChunkDto,
   SemanticSearchResultDto,
 } from '@codecollab/shared';
 import {
+  createAiConversation,
   deleteAiConversation,
   fetchAiConversationDetail,
   fetchAiConversations,
@@ -98,9 +100,17 @@ export function useStudioAi({
     [conversationsQuery.data]
   );
 
-  // If no conversation is active and there are conversations, auto-select the latest one
+  const hasAutoSelectedRef = useRef(false);
+
+  // Reset auto-select ref when project or branch changes
   useEffect(() => {
-    if (!activeConversationId && conversations.length > 0 && !isStreaming) {
+    hasAutoSelectedRef.current = false;
+  }, [projectId, branchId]);
+
+  // Auto-select the latest conversation ONLY ONCE on initial load if user hasn't explicitly chosen "+ New Conversation"
+  useEffect(() => {
+    if (!hasAutoSelectedRef.current && conversations.length > 0 && !activeConversationId && !isStreaming) {
+      hasAutoSelectedRef.current = true;
       setActiveConversationId(conversations[0]?.id ?? null);
     }
   }, [conversations, activeConversationId, isStreaming]);
@@ -124,7 +134,7 @@ export function useStudioAi({
   const [localMessages, setLocalMessages] = useState<StudioAiMessageItem[]>([]);
 
   useEffect(() => {
-    if (detailQuery.data?.messages) {
+    if (detailQuery.data?.messages && activeConversationId) {
       const items: StudioAiMessageItem[] = detailQuery.data.messages.map((m) => ({
         id: m.id,
         role: m.role,
@@ -150,11 +160,28 @@ export function useStudioAi({
     mutationFn: (conversationId: string) =>
       deleteAiConversation(projectId!, branchId!, conversationId),
     onSuccess: async (_, conversationId) => {
+      hasAutoSelectedRef.current = true;
       setActiveConversationId((prev) => (prev === conversationId ? null : prev));
       setLocalMessages([]);
       await queryClient.invalidateQueries({
         queryKey: queryKeys.projects.aiConversations(projectId!, branchId!),
       });
+    },
+  });
+
+  // 3b. Explicitly Create AI Conversation Thread Mutation
+  const createMutation = useMutation({
+    mutationFn: (title?: string) =>
+      createAiConversation(projectId!, branchId!, title),
+    onSuccess: (created) => {
+      hasAutoSelectedRef.current = true;
+      setActiveConversationId(created.id);
+      setLocalMessages([]);
+      setAiError(null);
+      queryClient.setQueryData<AiConversationSummaryDto[]>(
+        queryKeys.projects.aiConversations(projectId!, branchId!),
+        (prev) => [created, ...(prev?.filter((c) => c.id !== created.id) ?? [])]
+      );
     },
   });
 
@@ -281,6 +308,7 @@ export function useStudioAi({
 
               if (chunk.type === 'start') {
                 resolvedConvId = chunk.conversationId;
+                hasAutoSelectedRef.current = true;
                 setActiveConversationId(chunk.conversationId);
               } else if (chunk.type === 'token') {
                 fullAccumulated += chunk.token;
@@ -400,7 +428,17 @@ export function useStudioAi({
     [activeFileName, activeSelection, sendPrompt]
   );
 
+  const selectConversation = useCallback((id: string | null) => {
+    hasAutoSelectedRef.current = true;
+    setActiveConversationId(id);
+    if (!id) {
+      setLocalMessages([]);
+      setAiError(null);
+    }
+  }, []);
+
   const startNewConversation = useCallback(() => {
+    hasAutoSelectedRef.current = true;
     stopStreaming();
     setActiveConversationId(null);
     setLocalMessages([]);
@@ -419,7 +457,7 @@ export function useStudioAi({
   return {
     conversations,
     activeConversationId,
-    setActiveConversationId,
+    setActiveConversationId: selectConversation,
     messages: localMessages,
     isStreaming,
     streamingContent,
@@ -431,6 +469,7 @@ export function useStudioAi({
     quickAction,
     stopStreaming,
     startNewConversation,
+    isCreating: createMutation.isPending,
     deleteConversation: (id: string) => deleteMutation.mutate(id),
     isDeleting: deleteMutation.isPending,
     applySuggestedCode,

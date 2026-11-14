@@ -10,13 +10,12 @@ import {
   FileCode,
   Lightbulb,
   Loader2,
-  Plus,
   RefreshCw,
+  RotateCcw,
   Send,
   Sparkles,
   Square,
   TestTube,
-  Trash2,
   User,
   Wand2,
 } from 'lucide-react';
@@ -524,9 +523,6 @@ export function StudioAiDrawer({
   onSelectCitation,
 }: StudioAiDrawerProps) {
   const {
-    conversations,
-    activeConversationId,
-    setActiveConversationId,
     messages,
     isStreaming,
     streamingContent,
@@ -537,8 +533,6 @@ export function StudioAiDrawer({
     quickAction,
     stopStreaming,
     startNewConversation,
-    deleteConversation,
-    isDeleting,
     ragMode,
     setRagMode,
     streamingCitations,
@@ -580,48 +574,31 @@ export function StudioAiDrawer({
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background/50">
-      {/* Top Conversation Selector & Controls */}
+      {/* Top Header & Clear Chat */}
       <div className="flex shrink-0 items-center justify-between gap-1.5 border-b border-border/50 px-3 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <select
-            value={activeConversationId ?? ''}
-            onChange={(e) => {
-              const val = e.target.value;
-              setActiveConversationId(val ? val : null);
-            }}
-            className="glass-control h-7 min-w-0 max-w-[190px] truncate rounded-lg border border-border/40 bg-background/40 px-2 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
-            title="Switch AI conversation thread"
-          >
-            <option value="">+ New Conversation</option>
-            {conversations.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title} ({c.messageCount})
-              </option>
-            ))}
-          </select>
-
-          {activeConversationId && (
-            <button
-              type="button"
-              onClick={() => deleteConversation(activeConversationId)}
-              disabled={isDeleting}
-              title="Delete conversation"
-              className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive disabled:opacity-40"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-500/15 text-purple-400">
+            <Sparkles className="h-3.5 w-3.5" />
+          </div>
+          <span className="text-xs font-semibold tracking-tight text-foreground">
+            AI Assistant
+          </span>
+          <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-[9.5px] font-mono text-purple-400 border border-purple-500/20">
+            Gemini Pro
+          </span>
         </div>
 
-        <button
-          type="button"
-          onClick={startNewConversation}
-          className="inline-flex h-7 items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
-          title="Start fresh conversation"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          <span>New</span>
-        </button>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={startNewConversation}
+            className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-[10.5px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+            title="Clear chat and start fresh"
+          >
+            <RotateCcw className="h-3 w-3" />
+            <span>Clear</span>
+          </button>
+        )}
       </div>
 
       {/* Context Banner: Active File & Line Selection */}
