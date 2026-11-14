@@ -198,6 +198,7 @@ model Project {
   agentSessions   AgentSession[]
   ChatMessage     ChatMessage[]
   BranchSnapshot  BranchSnapshot[]
+  previewSandboxes PreviewSandbox[]
 
   @@index([ownerId])
   @@map("projects")
@@ -244,6 +245,7 @@ model ProjectBranch {
   agentSessions   AgentSession[]
   ChatMessage     ChatMessage[]
   BranchSnapshot  BranchSnapshot[]
+  previewSandboxes PreviewSandbox[]
 
   @@unique([projectId, name])
   @@unique([id, projectId])
@@ -597,4 +599,42 @@ model AgentStagedFile {
   @@unique([sessionId, filePath])
   @@index([sessionId])
   @@map("agent_staged_files")
+}
+
+// Day 9: Developer Sandbox container states
+enum SandboxStatus {
+  STARTING
+  RUNNING
+  STOPPING
+  STOPPED
+  FAILED
+}
+
+// Day 9: Dedicated developer sandbox container instance running on private Docker network
+model PreviewSandbox {
+  id            String        @id @default(uuid())
+  projectId     String
+  branchId      String
+  containerId   String?       @db.VarChar(128)
+  containerName String        @db.VarChar(128)
+  internalIp    String?       @db.VarChar(64)
+  status        SandboxStatus @default(STARTING)
+  ports         Int[]         @default([5173])
+  primaryPort   Int           @default(5173)
+  memoryLimitMb Int           @default(512)
+  cpuLimit      Float         @default(1.0)
+  previewToken  String?       @db.Text
+  errorMessage  String?       @db.Text
+  lastPingAt    DateTime?
+  startedAt     DateTime?
+  stoppedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch  ProjectBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, branchId])
+  @@index([projectId, status])
+  @@map("preview_sandboxes")
 }

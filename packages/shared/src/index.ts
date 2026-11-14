@@ -32,3 +32,8 @@ export * from './schemas/ai';
 // Export Day 8 Autonomous Agent contracts and Zod schemas
 export * from './types/agent';
 export * from './schemas/agent';
+
+// Export Day 9 Cloud Sandbox & Containerized Preview contracts and Zod schemas
+export * from './types/sandbox';
+export * from './schemas/sandbox';
+
