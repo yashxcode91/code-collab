@@ -341,3 +341,23 @@
     transition: none !important;
   }
 }
+
+/* Day 7: Soft purple glowing citation highlight for Monaco RAG jumps */
+.rag-citation-glow-highlight {
+  background: rgba(168, 85, 247, 0.22) !important;
+  border-left: 3px solid #a855f7 !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
+  animation: ragFadeGlow 3.5s forwards ease-out;
+}
+
+@keyframes ragFadeGlow {
+  0% {
+    background: rgba(168, 85, 247, 0.35);
+  }
+  70% {
+    background: rgba(168, 85, 247, 0.20);
+  }
+  100% {
+    background: transparent;
+  }
+}

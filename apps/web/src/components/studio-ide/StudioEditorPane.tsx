@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Editor, { type Monaco } from '@monaco-editor/react';
+import Editor, { DiffEditor, type Monaco } from '@monaco-editor/react';
 import type { editor as MonacoEditorNamespace } from 'monaco-editor';
 import { MonacoBinding } from 'y-monaco';
 import type * as Y from 'yjs';
 import {
   AlertTriangle,
+  Check,
   ChevronRight,
   Code2,
   Crosshair,
@@ -17,6 +18,7 @@ import {
   RotateCcw,
   Save,
   ShieldAlert,
+  Sparkles,
   X,
 } from 'lucide-react';
 import type {
@@ -63,6 +65,15 @@ interface ReadyEditorSnapshot {
   canEdit: boolean;
 }
 
+export interface StudioAiDiffReview {
+  fileId: string;
+  fileName: string;
+  originalContent: string;
+  proposedContent: string;
+  onAccept: () => void;
+  onDiscard: () => void;
+}
+
 interface StudioEditorPaneProps {
   project: Project;
   branch: ProjectBranchDto | null;
@@ -71,6 +82,7 @@ interface StudioEditorPaneProps {
   activeFile: ProjectFileNodeDto | null;
   activeDraft: FileDraftBuffer | null;
   activeConflict: FileVersionConflict | null;
+  aiDiffReview?: StudioAiDiffReview | null;
   isFileLoading: boolean;
   fileLoadError: string | null;
   saveError: string | null;
@@ -87,7 +99,12 @@ interface StudioEditorPaneProps {
   preventSameLineEdit: boolean;
   realtimeError: RealtimeErrorState | null;
   focusModeEnabled: boolean;
-  scrollToLineRequest: { fileId?: string; line: number; seq: number } | null;
+  scrollToLineRequest: {
+    fileId?: string;
+    line: number;
+    endLine?: number;
+    seq: number;
+  } | null;
   onSelectTab: (fileId: string) => void;
   onCloseTab: (fileId: string) => void;
   onChangeContent: (fileId: string, value: string) => void;
@@ -123,6 +140,7 @@ export function StudioEditorPane({
   activeFile,
   activeDraft,
   activeConflict,
+  aiDiffReview,
   isFileLoading,
   fileLoadError,
   saveError,
@@ -402,13 +420,54 @@ export function StudioEditorPane({
     if (!model) return;
 
     lastAppliedScrollSeqRef.current = scrollToLineRequest.seq;
-    const clamped = Math.min(
+    const clampedStart = Math.min(
       Math.max(1, scrollToLineRequest.line),
       model.getLineCount(),
     );
-    editor.revealLineInCenter(clamped);
-    editor.setPosition({ lineNumber: clamped, column: 1 });
+    const clampedEnd = scrollToLineRequest.endLine
+      ? Math.min(Math.max(clampedStart, scrollToLineRequest.endLine), model.getLineCount())
+      : clampedStart;
+
+    if (clampedEnd > clampedStart) {
+      editor.revealRangeInCenter({
+        startLineNumber: clampedStart,
+        startColumn: 1,
+        endLineNumber: clampedEnd,
+        endColumn: 1,
+      });
+    } else {
+      editor.revealLineInCenter(clampedStart);
+    }
+
+    editor.setPosition({ lineNumber: clampedStart, column: 1 });
     editor.focus();
+
+    // Option 1: Attach transient soft purple glowing citation highlight
+    if (monacoRef.current) {
+      const monacoInstance = monacoRef.current;
+      const decorations = editor.createDecorationsCollection([
+        {
+          range: new monacoInstance.Range(
+            clampedStart,
+            1,
+            clampedEnd,
+            model.getLineMaxColumn(clampedEnd),
+          ),
+          options: {
+            isWholeLine: true,
+            className: 'rag-citation-glow-highlight',
+            overviewRuler: {
+              color: '#a855f7',
+              position: monacoInstance.editor.OverviewRulerLane.Full,
+            },
+          },
+        },
+      ]);
+
+      setTimeout(() => {
+        decorations.clear();
+      }, 3500);
+    }
   }, [scrollToLineRequest, renderedTarget?.file.id, isEditorMounted]);
 
   const openTabs = useMemo(() => {
@@ -999,58 +1058,124 @@ export function StudioEditorPane({
           </div>
         ) : (
           <>
-            {renderedTarget && expectedModelPath && (
-              <Editor
-                height="100%"
-                width="100%"
-                path={expectedModelPath}
-                language={monacoLanguage}
-                defaultValue={renderedTarget.draft.content}
-                theme={theme === 'dark' ? STUDIO_DARK_THEME : STUDIO_LIGHT_THEME}
-                keepCurrentModel={true}
-                saveViewState={true}
-                beforeMount={handleBeforeMount}
-                onMount={handleMount}
-                onChange={handleEditorChange}
-                loading={
-                  <div className="flex h-full w-full items-center justify-center gap-2 font-mono text-xs text-muted-foreground">
-                    <Loader2
-                      className="h-4 w-4 animate-spin text-primary"
-                      aria-hidden="true"
-                    />
-                    <span>Initializing Monaco Engine…</span>
+            {aiDiffReview && aiDiffReview.fileId === activeFile?.id ? (
+              <div className="flex h-full w-full flex-col overflow-hidden">
+                {/* Floating Diff Review Action Bar */}
+                <div className="z-20 flex shrink-0 items-center justify-between border-b border-border/80 bg-neutral-900/95 px-4 py-2 text-xs shadow-lg backdrop-blur-md">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-purple-400" />
+                    <span className="font-semibold text-foreground">
+                      AI Proposed Changes for{' '}
+                      <code className="rounded bg-primary/20 px-1 py-0.5 font-mono text-primary">
+                        {aiDiffReview.fileName}
+                      </code>
+                    </span>
+                    <span className="rounded border border-rose-800/40 bg-rose-950/70 px-2 py-0.5 font-mono text-[10px] text-rose-300">
+                      Red: Current
+                    </span>
+                    <span className="rounded border border-[#46c466]/40 bg-[#2b593a]/70 px-2 py-0.5 font-mono text-[10px] text-[#46c466]">
+                      Green: Proposed
+                    </span>
                   </div>
-                }
-                options={{
-                  readOnly:
-                    !renderedTarget.canEdit ||
-                    isWaitingForNewBuffer ||
-                    (collabConnectionStatus === 'connecting' &&
-                      !collabRoomReady) ||
-                    Boolean(renderedTarget.canEdit && activeGuardedLineInfo),
-                  domReadOnly:
-                    !renderedTarget.canEdit ||
-                    isWaitingForNewBuffer ||
-                    (collabConnectionStatus === 'connecting' &&
-                      !collabRoomReady) ||
-                    Boolean(renderedTarget.canEdit && activeGuardedLineInfo),
-                  glyphMargin: true,
-                  minimap: { enabled: true },
-                  fontSize: 13.5,
-                  fontFamily:
-                    '"Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace',
-                  fontLigatures: true,
-                  tabSize: 2,
-                  insertSpaces: true,
-                  smoothScrolling: true,
-                  cursorSmoothCaretAnimation: 'on',
-                  scrollBeyondLastLine: false,
-                  wordWrap: 'on',
-                  automaticLayout: true,
-                  renderLineHighlight: 'all',
-                  padding: { top: 24, bottom: 24 },
-                }}
-              />
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={aiDiffReview.onDiscard}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/90 px-3 py-1 font-medium text-neutral-300 transition-colors hover:bg-neutral-700 hover:text-white"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span>Discard</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={aiDiffReview.onAccept}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 font-semibold text-white shadow-md transition-colors hover:bg-emerald-500"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Accept Changes</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Monaco Diff Editor Pane */}
+                <div className="min-h-0 flex-1">
+                  <DiffEditor
+                    height="100%"
+                    width="100%"
+                    language={monacoLanguage}
+                    original={aiDiffReview.originalContent}
+                    modified={aiDiffReview.proposedContent}
+                    theme={theme === 'dark' ? STUDIO_DARK_THEME : STUDIO_LIGHT_THEME}
+                    options={{
+                      readOnly: true,
+                      renderSideBySide: true,
+                      fontFamily:
+                        '"Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace',
+                      fontSize: 13,
+                      lineNumbers: 'on',
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                      renderOverviewRuler: false,
+                      diffWordWrap: 'off',
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              renderedTarget && expectedModelPath && (
+                <Editor
+                  height="100%"
+                  width="100%"
+                  path={expectedModelPath}
+                  language={monacoLanguage}
+                  defaultValue={renderedTarget.draft.content}
+                  theme={theme === 'dark' ? STUDIO_DARK_THEME : STUDIO_LIGHT_THEME}
+                  keepCurrentModel={true}
+                  saveViewState={true}
+                  beforeMount={handleBeforeMount}
+                  onMount={handleMount}
+                  onChange={handleEditorChange}
+                  loading={
+                    <div className="flex h-full w-full items-center justify-center gap-2 font-mono text-xs text-muted-foreground">
+                      <Loader2
+                        className="h-4 w-4 animate-spin text-primary"
+                        aria-hidden="true"
+                      />
+                      <span>Initializing Monaco Engine…</span>
+                    </div>
+                  }
+                  options={{
+                    readOnly:
+                      !renderedTarget.canEdit ||
+                      isWaitingForNewBuffer ||
+                      (collabConnectionStatus === 'connecting' &&
+                        !collabRoomReady) ||
+                      Boolean(renderedTarget.canEdit && activeGuardedLineInfo),
+                    domReadOnly:
+                      !renderedTarget.canEdit ||
+                      isWaitingForNewBuffer ||
+                      (collabConnectionStatus === 'connecting' &&
+                        !collabRoomReady) ||
+                      Boolean(renderedTarget.canEdit && activeGuardedLineInfo),
+                    glyphMargin: true,
+                    minimap: { enabled: true },
+                    fontSize: 13.5,
+                    fontFamily:
+                      '"Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace',
+                    fontLigatures: true,
+                    tabSize: 2,
+                    insertSpaces: true,
+                    smoothScrolling: true,
+                    cursorSmoothCaretAnimation: 'on',
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
+                    automaticLayout: true,
+                    renderLineHighlight: 'all',
+                    padding: { top: 24, bottom: 24 },
+                  }}
+                />
+              )
             )}
 
             {(isWaitingForNewBuffer || isFileLoading) && !activeDraft && (

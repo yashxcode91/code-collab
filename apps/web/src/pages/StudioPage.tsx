@@ -23,6 +23,7 @@ import { StudioEditorPane } from '@/components/studio-ide/StudioEditorPane';
 import { StudioExecutionConsole } from '@/components/studio-ide/StudioExecutionConsole';
 import { StudioInspectorDrawer } from '@/components/studio-ide/StudioInspectorDrawer';
 import { StudioSnapshotDiffModal } from '@/components/studio-ide/StudioSnapshotDiffModal';
+import { SemanticSearchModal } from '@/components/studio-ide/SemanticSearchModal';
 import {
   collectSubtreeIds,
   inferExecutionLanguage,
@@ -75,8 +76,10 @@ export function StudioPage() {
   const [scrollToLineRequest, setScrollToLineRequest] = useState<{
     fileId?: string;
     line: number;
+    endLine?: number;
     seq: number;
   } | null>(null);
+  const [isSemanticSearchOpen, setIsSemanticSearchOpen] = useState(false);
   const [languageOverride, setLanguageOverride] =
     useState<SupportedLanguage | null>(null);
   const autoOpenedBranchRef = useRef<string | null>(null);
@@ -366,50 +369,72 @@ export function StudioPage() {
     onBranchRestored: handleBranchRestored,
   });
 
+  const [aiDiffReview, setAiDiffReview] = useState<{
+    fileId: string;
+    fileName: string;
+    originalContent: string;
+    proposedContent: string;
+  } | null>(null);
+
   const handleApplyAiCode = useCallback(
-    async (suggestedCode: string) => {
+    (suggestedCode: string) => {
       const draft = activeFile ? (buffers[activeFile.id] ?? null) : null;
       if (!activeFile || !draft) return;
 
-      // 1. Day 5 Safety Snapshot Integration
-      try {
-        await snapshots.createSnapshot({
-          title: `Pre-AI Patch: ${activeFile.name}`,
-          description: `Automatic safety checkpoint before applying CodeCollab AI suggestion`,
-        });
-      } catch {
-        // Best effort safety snapshot
-      }
-
-      // 2. Replace active selection or entire file content
+      // 1. Calculate the proposed content (handling selection or full file)
+      let proposedContent = suggestedCode;
       if (activeSelection && activeSelection.text) {
         const lines = draft.content.split('\n');
         const before = lines.slice(0, Math.max(0, activeSelection.startLine - 1));
         const after = lines.slice(Math.min(lines.length, activeSelection.endLine));
-        const newContent = [...before, suggestedCode, ...after].join('\n');
-        updateDraftContent(activeFile.id, newContent);
-        if (collab.activeRoomKey && collab.ytext) {
-          collab.ytext.delete(0, collab.ytext.length);
-          collab.ytext.insert(0, newContent);
-        }
-      } else {
-        updateDraftContent(activeFile.id, suggestedCode);
-        if (collab.activeRoomKey && collab.ytext) {
-          collab.ytext.delete(0, collab.ytext.length);
-          collab.ytext.insert(0, suggestedCode);
-        }
+        proposedContent = [...before, suggestedCode, ...after].join('\n');
       }
+
+      // 2. Open Diff Review Mode in Monaco instead of directly overwriting!
+      setAiDiffReview({
+        fileId: activeFile.id,
+        fileName: activeFile.name,
+        originalContent: draft.content,
+        proposedContent,
+      });
     },
-    [
-      activeFile,
-      activeSelection,
-      buffers,
-      collab.activeRoomKey,
-      collab.ytext,
-      snapshots,
-      updateDraftContent,
-    ],
+    [activeFile, activeSelection, buffers],
   );
+
+  const handleAcceptAiDiff = useCallback(async () => {
+    if (!aiDiffReview || !activeFile) return;
+
+    // 1. Day 5 Safety Snapshot Integration
+    try {
+      await snapshots.createSnapshot({
+        title: `Pre-AI Patch: ${aiDiffReview.fileName}`,
+        description: `Automatic safety checkpoint before applying CodeCollab AI suggestion`,
+      });
+    } catch {
+      // Best effort safety snapshot
+    }
+
+    // 2. Commit proposed content into editor draft and CRDT room
+    updateDraftContent(aiDiffReview.fileId, aiDiffReview.proposedContent);
+    if (collab.activeRoomKey && collab.ytext) {
+      collab.ytext.delete(0, collab.ytext.length);
+      collab.ytext.insert(0, aiDiffReview.proposedContent);
+    }
+
+    // 3. Exit diff review mode
+    setAiDiffReview(null);
+  }, [
+    aiDiffReview,
+    activeFile,
+    collab.activeRoomKey,
+    collab.ytext,
+    snapshots,
+    updateDraftContent,
+  ]);
+
+  const handleDiscardAiDiff = useCallback(() => {
+    setAiDiffReview(null);
+  }, []);
 
   const handleDebugWithAi = useCallback(
     (_errorText: string, _runId?: string) => {
@@ -418,9 +443,10 @@ export function StudioPage() {
     [setRightPanelTab],
   );
 
-  // Reset manual language override when switching active file
+  // Reset manual language override and AI diff review when switching active file
   useEffect(() => {
     setLanguageOverride(null);
+    setAiDiffReview(null);
   }, [activeFileId]);
 
   const resolvedExecutionLanguage = useMemo(
@@ -830,6 +856,16 @@ export function StudioPage() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (
         (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === 'f'
+      ) {
+        event.preventDefault();
+        setIsSemanticSearchOpen((prev) => !prev);
+        return;
+      }
+
+      if (
+        (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === 's'
       ) {
         event.preventDefault();
@@ -1026,6 +1062,7 @@ export function StudioPage() {
         onSaveActiveFile={() => void handleSaveFile()}
         onToggleLockActiveFile={handleToggleLockActiveFile}
         onSetRightPanelTab={setRightPanelTab}
+        onOpenSemanticSearch={() => setIsSemanticSearchOpen(true)}
       />
 
       {/* Split-Pane Studio Body with balanced framing below attached top bar */}
@@ -1080,6 +1117,15 @@ export function StudioPage() {
               activeFile={activeFile}
               activeDraft={activeDraft}
               activeConflict={activeConflict}
+              aiDiffReview={
+                aiDiffReview
+                  ? {
+                      ...aiDiffReview,
+                      onAccept: handleAcceptAiDiff,
+                      onDiscard: handleDiscardAiDiff,
+                    }
+                  : null
+              }
               isFileLoading={activeFileDetailQuery.isLoading}
               fileLoadError={
                 activeFileDetailQuery.isError
@@ -1166,7 +1212,17 @@ export function StudioPage() {
               activeFileId,
               activeFileName: activeFile?.name,
               activeSelection,
+              activeFileContent: activeDraft?.content ?? null,
               onApplyCode: handleApplyAiCode,
+              onSelectCitation: (fileId, startLine, endLine) => {
+                openFileTab(fileId);
+                setScrollToLineRequest({
+                  fileId,
+                  line: startLine,
+                  endLine,
+                  seq: Date.now(),
+                });
+              },
             }}
             chatState={{
               messages: chat.messages,
@@ -1236,6 +1292,24 @@ export function StudioPage() {
         onClose={() => setDiffSnapshotTarget(null)}
         onRestore={snapshots.restoreSnapshot}
       />
+
+      {activeBranch && (
+        <SemanticSearchModal
+          isOpen={isSemanticSearchOpen}
+          onClose={() => setIsSemanticSearchOpen(false)}
+          projectId={project.id}
+          branchId={activeBranch.id}
+          onSelectResult={(fileId, startLine, endLine) => {
+            openFileTab(fileId);
+            setScrollToLineRequest({
+              fileId,
+              line: startLine,
+              endLine,
+              seq: Date.now(),
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
