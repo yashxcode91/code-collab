@@ -97,6 +97,41 @@ enum IndexTaskStatus {
   FAILED
 }
 
+// Lifecycle state of an autonomous multi-file agent session
+enum AgentSessionStatus {
+  PLANNING
+  EXECUTING
+  VERIFYING
+  SELF_HEALING
+  AWAITING_REVIEW
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// State machine status of an individual execution plan step
+enum AgentStepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+// Execution status of an individual agent tool call
+enum AgentToolStatus {
+  RUNNING
+  SUCCESS
+  ERROR
+}
+
+// Type of file mutation staged by an autonomous agent
+enum AgentFileChangeType {
+  CREATE
+  MODIFY
+  DELETE
+}
+
 // Core user identity; supports password auth, OAuth-only accounts, or both
 model User {
   id           String   @id @default(uuid())
@@ -119,6 +154,7 @@ model User {
   createdSnapshots    BranchSnapshot[]    @relation("SnapshotCreator")
   aiConversations     AiConversation[]    @relation("AiConversationOwner")
   requestedIndexTasks CodebaseIndexTask[] @relation("IndexTaskRequester")
+  agentSessions       AgentSession[]      @relation("AgentSessionOwner")
 
   @@map("users")
 }
@@ -159,6 +195,7 @@ model Project {
   aiConversations AiConversation[]
   embeddings      CodebaseEmbedding[]
   indexTasks      CodebaseIndexTask[]
+  agentSessions   AgentSession[]
   ChatMessage     ChatMessage[]
   BranchSnapshot  BranchSnapshot[]
 
@@ -204,6 +241,7 @@ model ProjectBranch {
   aiConversations AiConversation[]
   embeddings      CodebaseEmbedding[]
   indexTasks      CodebaseIndexTask[]
+  agentSessions   AgentSession[]
   ChatMessage     ChatMessage[]
   BranchSnapshot  BranchSnapshot[]
 
@@ -458,4 +496,105 @@ model CodebaseIndexTask {
 
   @@index([projectId, branchId, createdAt(sort: Desc)])
   @@map("codebase_index_tasks")
+}
+
+// =====================================================================
+// Day 8: Multi-File Autonomous Agent Workflows & Self-Healing Models
+// Tracks autonomous multi-turn sessions, plan decomposition steps,
+// detailed tool execution logs, and quarantined staged file mutations.
+// =====================================================================
+
+// Top-level autonomous agent refactoring or migration session
+model AgentSession {
+  id                     String             @id @default(uuid())
+  projectId              String
+  branchId               String
+  userId                 String
+  title                  String             @default("Multi-File Refactor")
+  prompt                 String             @db.Text
+  status                 AgentSessionStatus @default(PLANNING)
+  model                  String             @default("gemini-1.5-pro")
+  totalInputTokens       Int                @default(0)
+  totalOutputTokens      Int                @default(0)
+  selfHealingAttempts    Int                @default(0)
+  maxSelfHealingAttempts Int                @default(3)
+  errorMessage           String?            @db.Text
+  expiresAt              DateTime?
+  cancelledAt            DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch      ProjectBranch     @relation(fields: [branchId, projectId], references: [id, projectId], onDelete: Cascade)
+  user        User              @relation("AgentSessionOwner", fields: [userId], references: [id], onDelete: Cascade)
+  steps       AgentPlanStep[]
+  toolCalls   AgentToolCall[]
+  stagedFiles AgentStagedFile[]
+
+  @@index([projectId, branchId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("agent_sessions")
+}
+
+// Discrete execution milestone produced by agent planning
+model AgentPlanStep {
+  id           String          @id @default(uuid())
+  sessionId    String
+  stepNumber   Int
+  title        String
+  description  String          @db.Text
+  status       AgentStepStatus @default(PENDING)
+  errorMessage String?         @db.Text
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, stepNumber])
+  @@index([sessionId, stepNumber(sort: Asc)])
+  @@map("agent_plan_steps")
+}
+
+// Audit record of an autonomous tool execution
+model AgentToolCall {
+  id            String          @id @default(uuid())
+  sessionId     String
+  stepId        String?
+  toolName      String
+  inputPayload  Json
+  outputPayload Json?
+  status        AgentToolStatus @default(RUNNING)
+  errorMessage  String?         @db.Text
+  durationMs    Int?
+  createdAt     DateTime        @default(now())
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt(sort: Asc)])
+  @@map("agent_tool_calls")
+}
+
+// Quarantined file mutation buffer awaiting developer review & atomic application
+model AgentStagedFile {
+  id              String              @id @default(uuid())
+  sessionId       String
+  fileId          String?
+  filePath        String
+  changeType      AgentFileChangeType @default(MODIFY)
+  originalContent     String?             @db.Text
+  stagedContent       String              @db.Text
+  originalVersion     Int?
+  originalContentHash String?             @db.VarChar(64)
+  isApplied           Boolean             @default(false)
+  hasConflict         Boolean             @default(false)
+  createdAt           DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, filePath])
+  @@index([sessionId])
+  @@map("agent_staged_files")
 }
