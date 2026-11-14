@@ -1,4 +1,4 @@
-import { AiActionKind } from '@codecollab/shared';
+import { AiActionKind, SemanticSearchResultDto } from '@codecollab/shared';
 
 // =====================================================================
 // Types & Provider Interfaces
@@ -14,6 +14,8 @@ export interface AiPromptPayload {
   terminalError?: string;
   branchName?: string;
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  ragCitations?: SemanticSearchResultDto[];
+  ragContext?: string;
 }
 
 export interface AiCompletionResult {
@@ -156,6 +158,9 @@ This module implements the core logic for \`${fileLabel}\`. It is designed with 
           patchCode = codeSnippet
             .split('\n')
             .map((line) => {
+              if (line.includes('stdc::cout')) {
+                return line.replace(/stdc::cout/g, 'std::cout');
+              }
               if (line.includes('// TODO') || line.includes('throw new Error')) {
                 return line.replace(/throw new Error.*/, 'return true; // Fixed implementation');
               }
@@ -312,6 +317,7 @@ Active file: ${payload.activeFilePath ?? 'None'}
 Branch: ${payload.branchName ?? 'main'}`;
 
     const userPrompt = [
+      payload.ragContext ? `=== RELEVANT CODEBASE CONTEXT (pgvector RAG) ===\n${payload.ragContext}\n================================================` : '',
       payload.activeFileContent ? `[FILE CONTENT: ${payload.activeFilePath}]\n${payload.activeFileContent}` : '',
       payload.selectedCode ? `[SELECTED CODE]:\n${payload.selectedCode}` : '',
       payload.terminalError ? `[TERMINAL ERROR]:\n${payload.terminalError}` : '',
