@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Construction,
   FileCode2,
   Loader2,
   RotateCw,
@@ -26,6 +27,12 @@ export interface StudioAgentDrawerProps {
   branchId: string;
   onFilesApplied?: () => void;
 }
+
+/**
+ * Feature flag: Temporarily discontinue Agent Workstation submissions
+ * Set to `false` to reactivate the interactive goal prompt and execution runner.
+ */
+export const IS_AGENT_WORKSTATION_DISCONTINUED = true;
 
 const STATUS_CONFIG: Record<
   AgentSessionStatusDto,
@@ -124,33 +131,41 @@ export function StudioAgentDrawer({
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 bg-muted/20">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Bot className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold tracking-tight">Agent Workstation</span>
-              <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.2 font-mono text-[9px] text-primary">
+      <div className="border-b border-border/60 px-4 py-3 bg-muted/20 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+              <Bot className="h-4 w-4" />
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+              <span className="text-xs font-semibold tracking-tight whitespace-nowrap">Agent Workstation</span>
+              <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] text-primary whitespace-nowrap">
                 gemini-1.5-pro
               </span>
             </div>
-            <p className="text-[11px] text-muted-foreground">Autonomous Multi-File Workflows</p>
           </div>
-        </div>
 
-        {statusCfg && (
-          <span
-            className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
-              statusCfg.className,
-            )}
-          >
-            <statusCfg.icon className={cn('h-3 w-3', isRunning && 'animate-spin')} />
-            {statusCfg.label}
-          </span>
-        )}
+          {IS_AGENT_WORKSTATION_DISCONTINUED ? (
+            <span
+              data-testid="agent-status-label"
+              className="inline-flex items-center gap-1 shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9.5px] font-mono font-medium text-amber-500 dark:text-amber-400 select-none shadow-sm whitespace-nowrap"
+            >
+              <Construction className="h-3 w-3 shrink-0" />
+              <span>DISABLED</span>
+            </span>
+          ) : statusCfg ? (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap',
+                statusCfg.className,
+              )}
+            >
+              <statusCfg.icon className={cn('h-3 w-3', isRunning && 'animate-spin')} />
+              {statusCfg.label}
+            </span>
+          ) : null}
+        </div>
+        <p className="text-[11px] text-muted-foreground truncate pl-9">Autonomous Multi-File Workflows</p>
       </div>
 
       {/* Main Scrollable Content */}
@@ -172,54 +187,93 @@ export function StudioAgentDrawer({
           </div>
         )}
 
-        {/* Prompt Input Form */}
-        <form onSubmit={handleSubmit} className="space-y-2">
-          <label htmlFor="agent-prompt" className="text-xs font-medium text-foreground/80">
-            Autonomous Goal or Refactoring Task:
-          </label>
-          <textarea
-            id="agent-prompt"
-            value={promptInput}
-            onChange={(e) => setPromptInput(e.target.value)}
-            disabled={isRunning}
-            placeholder="e.g. Implement input validation middleware and apply it to auth routes with tests..."
-            className="w-full resize-none rounded-xl border border-border/80 bg-background/50 px-3 py-2 text-xs placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-            rows={3}
-          />
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">
-              Quarantines modifications to in-memory staging buffer.
-            </span>
-            {isRunning ? (
-              <button
-                type="button"
-                onClick={cancelSession}
-                disabled={isCancelling}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition hover:bg-destructive/20 disabled:opacity-50"
-              >
-                {isCancelling ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <StopCircle className="h-3.5 w-3.5" />
-                )}
-                Stop Agent
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!promptInput.trim() || isStarting}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow transition hover:bg-primary/90 disabled:opacity-50"
-              >
-                {isStarting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                Plan & Execute
-              </button>
-            )}
+        {/* Temporarily Discontinued Announcement Card OR Interactive Prompt Form */}
+        {IS_AGENT_WORKSTATION_DISCONTINUED ? (
+          <div
+            data-testid="agent-discontinued-notice"
+            className="relative overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-b from-amber-500/10 via-card/60 to-background/90 p-4 backdrop-blur-md shadow-xl transition-all"
+          >
+            {/* Maintenance Header */}
+            <div className="flex items-center justify-between gap-2 pb-2.5 mb-3 border-b border-border/40">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400">
+                  <Construction className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-[11px] font-mono uppercase tracking-wider font-semibold text-amber-500 dark:text-amber-400 whitespace-nowrap">
+                  Dev Notice
+                </span>
+              </div>
+              <span className="inline-flex items-center shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-mono font-bold tracking-tight text-amber-500 dark:text-amber-400 whitespace-nowrap">
+                TEMPORARILY DISABLED
+              </span>
+            </div>
+
+            {/* Exact Announcement Text (Tasteful developer sarcasm & Solar Tangerine highlight) */}
+            <div className="space-y-3 text-xs leading-relaxed text-foreground/90">
+              <p className="text-zinc-200">
+                Due to unexpected financial difficulties faced by our developer Yash, this feature has been temporarily discontinued.
+              </p>
+
+              <div className="rounded-lg border-l-2 border-amber-500/50 bg-muted/40 px-3 py-2 font-mono text-[11px] italic text-muted-foreground leading-normal">
+                Apparently, AI doesn't run on motivation.
+              </div>
+
+              <div className="pt-0.5 flex items-center gap-1.5 font-mono text-xs font-semibold text-primary">
+                <Sparkles className="h-3.5 w-3.5 text-primary shrink-0 animate-pulse" />
+                <span className="tracking-wide">Premium access coming soon.</span>
+              </div>
+            </div>
           </div>
-        </form>
+        ) : (
+          /* Prompt Input Form */
+          <form onSubmit={handleSubmit} className="space-y-2">
+            <label htmlFor="agent-prompt" className="text-xs font-medium text-foreground/80">
+              Autonomous Goal or Refactoring Task:
+            </label>
+            <textarea
+              id="agent-prompt"
+              value={promptInput}
+              onChange={(e) => setPromptInput(e.target.value)}
+              disabled={isRunning}
+              placeholder="e.g. Implement input validation middleware and apply it to auth routes with tests..."
+              className="w-full resize-none rounded-xl border border-border/80 bg-background/50 px-3 py-2 text-xs placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+              rows={3}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground">
+                Quarantines modifications to in-memory staging buffer.
+              </span>
+              {isRunning ? (
+                <button
+                  type="button"
+                  onClick={cancelSession}
+                  disabled={isCancelling}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition hover:bg-destructive/20 disabled:opacity-50"
+                >
+                  {isCancelling ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <StopCircle className="h-3.5 w-3.5" />
+                  )}
+                  Stop Agent
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!promptInput.trim() || isStarting}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground shadow transition hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isStarting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Plan & Execute
+                </button>
+              )}
+            </div>
+          </form>
+        )}
 
         {/* Self-Healing Banner */}
         {activeSession?.status === 'SELF_HEALING' && (

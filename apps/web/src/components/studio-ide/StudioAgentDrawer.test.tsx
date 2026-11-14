@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentSessionDetailDto } from '@codecollab/shared';
 import { StudioAgentDrawer } from '@/components/studio-ide/StudioAgentDrawer';
@@ -64,25 +64,36 @@ describe('StudioAgentDrawer Component', () => {
     );
   }
 
-  it('renders idle prompt input and Plan & Execute button', () => {
+  it('renders temporarily discontinued notice with developer announcement and status label', () => {
     renderDrawer();
 
+    // 1. Branding preserved
     expect(screen.getByText('Agent Workstation')).toBeDefined();
-    expect(screen.getByPlaceholderText(/Implement input validation/i)).toBeDefined();
-    const submitBtn = screen.getByRole('button', { name: /Plan & Execute/i });
-    expect(submitBtn).toBeDefined();
+    expect(screen.getByText('gemini-1.5-pro')).toBeDefined();
+
+    // 2. Status label
+    const statusLabels = screen.getAllByText('TEMPORARILY DISABLED');
+    expect(statusLabels.length).toBeGreaterThan(0);
+
+    // 3. Exact announcement text
+    expect(
+      screen.getByText(
+        'Due to unexpected financial difficulties faced by our developer Yash, this feature has been temporarily discontinued.'
+      )
+    ).toBeDefined();
+    expect(screen.getByText("Apparently, AI doesn't run on motivation.")).toBeDefined();
+    expect(screen.getByText('Premium access coming soon.')).toBeDefined();
+
+    // 4. Input form and Plan & Execute button disabled / not present
+    expect(screen.queryByPlaceholderText(/Implement input validation/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Plan & Execute/i })).toBeNull();
   });
 
-  it('submits user prompt when Plan & Execute is clicked', () => {
+  it('prevents starting new agent sessions through discontinued UI', () => {
     renderDrawer();
 
-    const textarea = screen.getByPlaceholderText(/Implement input validation/i);
-    fireEvent.change(textarea, { target: { value: 'Create login route' } });
-
-    const submitBtn = screen.getByRole('button', { name: /Plan & Execute/i });
-    fireEvent.click(submitBtn);
-
-    expect(mockStartSession).toHaveBeenCalledWith('Create login route');
+    expect(screen.queryByRole('button', { name: /Plan & Execute/i })).toBeNull();
+    expect(mockStartSession).not.toHaveBeenCalled();
   });
 
   it('renders active plan steps and quarantined staged files when session is loaded', () => {
