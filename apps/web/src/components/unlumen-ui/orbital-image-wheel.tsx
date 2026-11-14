@@ -608,7 +608,7 @@ export function OrbitalImageWheel<T>({
                 direction={subtitleDirection}
                 speed={subtitleSpeed}
                 stagger={subtitleStagger}
-                className="font-mono text-[11px] tracking-wide text-muted-foreground"
+                className="font-mono text-xs sm:text-sm tracking-wide text-muted-foreground"
               />
             </div>
           )}
@@ -682,7 +682,7 @@ export function OrbitalImageWheel<T>({
                         transform: pillActive ? 'scale(1)' : 'scale(0.95)',
                       }}
                       className={cn(
-                        'glass-control mr-2 inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full px-4 py-1.5 font-mono text-xs transition-[opacity,transform,color,border-color] duration-200',
+                        'glass-control mr-2 inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full px-4 py-1.5 font-mono text-xs sm:text-[13px] transition-[opacity,transform,color,border-color] duration-200',
                         pillActive
                           ? 'border-primary/50 bg-primary/15 font-semibold text-primary'
                           : 'text-muted-foreground hover:border-foreground/30 hover:text-foreground',

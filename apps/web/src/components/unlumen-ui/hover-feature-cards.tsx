@@ -119,14 +119,14 @@ function HoverFeatureCard({
               <div className="min-w-0">
                 <span
                   className={cn(
-                    "block truncate text-base font-semibold tracking-tight",
+                    "block truncate text-lg font-bold tracking-tight",
                     item.soon ? "text-muted-foreground/80" : "text-foreground",
                   )}
                 >
                   {item.name}
                 </span>
                 {item.meta && (
-                  <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                  <span className="block truncate font-mono text-xs text-muted-foreground">
                     {item.meta}
                   </span>
                 )}
@@ -134,12 +134,12 @@ function HoverFeatureCard({
             </div>
 
             {item.soon ? (
-              <span className="glass-control shrink-0 rounded-full px-2.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+              <span className="glass-control shrink-0 rounded-full px-2.5 py-0.5 font-mono text-xs text-muted-foreground">
                 Coming soon
               </span>
             ) : (
               item.badge && (
-                <span className="glass-control shrink-0 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground group-hover:border-primary/35 group-hover:text-primary">
+                <span className="glass-control shrink-0 rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold text-muted-foreground group-hover:border-primary/35 group-hover:text-primary">
                   {item.badge}
                 </span>
               )
@@ -188,13 +188,13 @@ function HoverFeatureCard({
         className="pointer-events-none relative z-[1] -mt-3 w-[92%] self-center overflow-hidden"
       >
         <div className="glass-surface relative rounded-b-2xl border-t-0 px-4 pb-3.5 pt-5">
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {item.description}
           </p>
           {isInteractive && (
-            <span className="mt-2 inline-flex items-center gap-1 font-mono text-[10px] font-medium text-primary">
+            <span className="mt-2.5 inline-flex items-center gap-1 font-mono text-xs font-semibold text-primary">
               <span>Use template</span>
-              <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             </span>
           )}
         </div>

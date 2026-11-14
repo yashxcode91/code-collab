@@ -689,7 +689,7 @@ export function DashboardPage() {
         }}
       />
 
-      <main className="relative z-10 mx-auto max-w-6xl space-y-12 px-4 pb-16 pt-8 sm:px-6">
+      <main className="relative z-10 mx-auto w-full max-w-7xl xl:max-w-[1400px] 2xl:max-w-[1536px] space-y-12 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         {/* 1. Flagship Mirror-Glass Hero Banner + Studio Snapshot */}
         <section className="glass-mirror relative overflow-hidden rounded-[28px] p-6 sm:p-8 lg:p-10">
           <PixelRippleBackground gap={18} pixelSize={2.5} />
@@ -699,7 +699,7 @@ export function DashboardPage() {
             <div className="space-y-5 lg:col-span-7">
               <div className="flex flex-wrap items-center gap-2.5">
                 {/* Monochrome crystal capsule replacing common green status badges */}
-                <span className="glass-control inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[11px] font-medium text-foreground">
+                <span className="glass-control inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 font-mono text-xs font-medium text-foreground">
                   <span className="relative flex h-2 w-2">
                     <span
                       className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -725,16 +725,16 @@ export function DashboardPage() {
                   </span>
                 </span>
 
-                <span className="font-mono text-[11px] text-muted-foreground">
+                <span className="font-mono text-xs text-muted-foreground">
                   @{user?.username} · {user?.role ?? 'member'}
                 </span>
               </div>
 
               <div className="space-y-2.5">
-                <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
                   Collaborative Studio Hub
                 </h1>
-                <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
+                <p className="max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
                   Provision multi-cursor CRDT repositories, inspect live branch
                   access, and jump directly into isolated code execution from a
                   unified workspace surface.
@@ -745,7 +745,7 @@ export function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => openCreateModal(null)}
-                  className="btn-studio-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold sm:text-sm"
+                  className="btn-studio-primary inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold"
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   <span>New Workspace</span>
@@ -754,10 +754,10 @@ export function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => handleSelectSection('templates')}
-                  className="glass-control inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-medium text-foreground sm:text-sm"
+                  className="glass-control inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground"
                 >
                   <Sparkles
-                    className="h-3.5 w-3.5 text-muted-foreground"
+                    className="h-4 w-4 text-muted-foreground"
                     aria-hidden="true"
                   />
                   <span>Browse Templates</span>
@@ -767,46 +767,46 @@ export function DashboardPage() {
 
             {/* Right: Frosted Glass Studio Snapshot Telemetry Card */}
             <div className="lg:col-span-5">
-              <div className="glass-surface rounded-3xl p-5">
-                <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                  <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              <div className="glass-surface rounded-3xl p-6">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3.5">
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Studio Snapshot
                   </span>
-                  <span className="font-mono text-[11px] font-medium text-muted-foreground">
+                  <span className="font-mono text-xs font-medium text-muted-foreground">
                     {healthQuery.data?.uptime ?? 0}s uptime
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="glass-control rounded-2xl p-3.5">
-                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="mt-4 grid grid-cols-2 gap-3.5">
+                  <div className="glass-control rounded-2xl p-4">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                       <FolderGit2
-                        className="h-3.5 w-3.5 text-muted-foreground"
+                        className="h-4 w-4 text-muted-foreground"
                         aria-hidden="true"
                       />
                       Workspaces
                     </span>
-                    <p className="mt-1.5 text-2xl font-semibold tracking-tight text-foreground">
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
                       {stats.total}
                     </p>
-                    <span className="font-mono text-[10px] text-muted-foreground">
+                    <span className="font-mono text-xs text-muted-foreground">
                       {stats.owned} owned · {stats.shared} shared
                     </span>
                   </div>
 
-                  <div className="glass-control rounded-2xl p-3.5">
-                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <div className="glass-control rounded-2xl p-4">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                       <GitBranch
-                        className="h-3.5 w-3.5 text-muted-foreground"
+                        className="h-4 w-4 text-muted-foreground"
                         aria-hidden="true"
                       />
                       Active Topology
                     </span>
-                    <p className="mt-1.5 text-2xl font-semibold tracking-tight text-foreground">
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
                       {stats.totalBranches}
                     </p>
-                    <span className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
-                      <Users className="h-2.5 w-2.5" aria-hidden="true" />
+                    <span className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+                      <Users className="h-3 w-3" aria-hidden="true" />
                       {stats.totalMembers} collaborator seats
                     </span>
                   </div>
@@ -862,17 +862,17 @@ export function DashboardPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                <span className="font-mono text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Repositories · File Structure
                 </span>
                 {filteredProjects.length > 0 && (
-                  <span className="glass-control rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-xs text-muted-foreground">
                     {Math.min(activeWorkspaceIndex + 1, filteredProjects.length)} /{' '}
                     {filteredProjects.length}
                   </span>
                 )}
               </div>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 Your Workspaces
               </h2>
             </div>
@@ -881,7 +881,7 @@ export function DashboardPage() {
               {/* Search Box */}
               <div className="relative">
                 <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                   aria-hidden="true"
                 />
                 <input
@@ -890,16 +890,16 @@ export function DashboardPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search repositories…"
                   aria-label="Search workspaces"
-                  className="glass-control h-9 w-full rounded-xl pl-8 pr-8 text-xs text-foreground placeholder:text-muted-foreground/70 focus:border-primary/55 focus:outline-none sm:w-56"
+                  className="glass-control h-10 w-full rounded-xl pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary/55 focus:outline-none sm:w-64"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
                     aria-label="Clear search"
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    <X className="h-4 w-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -917,7 +917,7 @@ export function DashboardPage() {
                       key={item.id}
                       type="button"
                       onClick={() => setLanguageFilter(item.id)}
-                      className={`rounded-lg px-2.5 py-1 font-mono text-[11px] font-medium transition-colors ${
+                      className={`rounded-lg px-3 py-1.5 font-mono text-xs font-medium transition-colors ${
                         active
                           ? 'bg-primary/15 text-primary'
                           : 'text-muted-foreground hover:text-foreground'
@@ -937,14 +937,14 @@ export function DashboardPage() {
               {[0, 1, 2].map((slot) => (
                 <div
                   key={slot}
-                  className={`glass-surface h-[356px] w-[336px] shrink-0 animate-pulse rounded-3xl p-5 ${
+                  className={`glass-surface h-[380px] w-[360px] shrink-0 animate-pulse rounded-3xl p-5 ${
                     slot !== 1 ? 'hidden opacity-60 scale-90 sm:block' : ''
                   }`}
                 >
                   <div className="h-6 w-24 rounded-lg bg-muted/60" />
                   <div className="mt-4 h-5 w-44 rounded-lg bg-muted/60" />
                   <div className="mt-2 h-4 w-full rounded-lg bg-muted/40" />
-                  <div className="mt-4 h-[106px] w-full rounded-2xl bg-muted/35" />
+                  <div className="mt-4 h-[112px] w-full rounded-2xl bg-muted/35" />
                 </div>
               ))}
             </div>
@@ -1030,9 +1030,9 @@ export function DashboardPage() {
                 }
                 activeIndex={activeWorkspaceIndex}
                 onActiveIndexChange={setActiveWorkspaceIndex}
-                itemWidth={336}
-                itemHeight={356}
-                itemGap={26}
+                itemWidth={360}
+                itemHeight={380}
+                itemGap={28}
                 renderItem={(project, { isActive }) => (
                   <WorkspaceCard
                     project={project}
@@ -1056,10 +1056,10 @@ export function DashboardPage() {
           className="scroll-mt-24 space-y-5"
         >
           <div>
-            <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+            <span className="font-mono text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Starter Blueprints
             </span>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               Quick-Launch Environments
             </h2>
           </div>
@@ -1086,33 +1086,33 @@ export function DashboardPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                        <Activity className="h-3 w-3" aria-hidden="true" />
+                      <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                        <Activity className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>Cadence</span>
                       </span>
                       {isResolvingAutoGithub ? (
-                        <span className="glass-control rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-xs text-muted-foreground">
                           Syncing GitHub…
                         </span>
                       ) : liveGithubAccount ? (
-                        <span className="glass-control rounded-full px-2 py-0.5 font-mono text-[10px] text-foreground">
+                        <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-xs text-foreground">
                           GitHub · @{liveGithubAccount}
                         </span>
                       ) : preferStudioSeed && autoGithubHandle ? (
                         <button
                           type="button"
                           onClick={() => setPreferStudioSeed(false)}
-                          className="glass-control rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-primary/45 hover:text-primary"
+                          className="glass-control rounded-full px-2.5 py-0.5 font-mono text-xs text-muted-foreground hover:border-primary/45 hover:text-primary"
                         >
                           Studio · Sync @{autoGithubHandle}
                         </button>
                       ) : (
-                        <span className="glass-control rounded-full px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-xs text-muted-foreground">
                           Studio
                         </span>
                       )}
                     </div>
-                    <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                    <h2 className="mt-1 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                       Workspace & Commit Rhythm
                     </h2>
                   </div>
@@ -1132,11 +1132,11 @@ export function DashboardPage() {
                           : 'github handle'
                       }
                       aria-label="GitHub username for live graph"
-                      className="glass-control h-8 w-32 rounded-xl px-2.5 font-mono text-[11px] text-foreground placeholder:text-muted-foreground/65 focus:border-primary/55 focus:outline-none sm:w-36"
+                      className="glass-control h-9 w-32 rounded-xl px-2.5 font-mono text-xs text-foreground placeholder:text-muted-foreground/65 focus:border-primary/55 focus:outline-none sm:w-40 sm:text-sm"
                     />
                     <button
                       type="submit"
-                      className="glass-control h-8 rounded-xl px-2.5 font-mono text-[11px] font-medium text-foreground hover:border-primary/45 hover:text-primary"
+                      className="glass-control h-9 rounded-xl px-3 font-mono text-xs font-semibold text-foreground hover:border-primary/45 hover:text-primary sm:text-sm"
                     >
                       Update
                     </button>
@@ -1150,9 +1150,9 @@ export function DashboardPage() {
                         }}
                         title="Revert to Studio cadence"
                         aria-label="Revert to Studio cadence"
-                        className="glass-control inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground"
+                        className="glass-control inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground"
                       >
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                        <X className="h-4 w-4" aria-hidden="true" />
                       </button>
                     )}
                   </form>
@@ -1182,40 +1182,40 @@ export function DashboardPage() {
               {/* Lower Summary Telemetry Strip + Profile/Source Footer */}
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2.5">
-                  <div className="glass-control rounded-2xl px-3.5 py-2.5">
-                    <span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <div className="glass-control rounded-2xl px-4 py-3">
+                    <span className="block font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       5m Total
                     </span>
-                    <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                    <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
                       {cadenceSummary ? cadenceSummary.totalContributions : '—'}
                     </p>
-                    <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    <span className="block truncate font-mono text-xs text-muted-foreground">
                       {liveGithubAccount ? 'contributions' : 'studio events'}
                     </span>
                   </div>
 
-                  <div className="glass-control rounded-2xl px-3.5 py-2.5">
-                    <span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <div className="glass-control rounded-2xl px-4 py-3">
+                    <span className="block font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Active Days
                     </span>
-                    <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                    <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
                       {cadenceSummary ? cadenceSummary.activeDays : '—'}
                     </p>
-                    <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    <span className="block truncate font-mono text-xs text-muted-foreground">
                       {cadenceSummary
                         ? `${cadenceSummary.currentStreak}d current streak`
                         : 'days active'}
                     </span>
                   </div>
 
-                  <div className="glass-control rounded-2xl px-3.5 py-2.5">
-                    <span className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <div className="glass-control rounded-2xl px-4 py-3">
+                    <span className="block font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Peak Day
                     </span>
-                    <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                    <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
                       {cadenceSummary ? cadenceSummary.peakCount : '—'}
                     </p>
-                    <span className="block truncate font-mono text-[10px] text-muted-foreground">
+                    <span className="block truncate font-mono text-xs text-muted-foreground">
                       {cadenceSummary
                         ? formatUtcMonthDay(cadenceSummary.peakDate)
                         : 'best burst'}
@@ -1223,7 +1223,7 @@ export function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-border/60 pt-4 font-mono text-[11px] text-muted-foreground">
+                <div className="flex items-center justify-between border-t border-border/60 pt-4 font-mono text-xs text-muted-foreground">
                   <span>
                     {liveGithubAccount
                       ? 'GitHub public calendar · last 5m'
@@ -1241,7 +1241,7 @@ export function DashboardPage() {
                         className="inline-flex items-center gap-1 text-muted-foreground transition-colors hover:text-primary"
                       >
                         <span>View @{safeHandle}</span>
-                        <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                        <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                       </a>
                     ) : (
                       <button
@@ -1263,14 +1263,14 @@ export function DashboardPage() {
             <div>
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                  <span className="font-mono text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Stack &amp; Pulse
                   </span>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                  <h2 className="mt-1 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                     Language Mix &amp; Recent
                   </h2>
                 </div>
-                <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-xs text-muted-foreground">
                   {stackInsights.languages.length}{' '}
                   {stackInsights.languages.length === 1 ? 'runtime' : 'runtimes'}
                 </span>
@@ -1311,10 +1311,10 @@ export function DashboardPage() {
                           setLanguageFilter(lang.id);
                           handleSelectSection('workspaces');
                         }}
-                        className="glass-control inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] text-foreground hover:border-primary/45 hover:text-primary"
+                        className="glass-control inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-xs text-foreground hover:border-primary/45 hover:text-primary"
                       >
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${
+                          className={`h-2 w-2 rounded-full ${
                             idx === 0 ? 'bg-primary' : 'bg-foreground/50'
                           }`}
                         />
@@ -1338,9 +1338,9 @@ export function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => openCreateModal(null)}
-                      className="mt-2 inline-flex items-center gap-1 font-mono text-[11px] font-medium text-primary hover:underline"
+                      className="mt-2 inline-flex items-center gap-1 font-mono text-xs font-semibold text-primary hover:underline"
                     >
-                      <Plus className="h-3 w-3" aria-hidden="true" />
+                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                       <span>Launch first room</span>
                     </button>
                   </div>
@@ -1350,17 +1350,17 @@ export function DashboardPage() {
                       key={room.id}
                       type="button"
                       onClick={() => navigate(`/studio/${room.id}`)}
-                      className="glass-control group flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-2.5 text-left hover:border-primary/40"
+                      className="glass-control group flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left hover:border-primary/40"
                     >
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <span className="flex h-7 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/65 font-mono text-[10px] font-semibold text-foreground transition-colors group-hover:text-primary">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-lg bg-muted/65 font-mono text-xs font-bold text-foreground transition-colors group-hover:text-primary">
                           {SHORT_LANG_LABELS[room.language]}
                         </span>
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-medium text-foreground transition-colors group-hover:text-primary">
+                          <p className="truncate text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
                             {room.name}
                           </p>
-                          <p className="truncate font-mono text-[10px] text-muted-foreground">
+                          <p className="truncate font-mono text-xs text-muted-foreground">
                             {formatShortRelativeTime(room.updatedAt)} ·{' '}
                             {room.branchCount ?? 1}{' '}
                             {(room.branchCount ?? 1) === 1
@@ -1372,7 +1372,7 @@ export function DashboardPage() {
                       </div>
 
                       <ArrowRight
-                        className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary"
+                        className="h-4 w-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary"
                         aria-hidden="true"
                       />
                     </button>
@@ -1381,7 +1381,7 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-4 font-mono text-[11px] text-muted-foreground">
+            <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-4 font-mono text-xs text-muted-foreground">
               <span>
                 {stackInsights.publicCount} public ·{' '}
                 {stackInsights.privateCount} private ·{' '}

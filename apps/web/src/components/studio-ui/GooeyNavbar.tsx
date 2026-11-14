@@ -106,7 +106,7 @@ export function GooeyNavbar({
     : 'CC';
 
   return (
-    <header className="sticky top-4 z-40 mx-auto max-w-6xl px-4 sm:px-6">
+    <header className="sticky top-4 z-40 mx-auto w-full max-w-7xl xl:max-w-[1400px] 2xl:max-w-[1536px] px-4 sm:px-6 lg:px-8">
       {/* Off-screen SVG filter definition for liquid metaball blending */}
       <svg
         aria-hidden="true"
@@ -153,14 +153,14 @@ export function GooeyNavbar({
                 onClick={() => setHubOpen((prev) => !prev)}
                 aria-expanded={hubOpen}
                 aria-haspopup="menu"
-                className="glass-control inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="glass-control inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span>Hub</span>
-                <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-xs font-bold text-primary">
                   {projectCount}
                 </span>
                 <ChevronDown
-                  className={`h-3 w-3 transition-transform duration-150 ${hubOpen ? 'rotate-180' : ''}`}
+                  className={`h-3.5 w-3.5 transition-transform duration-150 ${hubOpen ? 'rotate-180' : ''}`}
                   aria-hidden="true"
                 />
               </button>
@@ -194,11 +194,11 @@ export function GooeyNavbar({
                     >
                       <div className="relative z-10 space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-foreground">
+                          <span className="text-sm font-semibold text-foreground">
                             Workspace Hub
                           </span>
                           {/* Monochrome live beacon pill (no cliché emerald green) */}
-                          <span className="glass-control inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] text-foreground">
+                          <span className="glass-control inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-xs text-foreground">
                             <span className="relative flex h-1.5 w-1.5">
                               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground opacity-75 dark:bg-white" />
                               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground shadow-[0_0_6px_rgba(255,255,255,0.65)] dark:bg-white" />
@@ -207,7 +207,7 @@ export function GooeyNavbar({
                           </span>
                         </div>
 
-                        <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        <p className="text-xs leading-relaxed text-muted-foreground">
                           {projectCount === 0
                             ? 'Create your first collaborative repository or pick a starter preset.'
                             : `${projectCount} active workspace${projectCount === 1 ? '' : 's'} synced with PostgreSQL & Redis.`}
@@ -272,7 +272,7 @@ export function GooeyNavbar({
                         className="absolute inset-0 rounded-lg bg-primary"
                       />
                     )}
-                    <span className="invisible text-xs font-medium">
+                    <span className="invisible text-sm font-medium">
                       {tab.label}
                     </span>
                   </div>
@@ -287,7 +287,7 @@ export function GooeyNavbar({
                   key={tab.id}
                   type="button"
                   onClick={() => onSelectTab(tab.id)}
-                  className={`relative z-10 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  className={`relative z-10 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     isActive
                       ? 'text-primary'
                       : 'text-muted-foreground hover:text-foreground'
@@ -304,7 +304,7 @@ export function GooeyNavbar({
             <button
               type="button"
               onClick={onCreateNew}
-              className="btn-studio-primary inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="btn-studio-primary inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Plus className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">New</span>
@@ -336,11 +336,11 @@ export function GooeyNavbar({
                   className="h-6 w-6 rounded-full object-cover ring-1 ring-border"
                 />
               ) : (
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted font-mono text-[10px] font-semibold text-foreground">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted font-mono text-xs font-bold text-foreground">
                   {initials}
                 </div>
               )}
-              <span className="max-w-[100px] truncate font-mono text-[11px] font-medium text-foreground">
+              <span className="max-w-[120px] truncate font-mono text-xs font-medium text-foreground">
                 @{user?.username}
               </span>
             </div>
@@ -350,7 +350,7 @@ export function GooeyNavbar({
               onClick={onLogout}
               disabled={isLoggingOut}
               aria-label="Sign out"
-              className="glass-control inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="glass-control inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-55 sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {isLoggingOut ? (
                 <Loader2

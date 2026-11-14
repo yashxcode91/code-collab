@@ -98,10 +98,104 @@
     color-scheme: dark;
   }
 
+  /* Small Precision Monochrome Cyber Nav Cursor (Clean 16px Vector Arrow) */
+  html,
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     @apply antialiased min-h-dvh;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M2 1L11.5 9.5L7 10L5 14.5L2 1Z' fill='%2311141c' stroke='%23ffffff' stroke-width='1' stroke-linejoin='round'/%3E%3C/svg%3E") 2 1, auto;
+  }
+
+  /* Interactive State: Luminous Pearl Nav Pointer on Buttons, Cards, Tabs & Links */
+  button,
+  a,
+  [role="button"],
+  .cursor-pointer,
+  select,
+  input[type="button"],
+  input[type="submit"] {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M2 1L11.5 9.5L7 10L5 14.5L2 1Z' fill='%23ffffff' stroke='%2311141c' stroke-width='1' stroke-linejoin='round'/%3E%3C/svg%3E") 2 1, pointer !important;
+  }
+
+  /* Text inputs and Monaco editor preserve native text selection I-beam */
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  .monaco-editor,
+  .monaco-editor * {
+    cursor: text !important;
+  }
+
+  /* Modern CSS scrollbar standards for Firefox & compliant engines */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary)) rgba(234, 88, 12, 0.06);
+  }
+
+  .dark * {
+    scrollbar-color: hsl(var(--primary)) rgba(249, 115, 22, 0.06);
+  }
+
+  /* Solar Tangerine Orange signature scrollbar (Chrome, Edge, Safari, Brave, Electron) */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(234, 88, 12, 0.04);
+    border-left: 1px solid rgba(234, 88, 12, 0.1);
+  }
+
+  .dark ::-webkit-scrollbar-track {
+    background: rgba(249, 115, 22, 0.05);
+    border-left: 1px solid rgba(249, 115, 22, 0.14);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f97316, #ea580c);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: filter 150ms ease, background-color 150ms ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #fb923c, #f97316);
+    filter: brightness(1.1);
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #fb923c, #ea580c);
+    box-shadow: 0 0 10px rgba(249, 115, 22, 0.35);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #fed7aa, #fb923c);
+    box-shadow: 0 0 14px rgba(249, 115, 22, 0.6);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:active,
+  ::-webkit-scrollbar-thumb:active {
+    background: #c2410c;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  /* Utility class to hide scrollbars while preserving full scrollability */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 

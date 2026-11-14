@@ -896,7 +896,7 @@ export function StudioPage() {
     return (
       <div className="relative min-h-dvh bg-background text-foreground">
         <StudioBackdrop />
-        <header className="sticky top-4 z-30 mx-auto max-w-6xl px-4 sm:px-6">
+        <header className="sticky top-4 z-30 mx-auto w-full max-w-7xl xl:max-w-[1400px] 2xl:max-w-[1536px] px-4 sm:px-6 lg:px-8">
           <div className="glass-mirror flex items-center justify-between rounded-2xl px-4 py-2.5">
             <div className="relative z-10 flex items-center gap-3">
               <BrandLogo size="sm" />
@@ -932,7 +932,7 @@ export function StudioPage() {
     return (
       <div className="relative min-h-dvh bg-background text-foreground">
         <StudioBackdrop />
-        <header className="sticky top-4 z-30 mx-auto max-w-6xl px-4 sm:px-6">
+        <header className="sticky top-4 z-30 mx-auto w-full max-w-7xl xl:max-w-[1400px] 2xl:max-w-[1536px] px-4 sm:px-6 lg:px-8">
           <div className="glass-mirror flex items-center justify-between rounded-2xl px-4 py-2.5">
             <div className="relative z-10 flex items-center gap-3">
               <BrandLogo size="sm" />

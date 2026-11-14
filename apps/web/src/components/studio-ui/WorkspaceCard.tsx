@@ -120,20 +120,20 @@ function RolePill({ role }: { role: ProjectRole | null | undefined }) {
   const resolvedRole = role ?? 'viewer';
   if (resolvedRole === 'owner') {
     return (
-      <span className="rounded-full border border-primary/35 bg-primary/15 px-2.5 py-0.5 font-mono text-[10px] font-medium text-primary">
+      <span className="rounded-full border border-primary/35 bg-primary/15 px-2.5 py-0.5 font-mono text-xs font-semibold text-primary">
         owner
       </span>
     );
   }
   if (resolvedRole === 'editor') {
     return (
-      <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-[10px] font-medium text-foreground">
+      <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-xs font-medium text-foreground">
         editor
       </span>
     );
   }
   return (
-    <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+    <span className="glass-control rounded-full px-2.5 py-0.5 font-mono text-xs text-muted-foreground">
       viewer
     </span>
   );
@@ -248,7 +248,7 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
             <div className="flex flex-wrap items-center gap-1.5">
               <span
                 className={cn(
-                  'glass-control inline-flex h-7 items-center rounded-lg px-2 font-mono text-[11px] font-semibold transition-colors',
+                  'glass-control inline-flex h-7 items-center rounded-lg px-2.5 font-mono text-xs font-bold transition-colors',
                   isActive
                     ? 'text-primary'
                     : 'text-foreground group-hover:text-primary',
@@ -256,11 +256,11 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
               >
                 {LANGUAGE_BADGES[project.language]}
               </span>
-              <span className="glass-control inline-flex h-7 items-center gap-1 rounded-full px-2.5 font-mono text-[10px] text-muted-foreground">
+              <span className="glass-control inline-flex h-7 items-center gap-1 rounded-full px-2.5 font-mono text-xs font-medium text-muted-foreground">
                 {project.isPublic ? (
-                  <Globe className="h-3 w-3" aria-hidden="true" />
+                  <Globe className="h-3.5 w-3.5" aria-hidden="true" />
                 ) : (
-                  <Lock className="h-3 w-3" aria-hidden="true" />
+                  <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                 )}
                 <span>{project.isPublic ? 'Public' : 'Private'}</span>
               </span>
@@ -277,7 +277,7 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
           >
             <h3
               className={cn(
-                'truncate text-base font-semibold tracking-tight transition-colors',
+                'truncate text-lg font-bold tracking-tight transition-colors',
                 isActive
                   ? 'text-foreground group-hover:text-primary'
                   : 'text-foreground',
@@ -285,7 +285,7 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
             >
               {project.name}
             </h3>
-            <p className="mt-1 line-clamp-2 min-h-[2.1rem] text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-1 line-clamp-2 min-h-[2.4rem] text-sm leading-relaxed text-muted-foreground">
               {project.description?.trim() ||
                 `${LANGUAGE_NAMES[project.language]} workspace ready for multi-cursor CRDT editing.`}
             </p>
@@ -295,11 +295,11 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
           <button
             type="button"
             onClick={() => onOpen(project.id)}
-            className="glass-control mt-3 block h-[106px] w-full overflow-hidden rounded-2xl px-3 py-2 text-left transition-colors hover:border-primary/40 focus-visible:outline-none"
+            className="glass-control mt-3 block h-[112px] w-full overflow-hidden rounded-2xl px-3 py-2 text-left transition-colors hover:border-primary/40 focus-visible:outline-none"
           >
-            <div className="flex items-center justify-between border-b border-border/50 pb-1.5 font-mono text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-between border-b border-border/50 pb-1.5 font-mono text-xs font-medium text-muted-foreground">
               <span className="inline-flex min-w-0 items-center gap-1">
-                <GitBranch className="h-2.5 w-2.5 shrink-0" aria-hidden="true" />
+                <GitBranch className="h-3 w-3 shrink-0" aria-hidden="true" />
                 <span className="truncate">
                   {defaultBranch?.name ?? 'main'}
                 </span>
@@ -314,11 +314,11 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
             </div>
 
             {filesQuery.isSuccess && liveRows && liveRows.length === 0 ? (
-              <p className="mt-3 font-mono text-[10px] text-muted-foreground">
+              <p className="mt-3 font-mono text-xs text-muted-foreground">
                 Empty branch · open Studio to add files
               </p>
             ) : (
-              <div className="mt-1.5 space-y-1 font-mono text-[10.5px]">
+              <div className="mt-1.5 space-y-1 font-mono text-xs">
                 {visibleRows.map((row) => (
                   <div
                     key={row.id}
@@ -328,12 +328,12 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
                     <span className="flex min-w-0 items-center gap-1.5">
                       {row.nodeType === 'folder' ? (
                         <Folder
-                          className="h-3 w-3 shrink-0 text-primary"
+                          className="h-3.5 w-3.5 shrink-0 text-primary"
                           aria-hidden="true"
                         />
                       ) : (
                         <FileCode2
-                          className="h-3 w-3 shrink-0 text-muted-foreground"
+                          className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                           aria-hidden="true"
                         />
                       )}
@@ -343,12 +343,12 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
                     </span>
                     {row.locked ? (
                       <Lock
-                        className="h-2.5 w-2.5 shrink-0 text-primary"
+                        className="h-3 w-3 shrink-0 text-primary"
                         aria-hidden="true"
                       />
                     ) : row.id === visibleRows[visibleRows.length - 1]?.id &&
                       hiddenCount > 0 ? (
-                      <span className="shrink-0 text-[9.5px] text-muted-foreground">
+                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
                         +{hiddenCount} more
                       </span>
                     ) : null}
@@ -361,19 +361,19 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
 
         {/* Footer Telemetry + Owner Delete Guard + Open Studio CTA */}
         <div className="mt-3.5 space-y-2.5 border-t border-border/60 pt-3">
-          <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
-              <GitBranch className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+              <GitBranch className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               {project.branchCount ?? 1}
             </span>
             <span
               className="inline-flex items-center gap-1"
               title={`${project.memberCount ?? 1} workspace ${(project.memberCount ?? 1) === 1 ? 'member' : 'members'} · ${project.maxConcurrentEditors} max live editors`}
             >
-              <Users className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+              <Users className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               {project.memberCount ?? 1} · {project.maxConcurrentEditors} live
             </span>
-            <span className="ml-auto text-[10px]">
+            <span className="ml-auto font-mono text-xs">
               {formatRelativeTime(project.updatedAt)}
             </span>
           </div>
@@ -381,7 +381,7 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
           <div className="flex items-center justify-between gap-2">
             {isOwner ? (
               confirmingDelete ? (
-                <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                <div className="flex items-center gap-1.5 font-mono text-xs">
                   <span className="text-destructive">Delete?</span>
                   <button
                     type="button"
@@ -417,7 +417,7 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
                 </button>
               )
             ) : (
-              <span className="font-mono text-[10px] text-muted-foreground">
+              <span className="font-mono text-xs text-muted-foreground">
                 Shared room
               </span>
             )}
@@ -426,9 +426,9 @@ export const WorkspaceCard = React.forwardRef<HTMLElement, WorkspaceCardProps>(
               type="button"
               onClick={() => onOpen(project.id)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all',
+                'inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
                 isActive
-                  ? 'btn-studio-primary font-semibold'
+                  ? 'btn-studio-primary'
                   : 'glass-control text-foreground group-hover:border-primary/50 group-hover:bg-primary group-hover:text-primary-foreground',
               )}
             >
