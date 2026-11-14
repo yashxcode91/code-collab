@@ -4,6 +4,8 @@ import {
   Copy,
   ExternalLink,
   Laptop,
+  Maximize2,
+  Minimize2,
   Play,
   RotateCw,
   Smartphone,
@@ -18,6 +20,8 @@ export interface StudioPreviewPaneProps {
   projectId: string;
   branchId?: string;
   onClose?: () => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   className?: string;
 }
 
@@ -34,6 +38,8 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
   projectId,
   branchId,
   onClose,
+  isFullscreen = false,
+  onToggleFullscreen,
   className = '',
 }) => {
   const {
@@ -115,9 +121,9 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
       data-testid="studio-preview-pane"
     >
       {/* 1. Header Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-[#0d1117] border-b border-zinc-800/80 gap-2 shrink-0 select-none">
+      <div className="flex items-center justify-between px-2.5 py-1.5 bg-[#0d1117] border-b border-zinc-800/80 gap-1.5 shrink-0 select-none overflow-x-auto">
         {/* Left: Status Pill */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium font-mono border bg-zinc-900 border-zinc-800">
             {status === 'RUNNING' && (
               <>
@@ -147,11 +153,11 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
         </div>
 
         {/* Center: Address Bar with Port Selector */}
-        <div className="flex-1 max-w-md mx-2 flex items-center bg-[#161b22] border border-zinc-700/60 rounded px-2 py-1 text-xs font-mono text-zinc-300 gap-1.5">
-          <span className="text-zinc-500 select-none">http://</span>
-          <span className="truncate flex-1">
+        <div className="flex-1 min-w-[90px] max-w-[280px] mx-1 flex items-center bg-[#161b22] border border-zinc-700/60 rounded px-1.5 py-1 text-xs font-mono text-zinc-300 gap-1 overflow-hidden">
+          <span className="text-zinc-500 select-none text-[11px] shrink-0 hidden sm:inline">http://</span>
+          <span className="truncate flex-1 text-[11px]" title={effectivePreviewUrl ?? ''}>
             {effectivePreviewUrl
-              ? `localhost:4000/preview/${projectId.slice(0, 8)}.../${selectedPort}`
+              ? `localhost:4000/preview/${projectId.slice(0, 6)}...`
               : 'sandbox:offline'}
           </span>
 
@@ -160,8 +166,8 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
             aria-label="Select preview port"
             value={selectedPort}
             onChange={(e) => setSelectedPort(Number(e.target.value))}
-            className="bg-zinc-800 hover:bg-zinc-750 text-orange-400 font-mono text-[11px] font-medium border border-zinc-700/80 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
-            title="Switch destination port"
+            className="bg-zinc-800 hover:bg-zinc-750 text-orange-400 font-mono text-[10.5px] font-medium border border-zinc-700/80 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer shrink-0"
+            title={`Switch destination port (current: :${selectedPort}${PORT_LABELS[selectedPort] ? ` - ${PORT_LABELS[selectedPort]}` : ''})`}
           >
             {availablePorts.map((p) => (
               <option key={p} value={p}>
@@ -174,7 +180,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
             <button
               onClick={handleCopyUrl}
               title="Copy preview URL"
-              className="ml-1 text-zinc-400 hover:text-orange-400 transition-colors"
+              className="ml-0.5 text-zinc-400 hover:text-orange-400 transition-colors shrink-0"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
@@ -184,7 +190,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
         {/* Right: Device Toggles & Actions */}
         <div className="flex items-center gap-1 shrink-0">
           {/* Device Breakpoints */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 mr-1">
+          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 shrink-0">
             <button
               onClick={() => setDeviceMode('desktop')}
               className={`p-1 rounded text-xs transition-colors ${
@@ -224,7 +230,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
           <button
             onClick={handleRefresh}
             disabled={status !== 'RUNNING' && status !== 'STARTING'}
-            className="p-1.5 text-zinc-400 hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors"
+            className="p-1 text-zinc-400 hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-400 transition-colors shrink-0"
             title="Reload preview"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-orange-400' : ''}`} />
@@ -236,17 +242,37 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
               href={effectivePreviewUrl}
               target="_blank"
               rel="noreferrer noopener"
-              className="p-1.5 text-zinc-400 hover:text-orange-400 transition-colors"
+              className="p-1 text-zinc-400 hover:text-orange-400 transition-colors shrink-0"
               title="Open preview in new browser tab"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
 
+          {/* Full Screen Preview Toggle */}
+          {onToggleFullscreen && (
+            <button
+              onClick={onToggleFullscreen}
+              className={`p-1 rounded transition-colors shrink-0 ${
+                isFullscreen
+                  ? 'bg-orange-500/20 text-orange-400'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
+              }`}
+              title={isFullscreen ? 'Exit full screen preview (Esc)' : 'Full screen preview'}
+              aria-label={isFullscreen ? 'Exit full screen preview' : 'Full screen preview'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
+
           {/* Logs Drawer Toggle */}
           <button
             onClick={handleToggleLogs}
-            className={`p-1.5 rounded transition-colors ${
+            className={`p-1 rounded transition-colors shrink-0 ${
               showLogs ? 'bg-zinc-800 text-orange-400' : 'text-zinc-400 hover:text-zinc-200'
             }`}
             title="Toggle container logs"
@@ -259,7 +285,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
             <button
               onClick={() => void stop()}
               disabled={isStopping}
-              className="flex items-center gap-1 px-2.5 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-medium transition-colors disabled:opacity-50 shrink-0"
               title="Stop container"
             >
               <Square className="w-3 h-3 fill-current" />
@@ -269,7 +295,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
             <button
               onClick={() => void start()}
               disabled={isStarting}
-              className="flex items-center gap-1 px-2.5 py-1 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors disabled:opacity-50 shadow-sm"
+              className="flex items-center gap-1 px-2 py-1 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors disabled:opacity-50 shadow-sm shrink-0"
               title="Start preview sandbox"
             >
               <Play className="w-3 h-3 fill-current" />
@@ -281,8 +307,9 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 text-zinc-400 hover:text-zinc-100 transition-colors ml-1"
+              className="p-1 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors ml-0.5 shrink-0"
               title="Close preview pane"
+              aria-label="Close preview pane"
             >
               <X className="w-4 h-4" />
             </button>

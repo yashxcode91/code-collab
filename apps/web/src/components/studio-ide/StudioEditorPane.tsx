@@ -776,6 +776,20 @@ export function StudioEditorPane({
             );
           })
         )}
+        {openTabs.length > 1 && (
+          <button
+            type="button"
+            onClick={() => {
+              openTabs.forEach((tab) => handleRequestCloseTab(tab.id));
+            }}
+            title="Close all open files"
+            aria-label="Close all open files"
+            className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-[10.5px] text-muted-foreground hover:bg-foreground/10 hover:text-foreground transition-colors glass-control"
+          >
+            <X className="h-3 w-3" />
+            <span>Close All</span>
+          </button>
+        )}
       </div>
 
       {/* Inline Unsaved Tab Close Confirmation Prompt */}
@@ -905,6 +919,17 @@ export function StudioEditorPane({
             <span className="glass-control rounded-md px-1.5 py-0.5 text-muted-foreground">
               v{activeDraft?.savedVersion ?? activeFile.version}
             </span>
+
+            <button
+              type="button"
+              onClick={() => handleRequestCloseTab(activeFile.id)}
+              title="Close active file"
+              aria-label="Close active file"
+              className="glass-control inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground transition-colors"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+              <span>Close</span>
+            </button>
           </div>
         </div>
       )}

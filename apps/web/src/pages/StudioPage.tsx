@@ -85,6 +85,78 @@ export function StudioPage() {
   const [languageOverride, setLanguageOverride] =
     useState<SupportedLanguage | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
+  const [previewSplitRatio, setPreviewSplitRatio] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('studio:preview-split');
+      if (saved) {
+        const num = parseFloat(saved);
+        if (!isNaN(num) && num >= 25 && num <= 65) return num;
+      }
+    } catch {
+      // Ignore storage errors in restricted contexts
+    }
+    return 48;
+  });
+  const [isDraggingSplitter, setIsDraggingSplitter] = useState(false);
+  const workspaceSplitContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingSplitter(true);
+  }, []);
+
+  // Strict limits for dragging: clamp ratio between 25% and 65% and enforce minimum pixel widths
+  useEffect(() => {
+    if (!isDraggingSplitter) return;
+
+    const MIN_EDITOR_PX = 400;
+    const MIN_PREVIEW_PX = 360;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!workspaceSplitContainerRef.current) return;
+      const rect = workspaceSplitContainerRef.current.getBoundingClientRect();
+      const totalWidth = rect.width;
+      if (totalWidth <= 0) return;
+
+      let previewWidthPx = rect.right - e.clientX;
+      const maxPreviewPx = Math.max(MIN_PREVIEW_PX, totalWidth - MIN_EDITOR_PX);
+      previewWidthPx = Math.min(Math.max(previewWidthPx, MIN_PREVIEW_PX), maxPreviewPx);
+
+      let previewRatio = Math.round((previewWidthPx / totalWidth) * 100);
+      // Strict clamping: preview ratio strictly bounded between 25% and 65%
+      previewRatio = Math.min(Math.max(previewRatio, 25), 65);
+      setPreviewSplitRatio(previewRatio);
+      try {
+        localStorage.setItem('studio:preview-split', String(previewRatio));
+      } catch {
+        // Ignore storage errors
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSplitter(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingSplitter]);
+
+  // Escape key exits fullscreen preview
+  useEffect(() => {
+    if (!isPreviewFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsPreviewFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPreviewFullscreen]);
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const autoOpenedBranchRef = useRef<string | null>(null);
 
@@ -1068,7 +1140,12 @@ export function StudioPage() {
         onSetRightPanelTab={setRightPanelTab}
         onOpenSemanticSearch={() => setIsSemanticSearchOpen(true)}
         isPreviewOpen={isPreviewOpen}
-        onTogglePreview={() => setIsPreviewOpen((v) => !v)}
+        onTogglePreview={() =>
+          setIsPreviewOpen((v) => {
+            if (v) setIsPreviewFullscreen(false);
+            return !v;
+          })
+        }
         isTerminalOpen={isTerminalOpen}
         onToggleTerminal={() => setIsTerminalOpen((v) => !v)}
       />
@@ -1116,112 +1193,166 @@ export function StudioPage() {
             }}
           />
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-            <StudioEditorPane
-              project={project}
-              branch={activeBranch}
-              files={files}
-              openTabIds={openTabIds}
-              activeFile={activeFile}
-              activeDraft={activeDraft}
-              activeConflict={activeConflict}
-              aiDiffReview={
-                aiDiffReview
-                  ? {
-                      ...aiDiffReview,
-                      onAccept: handleAcceptAiDiff,
-                      onDiscard: handleDiscardAiDiff,
-                    }
-                  : null
+          {/* Main IDE workspace split container */}
+          <div
+            ref={workspaceSplitContainerRef}
+            className="flex min-h-0 min-w-0 flex-1 relative items-stretch gap-0"
+          >
+            <div
+              style={
+                isPreviewFullscreen
+                  ? { display: 'none' }
+                  : isPreviewOpen
+                    ? { width: `${100 - previewSplitRatio}%`, minWidth: 400 }
+                    : { width: '100%' }
               }
-              isFileLoading={activeFileDetailQuery.isLoading}
-              fileLoadError={
-                activeFileDetailQuery.isError
-                  ? activeFileDetailQuery.error instanceof Error
-                    ? activeFileDetailQuery.error.message
-                    : 'Unable to fetch file content'
-                  : null
-              }
-              saveError={saveError}
-              isSaving={saveFileMutation.isPending}
-              canEditActiveFile={canEditActiveFile}
-              buffers={buffers}
-              currentUserId={currentUserId}
-              collabConnectionStatus={collab.connectionStatus}
-              collabSyncStatus={collab.syncStatus}
-              collabRoomReady={collab.roomReady}
-              collabActiveRoomKey={collab.activeRoomKey}
-              collabYText={collab.ytext}
-              presenceUsers={collab.presenceUsers}
-              preventSameLineEdit={resolvedPreventSameLineEdit}
-              realtimeError={collab.realtimeError}
-              focusModeEnabled={focusModeEnabled}
-              scrollToLineRequest={scrollToLineRequest}
-              onSelectTab={openFileTab}
-              onCloseTab={closeFileTab}
-              onChangeContent={updateDraftContent}
-              onChangeCursor={setCursorPosition}
-              onSaveFile={handleSaveFile}
-              onDiscardDraft={discardFileDraft}
-              onResolveConflictReload={handleResolveConflictReload}
-              onResolveConflictOverwrite={handleResolveConflictOverwrite}
-              onDismissSaveError={() => setSaveError(null)}
-              onDismissRealtimeError={collab.clearRealtimeError}
-              onToggleFocusMode={toggleFocusMode}
-              onPublishAwareness={collab.publishAwareness}
-              onRetryFileLoad={() => void activeFileDetailQuery.refetch()}
-              onChangeSelection={setActiveSelection}
-            />
+              className={cn(
+                'flex min-h-0 min-w-0 flex-1 flex-col gap-3',
+                isPreviewFullscreen && 'hidden'
+              )}
+            >
+              <StudioEditorPane
+                project={project}
+                branch={activeBranch}
+                files={files}
+                openTabIds={openTabIds}
+                activeFile={activeFile}
+                activeDraft={activeDraft}
+                activeConflict={activeConflict}
+                aiDiffReview={
+                  aiDiffReview
+                    ? {
+                        ...aiDiffReview,
+                        onAccept: handleAcceptAiDiff,
+                        onDiscard: handleDiscardAiDiff,
+                      }
+                    : null
+                }
+                isFileLoading={activeFileDetailQuery.isLoading}
+                fileLoadError={
+                  activeFileDetailQuery.isError
+                    ? activeFileDetailQuery.error instanceof Error
+                      ? activeFileDetailQuery.error.message
+                      : 'Unable to fetch file content'
+                    : null
+                }
+                saveError={saveError}
+                isSaving={saveFileMutation.isPending}
+                canEditActiveFile={canEditActiveFile}
+                buffers={buffers}
+                currentUserId={currentUserId}
+                collabConnectionStatus={collab.connectionStatus}
+                collabSyncStatus={collab.syncStatus}
+                collabRoomReady={collab.roomReady}
+                collabActiveRoomKey={collab.activeRoomKey}
+                collabYText={collab.ytext}
+                presenceUsers={collab.presenceUsers}
+                preventSameLineEdit={resolvedPreventSameLineEdit}
+                realtimeError={collab.realtimeError}
+                focusModeEnabled={focusModeEnabled}
+                scrollToLineRequest={scrollToLineRequest}
+                onSelectTab={openFileTab}
+                onCloseTab={closeFileTab}
+                onChangeContent={updateDraftContent}
+                onChangeCursor={setCursorPosition}
+                onSaveFile={handleSaveFile}
+                onDiscardDraft={discardFileDraft}
+                onResolveConflictReload={handleResolveConflictReload}
+                onResolveConflictOverwrite={handleResolveConflictOverwrite}
+                onDismissSaveError={() => setSaveError(null)}
+                onDismissRealtimeError={collab.clearRealtimeError}
+                onToggleFocusMode={toggleFocusMode}
+                onPublishAwareness={collab.publishAwareness}
+                onRetryFileLoad={() => void activeFileDetailQuery.refetch()}
+                onChangeSelection={setActiveSelection}
+              />
 
-            <StudioExecutionConsole
-              open={consoleOpen}
-              expanded={consoleExpanded}
-              language={resolvedExecutionLanguage}
-              onChangeLanguage={setLanguageOverride}
-              activeFile={activeFile}
-              activeRun={execution.activeRun}
-              runs={execution.runs}
-              runsLoading={execution.runsLoading}
-              segments={execution.segments}
-              elapsedMs={execution.elapsedMs}
-              consoleError={execution.consoleError}
-              canRun={isEditorOrOwner}
-              isOwner={project.currentUserRole === 'owner'}
-              currentUserId={currentUserId}
-              isStarting={execution.isStarting}
-              isCancelling={execution.isCancelling}
-              hasRunnableSource={hasRunnableSource}
-              onRun={handleRunActiveFile}
-              onCancel={execution.cancelActiveRun}
-              onSendStdin={(line) => execution.sendStdin(line, true)}
-              onSelectRun={setActiveRunId}
-              onClearOutput={execution.clearOutputSegments}
-              onDismissError={execution.clearConsoleError}
-              onToggleExpanded={toggleConsoleExpanded}
-              onClose={() => setConsoleOpen(false)}
-              onDebugWithAi={handleDebugWithAi}
-            />
+              <StudioExecutionConsole
+                open={consoleOpen}
+                expanded={consoleExpanded}
+                language={resolvedExecutionLanguage}
+                onChangeLanguage={setLanguageOverride}
+                activeFile={activeFile}
+                activeRun={execution.activeRun}
+                runs={execution.runs}
+                runsLoading={execution.runsLoading}
+                segments={execution.segments}
+                elapsedMs={execution.elapsedMs}
+                consoleError={execution.consoleError}
+                canRun={isEditorOrOwner}
+                isOwner={project.currentUserRole === 'owner'}
+                currentUserId={currentUserId}
+                isStarting={execution.isStarting}
+                isCancelling={execution.isCancelling}
+                hasRunnableSource={hasRunnableSource}
+                onRun={handleRunActiveFile}
+                onCancel={execution.cancelActiveRun}
+                onSendStdin={(line) => execution.sendStdin(line, true)}
+                onSelectRun={setActiveRunId}
+                onClearOutput={execution.clearOutputSegments}
+                onDismissError={execution.clearConsoleError}
+                onToggleExpanded={toggleConsoleExpanded}
+                onClose={() => setConsoleOpen(false)}
+                onDebugWithAi={handleDebugWithAi}
+              />
 
-            {isTerminalOpen && (
-              <div className="h-64 border-t border-zinc-800 z-20 shrink-0">
-                <StudioTerminalPane
+              {isTerminalOpen && (
+                <div className="h-64 border-t border-zinc-800 z-20 shrink-0">
+                  <StudioTerminalPane
+                    projectId={projectId}
+                    branchId={activeBranch?.id}
+                    onClose={() => setIsTerminalOpen(false)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {isPreviewOpen && !isPreviewFullscreen && (
+              /* Vertical Draggable Splitter Handle */
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize Editor and Preview panels"
+                aria-valuenow={previewSplitRatio}
+                onMouseDown={handleSplitterMouseDown}
+                className="group relative flex w-3.5 cursor-col-resize select-none items-center justify-center shrink-0 z-30 mx-0.5 hover:bg-orange-500/10 active:bg-orange-500/20 rounded-md transition-colors"
+                title="Drag to resize Editor and Preview panels (25% - 65%)"
+              >
+                <div className="w-1 h-9 rounded-full bg-zinc-700/80 group-hover:bg-orange-500 group-hover:h-12 group-active:bg-orange-500 transition-all shadow-sm" />
+              </div>
+            )}
+
+            {isPreviewOpen && (
+              /* Live Preview Container */
+              <div
+                style={
+                  isPreviewFullscreen
+                    ? { width: '100%', flex: '1 1 100%' }
+                    : { width: `${previewSplitRatio}%`, minWidth: 360 }
+                }
+                className={cn(
+                  'h-full flex flex-col shrink-0 z-10 rounded-xl overflow-hidden shadow-2xl border border-zinc-800 transition-[width] duration-150 ease-out',
+                  isPreviewFullscreen ? 'flex-1 w-full' : ''
+                )}
+              >
+                <StudioPreviewPane
                   projectId={projectId}
                   branchId={activeBranch?.id}
-                  onClose={() => setIsTerminalOpen(false)}
+                  isFullscreen={isPreviewFullscreen}
+                  onToggleFullscreen={() => setIsPreviewFullscreen((v) => !v)}
+                  onClose={() => {
+                    setIsPreviewOpen(false);
+                    setIsPreviewFullscreen(false);
+                  }}
                 />
               </div>
             )}
-          </div>
 
-          {isPreviewOpen && (
-            <div className="w-1/2 min-w-[360px] max-w-[850px] h-full flex flex-col shrink-0 z-10 rounded-xl overflow-hidden shadow-2xl border border-zinc-800">
-              <StudioPreviewPane
-                projectId={projectId}
-                branchId={activeBranch?.id}
-                onClose={() => setIsPreviewOpen(false)}
-              />
-            </div>
-          )}
+            {/* Dragging Overlay to prevent pointer event capture by Monaco and Preview iframe */}
+            {isDraggingSplitter && (
+              <div className="fixed inset-0 z-50 cursor-col-resize select-none" />
+            )}
+          </div>
 
           <StudioInspectorDrawer
             project={project}

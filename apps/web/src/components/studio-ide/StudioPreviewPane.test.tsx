@@ -160,4 +160,36 @@ describe('StudioPreviewPane Component', () => {
     const iframe = screen.getByTitle('CodeCollab Sandbox Preview');
     expect(iframe.getAttribute('src')).toBe('http://localhost:4000/preview/test-proj-id/3000/?token=abc');
   });
+
+  it('toggles full screen preview mode when clicking full screen button', () => {
+    mockStatus = 'RUNNING';
+    const mockToggleFullscreen = vi.fn();
+
+    const { rerender } = render(
+      <StudioPreviewPane
+        projectId="test-proj-id"
+        isFullscreen={false}
+        onToggleFullscreen={mockToggleFullscreen}
+      />
+    );
+
+    const fsBtn = screen.getByTitle('Full screen preview');
+    expect(fsBtn).toBeDefined();
+    fireEvent.click(fsBtn);
+    expect(mockToggleFullscreen).toHaveBeenCalledTimes(1);
+
+    // Rerender in fullscreen state
+    rerender(
+      <StudioPreviewPane
+        projectId="test-proj-id"
+        isFullscreen={true}
+        onToggleFullscreen={mockToggleFullscreen}
+      />
+    );
+
+    const exitBtn = screen.getByTitle('Exit full screen preview (Esc)');
+    expect(exitBtn).toBeDefined();
+    fireEvent.click(exitBtn);
+    expect(mockToggleFullscreen).toHaveBeenCalledTimes(2);
+  });
 });

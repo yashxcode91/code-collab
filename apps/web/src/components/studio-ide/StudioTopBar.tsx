@@ -382,10 +382,11 @@ export function StudioTopBar({
 
   return (
     <header className="glass-surface relative z-40 w-full shrink-0 rounded-none border-x-0 border-t-0">
-      <div className="px-3 py-1.5 sm:px-5">
-        <div className="relative z-20 flex flex-wrap items-center justify-between gap-2">
+      <div className="px-3 py-1.5 sm:px-5 flex flex-col gap-1.5">
+        {/* Tier 1: Workspace Breadcrumbs & Runtime Operations */}
+        <div className="relative z-20 flex items-center justify-between gap-2 min-w-0">
           {/* Group 1 (Left): Navigation, Brand, Explorer Toggle, Workspace Title & Branch Switcher */}
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5 shrink-0">
             <Link
               to="/"
               title="Back to Workspaces"
@@ -728,8 +729,8 @@ export function StudioTopBar({
             )}
           </div>
 
-          {/* Group 2 (Center): Run, Console, Active File Lock & Save Actions */}
-          <div className="flex items-center gap-1">
+          {/* Group 2 (Right): Run, Console, Active File Lock & Save Actions */}
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
             {canRunCode &&
               (isExecutionActive ? (
                 <button
@@ -965,9 +966,12 @@ export function StudioTopBar({
               </>
             )}
           </div>
+        </div>
 
-          {/* Group 3 (Right): Inspector Tabs, Window Expand & Theme */}
-          <div className="flex items-center gap-1">
+        {/* Tier 2: Workspace Feature Drawers (Left) & Management/Theme Utilities (Right) */}
+        <div className="relative z-20 flex items-center justify-between gap-2 border-t border-border/40 pt-1.5 min-w-0">
+          {/* Left: Tools & Feature Drawers */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar min-w-0">
             <button
               type="button"
               onClick={() =>
@@ -1099,7 +1103,10 @@ export function StudioTopBar({
                 <span className="hidden lg:inline">Terminal</span>
               </button>
             )}
+          </div>
 
+          {/* Right: Team, Access, Settings, Window Expand & Theme */}
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
             <button
               type="button"
               onClick={() =>
