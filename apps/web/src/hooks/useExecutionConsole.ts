@@ -367,7 +367,8 @@ export function useExecutionConsole({
         ((err.runId && err.runId === activeRunIdRef.current) ||
           (err.fileId && err.fileId === activeRunFileIdRef.current))
       ) {
-        seededRunIdRef.current = activeRunIdRef.current;
+        activeRunIdRef.current = null;
+        seededRunIdRef.current = null;
         setActiveRun(null);
         setSegments([]);
         setElapsedMs(0);
