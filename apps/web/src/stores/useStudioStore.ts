@@ -8,7 +8,8 @@ export type InspectorTab =
   | 'members'
   | 'access'
   | 'settings'
-  | 'ai';
+  | 'ai'
+  | 'agent';
 
 export interface ActiveCodeSelection {
   startLine: number;

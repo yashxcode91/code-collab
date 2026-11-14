@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  Bot,
   Check,
   ChevronDown,
   GitBranch,
@@ -1035,6 +1036,25 @@ export function StudioTopBar({
             >
               <Sparkles className="h-3.5 w-3.5 text-purple-500" aria-hidden="true" />
               <span className="hidden lg:inline">AI</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                onSetRightPanelTab(
+                  rightPanelTab === 'agent' ? 'closed' : 'agent',
+                )
+              }
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors',
+                rightPanelTab === 'agent'
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground',
+              )}
+              title="Autonomous Agent Workstation (Multi-file plan & self-healing execution)"
+            >
+              <Bot className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+              <span className="hidden lg:inline">Agent</span>
             </button>
 
             <button

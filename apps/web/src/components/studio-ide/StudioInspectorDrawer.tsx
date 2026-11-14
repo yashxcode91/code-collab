@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 import {
   AlertCircle,
+  Bot,
   CheckCircle2,
   Folder,
   FileCode2,
@@ -42,6 +43,7 @@ import {
 import { StudioChatPanel } from '@/components/studio-ide/StudioChatPanel';
 import { StudioHistoryPanel } from '@/components/studio-ide/StudioHistoryPanel';
 import { StudioAiDrawer } from '@/components/studio-ide/StudioAiDrawer';
+import { StudioAgentDrawer } from '@/components/studio-ide/StudioAgentDrawer';
 import { buildNodeBreadcrumb } from '@/components/studio-ide/studioLanguage';
 import type { TypingPeer } from '@/hooks/useWorkspaceChat';
 import { ApiClientError } from '@/lib/api';
@@ -584,7 +586,24 @@ export function StudioInspectorDrawer({
                   </span>
                 </>
               )}
+              {resolvedTab === 'agent' && (
+                <>
+                  <Bot
+                    className="h-3.5 w-3.5 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+                    Agent Workstation
+                  </span>
+                </>
+              )}
             </div>
+
+            {resolvedTab === 'agent' && (
+              <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-primary">
+                Gemini Pro
+              </span>
+            )}
 
             {resolvedTab === 'ai' && (
               <span className="glass-control shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] text-purple-600 dark:text-purple-300">
@@ -678,6 +697,20 @@ export function StudioInspectorDrawer({
 
             <button
               type="button"
+              onClick={() => onChangeTab('agent')}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-medium transition-colors',
+                resolvedTab === 'agent'
+                  ? 'border border-primary/45 bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Agent</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => onChangeTab('members')}
               className={cn(
                 'inline-flex items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-medium transition-colors',
@@ -736,7 +769,7 @@ export function StudioInspectorDrawer({
         <div
           className={cn(
             'relative z-10 min-h-0 flex-1',
-            resolvedTab === 'chat' || resolvedTab === 'history' || resolvedTab === 'ai'
+            resolvedTab === 'chat' || resolvedTab === 'history' || resolvedTab === 'ai' || resolvedTab === 'agent'
               ? 'flex flex-col overflow-hidden p-0'
               : 'space-y-4 overflow-y-auto p-3.5',
           )}
@@ -752,6 +785,14 @@ export function StudioInspectorDrawer({
               activeFileContent={aiState?.activeFileContent}
               onApplyCode={aiState?.onApplyCode}
               onSelectCitation={aiState?.onSelectCitation}
+            />
+          )}
+
+          {/* ==================== -1.5. AUTONOMOUS AGENT TAB ==================== */}
+          {resolvedTab === 'agent' && branch && (
+            <StudioAgentDrawer
+              projectId={project.id}
+              branchId={branch.id}
             />
           )}
 
