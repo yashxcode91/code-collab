@@ -175,3 +175,57 @@ export const verifyOAuthStateToken = (token: string): OAuthStatePayload => {
     ...(decoded.codeVerifier ? { codeVerifier: decoded.codeVerifier } : {}),
   };
 };
+
+export interface PreviewJwtPayload {
+  purpose: 'sandbox_preview';
+  projectId: string;
+  branchId: string;
+  userId: string;
+}
+
+/** Signs a 2-hour signed JWT granting temporary preview access to a specific sandbox. */
+export const signPreviewToken = (payload: {
+  projectId: string;
+  branchId: string;
+  userId: string;
+}): string => {
+  const { secret } = getJwtConfig();
+  return jwt.sign(
+    {
+      purpose: 'sandbox_preview',
+      ...payload,
+    },
+    secret,
+    {
+      algorithm: 'HS256',
+      expiresIn: 7200, // 2 hours
+    }
+  );
+};
+
+/** Verifies preview token signature and claims. */
+export const verifyPreviewToken = (
+  token: string
+): { projectId: string; branchId: string; userId: string } => {
+  const { secret } = getJwtConfig();
+  const decoded = jwt.verify(token, secret, {
+    algorithms: ['HS256'],
+  }) as JwtPayload;
+
+  if (
+    typeof decoded !== 'object' ||
+    decoded === null ||
+    decoded.purpose !== 'sandbox_preview' ||
+    typeof decoded.projectId !== 'string' ||
+    typeof decoded.branchId !== 'string' ||
+    typeof decoded.userId !== 'string'
+  ) {
+    throw new jwt.JsonWebTokenError('Malformed preview sandbox token');
+  }
+
+  return {
+    projectId: decoded.projectId,
+    branchId: decoded.branchId,
+    userId: decoded.userId,
+  };
+};
