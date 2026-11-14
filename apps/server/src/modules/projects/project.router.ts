@@ -30,6 +30,7 @@ import { createRateLimitMiddleware } from '../../middleware/rateLimit.middleware
 import { validateBody } from '../../middleware/validate.middleware';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
+  createAiConversationController,
   deleteAiConversationController,
   getAiConversationDetailController,
   getBranchIndexStatusController,
@@ -327,6 +328,12 @@ projectRouter.get(
   '/:projectId/branches/:branchId/ai/conversations',
   aiReadLimiter,
   asyncHandler(listAiConversationsController)
+);
+
+projectRouter.post(
+  '/:projectId/branches/:branchId/ai/conversations',
+  aiPromptLimiter,
+  asyncHandler(createAiConversationController)
 );
 
 projectRouter.get(

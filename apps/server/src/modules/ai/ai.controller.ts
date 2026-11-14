@@ -4,6 +4,7 @@ import {
   assertProjectAccess,
 } from '../projects/project.auth';
 import {
+  createAiConversation,
   deleteAiConversation,
   getAiConversationDetail,
   listAiConversations,
@@ -60,6 +61,30 @@ export const listAiConversationsController = async (
   );
 
   res.json({ conversations });
+};
+
+/**
+ * Explicitly creates a new AI conversation thread.
+ */
+export const createAiConversationController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { projectId, branchId } = req.params as {
+    projectId: string;
+    branchId: string;
+  };
+  const userId = req.user!.id;
+  const title = (req.body?.title as string | undefined)?.trim();
+
+  const conversation = await createAiConversation(
+    projectId,
+    branchId,
+    userId,
+    title
+  );
+
+  res.status(201).json({ conversation });
 };
 
 /**

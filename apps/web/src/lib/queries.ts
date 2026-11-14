@@ -644,6 +644,22 @@ export async function fetchAiConversations(
   return res.conversations;
 }
 
+/** Explicitly creates a new AI conversation thread. */
+export async function createAiConversation(
+  projectId: string,
+  branchId: string,
+  title?: string,
+): Promise<AiConversationSummaryDto> {
+  const res = await apiRequest<{ conversation: AiConversationSummaryDto }>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/ai/conversations`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    },
+  );
+  return res.conversation;
+}
+
 /** Fetches full message history of an AI conversation. */
 export async function fetchAiConversationDetail(
   projectId: string,

@@ -318,6 +318,30 @@ export const createOrGetAiConversation = async (
   });
 };
 
+export const createAiConversation = async (
+  projectId: string,
+  branchId: string,
+  userId: string,
+  title?: string
+): Promise<AiConversationSummaryDto> => {
+  assertValidUuid(projectId, 'Project');
+  assertValidUuid(branchId, 'Branch');
+  await assertProjectAccess(projectId, userId);
+  await assertBranchInProject(projectId, branchId);
+
+  const cleanTitle = title?.trim() || 'New Conversation';
+  const created = await prisma.aiConversation.create({
+    data: {
+      projectId,
+      branchId,
+      userId,
+      title: cleanTitle,
+    },
+  });
+
+  return mapAiConversationSummaryDto(created);
+};
+
 export const listAiConversations = async (
   projectId: string,
   branchId: string,
@@ -598,10 +622,18 @@ export const streamAiPrompt = async (params: StreamAiPromptParams): Promise<void
       },
     });
 
-    // Update conversation timestamp
+    // Update conversation timestamp and set title from prompt if currently default
+    const newTitle =
+      conversation.title === 'New Conversation' && input.prompt
+        ? input.prompt.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 45) || conversation.title
+        : undefined;
+
     await prisma.aiConversation.update({
       where: { id: conversation.id },
-      data: { updatedAt: new Date() },
+      data: {
+        updatedAt: new Date(),
+        ...(newTitle ? { title: newTitle } : {}),
+      },
     });
 
     // 7. Emit done frame with persisted message payload
