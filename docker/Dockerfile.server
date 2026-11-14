@@ -1,0 +1,69 @@
+# =====================================================================
+# CodeCollab Production Server Dockerfile (Multi-Stage Build)
+# Stage 1: Build TypeScript binaries and prune devDependencies
+# Stage 2: Minimal, hardened, non-root Node.js Alpine runtime
+# =====================================================================
+
+# -------------------------------------------------------------
+# Stage 1: Builder
+# -------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+
+# Enable Corepack and pin exact pnpm version matching workspace
+RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
+
+# Copy workspace metadata for deterministic dependency caching
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/tsconfig/ packages/tsconfig/
+COPY packages/shared/ packages/shared/
+COPY packages/database/ packages/database/
+COPY apps/server/ packages/../apps/server/
+
+# Install all workspace dependencies
+RUN pnpm install --frozen-lockfile
+
+# Generate Prisma Client & compile shared packages
+RUN pnpm --filter @codecollab/database run generate
+RUN pnpm --filter @codecollab/shared run build
+RUN pnpm --filter @codecollab/database run build
+
+# Compile TypeScript server to dist/
+RUN pnpm --filter @codecollab/server run build
+
+# Deploy pruned production output bundle
+RUN pnpm --filter @codecollab/server --prod deploy /prod/server
+
+# Ensure generated prisma client runtime is available in production node_modules
+RUN cp -r /build/node_modules/.pnpm/@prisma+client* /prod/server/node_modules/ 2>/dev/null || true
+
+# -------------------------------------------------------------
+# Stage 2: Hardened Production Runner
+# -------------------------------------------------------------
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=4000
+
+# Install minimal healthcheck tool
+RUN apk add --no-cache wget ca-certificates
+
+# Copy deployed production files from builder
+COPY --from=builder /prod/server /app
+
+# Ensure non-root node user ownership
+RUN chown -R node:node /app
+
+# Run as unprivileged node user (UID 1000)
+USER node
+
+EXPOSE 4000
+
+# Automated container healthcheck against the production health route
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/api/health || exit 1
+
+CMD ["node", "dist/index.js"]

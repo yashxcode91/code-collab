@@ -1,0 +1,51 @@
+# =====================================================================
+# CodeCollab Production Web Dockerfile (Multi-Stage Build)
+# Stage 1: Build minified Vite SPA bundle
+# Stage 2: Ultra-lightweight Nginx Alpine web server (< 25MB)
+# =====================================================================
+
+# -------------------------------------------------------------
+# Stage 1: Builder
+# -------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+
+# Enable Corepack and prepare pinned pnpm
+RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
+
+# Copy workspace metadata for deterministic caching
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/tsconfig/ packages/tsconfig/
+COPY packages/shared/ packages/shared/
+COPY apps/web/ apps/web/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Build shared types & packages
+RUN pnpm --filter @codecollab/shared run build
+
+# Build optimized Vite production bundle
+RUN pnpm --filter @codecollab/web run build
+
+# -------------------------------------------------------------
+# Stage 2: Production Nginx Web Server
+# -------------------------------------------------------------
+FROM nginx:1.27-alpine AS runner
+
+# Remove default boilerplate site configuration
+RUN rm -rf /etc/nginx/conf.d/*
+
+# Copy built SPA artifacts to web root
+COPY --from=builder /build/apps/web/dist /usr/share/nginx/html
+
+# Copy optimized SPA nginx configuration
+COPY docker/nginx/spa.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

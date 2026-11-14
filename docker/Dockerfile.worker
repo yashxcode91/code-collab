@@ -1,0 +1,47 @@
+# =====================================================================
+# CodeCollab Background Execution Worker Dockerfile
+# Stage 1: Build TypeScript worker service
+# Stage 2: Hardened Alpine runtime with Docker CLI client
+# =====================================================================
+
+# -------------------------------------------------------------
+# Stage 1: Builder
+# -------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+
+RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
+
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/tsconfig/ packages/tsconfig/
+COPY packages/shared/ packages/shared/
+COPY packages/database/ packages/database/
+COPY apps/worker/ apps/worker/
+
+RUN pnpm install --frozen-lockfile
+
+RUN pnpm --filter @codecollab/database run generate
+RUN pnpm --filter @codecollab/shared run build
+RUN pnpm --filter @codecollab/database run build
+
+RUN pnpm --filter @codecollab/worker run build
+RUN pnpm --filter @codecollab/worker --prod deploy /prod/worker
+
+RUN cp -r /build/node_modules/.pnpm/@prisma+client* /prod/worker/node_modules/ 2>/dev/null || true
+
+# -------------------------------------------------------------
+# Stage 2: Hardened Production Worker
+# -------------------------------------------------------------
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Install Docker CLI to communicate with the host Docker daemon socket
+RUN apk add --no-cache docker-cli ca-certificates
+
+COPY --from=builder /prod/worker /app
+
+CMD ["node", "dist/index.js"]
