@@ -13,10 +13,17 @@ const {
   fetchAiConversationsMock,
   fetchAiConversationDetailMock,
   deleteAiConversationMock,
+  fetchCodebaseIndexStatusMock,
 } = vi.hoisted(() => ({
   fetchAiConversationsMock: vi.fn(),
   fetchAiConversationDetailMock: vi.fn(),
   deleteAiConversationMock: vi.fn(),
+  fetchCodebaseIndexStatusMock: vi.fn().mockResolvedValue({
+    status: 'IDLE',
+    totalFiles: 0,
+    indexedFiles: 0,
+    totalChunks: 0,
+  }),
 }));
 
 vi.mock('@/lib/queries', async (importOriginal) => {
@@ -26,6 +33,7 @@ vi.mock('@/lib/queries', async (importOriginal) => {
     fetchAiConversations: fetchAiConversationsMock,
     fetchAiConversationDetail: fetchAiConversationDetailMock,
     deleteAiConversation: deleteAiConversationMock,
+    fetchCodebaseIndexStatus: fetchCodebaseIndexStatusMock,
   };
 });
 
