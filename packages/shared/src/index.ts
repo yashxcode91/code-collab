@@ -28,3 +28,7 @@ export * from './schemas/snapshot';
 // Export Day 6 CodeCollab AI Assistant contracts and Zod schemas
 export * from './types/ai';
 export * from './schemas/ai';
+
+// Export Day 8 Autonomous Agent contracts and Zod schemas
+export * from './types/agent';
+export * from './schemas/agent';
