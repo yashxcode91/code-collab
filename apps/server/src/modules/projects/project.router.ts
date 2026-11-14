@@ -3,13 +3,16 @@ import {
   AddProjectMemberSchema,
   AI_LIMITS,
   AiPromptRequestSchema,
+  ApplyStagedFilesSchema,
   CodebaseIndexRequestSchema,
+  CreateAgentSessionSchema,
   CreateBranchSchema,
   CreateChatMessageSchema,
   CreateExecutionRunSchema,
   CreateFileNodeSchema,
   CreateProjectSchema,
   CreateSnapshotSchema,
+  DiscardStagedFilesSchema,
   MergeBranchSchema,
   RestoreSnapshotSchema,
   SemanticSearchRequestSchema,
@@ -33,6 +36,14 @@ import {
   streamAiPromptController,
   triggerBranchIndexingController,
 } from '../ai/ai.controller';
+import {
+  applyStagedFilesController,
+  cancelAgentSessionController,
+  createAgentSessionController,
+  discardStagedFilesController,
+  getAgentSessionController,
+  streamAgentSessionController,
+} from '../agent/agent.controller';
 import {
   createProjectChatMessageController,
   listProjectChatMessagesController,
@@ -340,4 +351,47 @@ projectRouter.post(
   aiReadLimiter,
   validateBody(SemanticSearchRequestSchema),
   asyncHandler(semanticSearchController)
+);
+
+// =====================================================================
+// Day 8: Autonomous Multi-File Agent Routes
+// =====================================================================
+
+projectRouter.post(
+  '/:projectId/branches/:branchId/agent/sessions',
+  aiPromptLimiter,
+  validateBody(CreateAgentSessionSchema),
+  asyncHandler(createAgentSessionController)
+);
+
+projectRouter.get(
+  '/:projectId/branches/:branchId/agent/sessions/:sessionId',
+  aiReadLimiter,
+  asyncHandler(getAgentSessionController)
+);
+
+projectRouter.post(
+  '/:projectId/branches/:branchId/agent/sessions/:sessionId/stream',
+  aiPromptLimiter,
+  asyncHandler(streamAgentSessionController)
+);
+
+projectRouter.post(
+  '/:projectId/branches/:branchId/agent/sessions/:sessionId/apply',
+  aiPromptLimiter,
+  validateBody(ApplyStagedFilesSchema),
+  asyncHandler(applyStagedFilesController)
+);
+
+projectRouter.delete(
+  '/:projectId/branches/:branchId/agent/sessions/:sessionId/staged',
+  aiPromptLimiter,
+  validateBody(DiscardStagedFilesSchema),
+  asyncHandler(discardStagedFilesController)
+);
+
+projectRouter.post(
+  '/:projectId/branches/:branchId/agent/sessions/:sessionId/cancel',
+  aiPromptLimiter,
+  asyncHandler(cancelAgentSessionController)
 );
