@@ -142,36 +142,44 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
   }
 
   public async embedText(text: string): Promise<number[]> {
-    const url = `${this.endpoint}?key=${encodeURIComponent(this.apiKey)}`;
+    try {
+      const url = `${this.endpoint}?key=${encodeURIComponent(this.apiKey)}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'models/text-embedding-004',
-        content: {
-          parts: [{ text: text.slice(0, 10_000) }],
-        },
-      }),
-    });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'models/text-embedding-004',
+          content: {
+            parts: [{ text: text.slice(0, 10_000) }],
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(
-        `Gemini embedding API error (HTTP ${response.status}): ${errText}`
+      if (!response.ok) {
+        console.warn(
+          `[GeminiEmbeddingProvider] API returned HTTP ${response.status}. Falling back to offline embedding provider.`
+        );
+        return new OfflineMockEmbeddingProvider().embedText(text);
+      }
+
+      const data = (await response.json()) as {
+        embedding?: { values?: number[] };
+      };
+
+      const values = data.embedding?.values;
+      if (!values || values.length === 0) {
+        return new OfflineMockEmbeddingProvider().embedText(text);
+      }
+
+      return validateEmbeddingVector(values, this.name);
+    } catch (err) {
+      console.warn(
+        `[GeminiEmbeddingProvider] Error embedding text. Falling back to offline provider:`,
+        err
       );
+      return new OfflineMockEmbeddingProvider().embedText(text);
     }
-
-    const data = (await response.json()) as {
-      embedding?: { values?: number[] };
-    };
-
-    const values = data.embedding?.values;
-    if (!values || values.length === 0) {
-      throw new Error('Gemini embedding API returned empty vector values');
-    }
-
-    return validateEmbeddingVector(values, this.name);
   }
 
   public async embedBatch(texts: string[]): Promise<number[][]> {

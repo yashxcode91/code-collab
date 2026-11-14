@@ -1458,6 +1458,7 @@ export function StudioPage() {
           onClose={() => setIsSemanticSearchOpen(false)}
           projectId={project.id}
           branchId={activeBranch.id}
+          files={files}
           onSelectResult={(fileId, startLine, endLine) => {
             openFileTab(fileId);
             setScrollToLineRequest({

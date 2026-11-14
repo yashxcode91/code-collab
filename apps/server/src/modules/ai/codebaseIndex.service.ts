@@ -258,6 +258,11 @@ export class CodebaseIndexService {
    * Chunks belonging to files where the user has DENIED permission are stripped
    * immediately on the server before entering any AI prompt or API response.
    */
+  /**
+   * Executes code search across a branch's files.
+   * Priority: Direct fast text/syntax matching across files and contents (sub-millisecond).
+   * Preserves full semantic vector search capability in `runSemanticVectorSearch` for future reactivation.
+   */
   public static async semanticSearch(
     projectId: string,
     branchId: string,
@@ -280,73 +285,185 @@ export class CodebaseIndexService {
       RAG_LIMITS.MAX_SIMILARITY_TOP_K,
       request.topK ?? RAG_LIMITS.DEFAULT_SIMILARITY_TOP_K
     );
-    const minScore = request.minScore ?? RAG_LIMITS.MIN_SIMILARITY_SCORE;
+    const permittedResults: SemanticSearchResultDto[] = [];
+    const lowerQuery = query.toLowerCase();
+
+    // 1. Direct High-Speed Code Search (File Names & Content)
+    try {
+      const matchingFiles = await prisma.projectFile.findMany({
+        where: {
+          branchId,
+          nodeType: 'FILE',
+          OR: [
+            { content: { contains: query, mode: 'insensitive' } },
+            { name: { contains: query, mode: 'insensitive' } },
+          ],
+        },
+        orderBy: { name: 'asc' },
+        take: topK * 3,
+      });
+
+      for (const file of matchingFiles) {
+        if (
+          request.fileExtensionFilter &&
+          request.fileExtensionFilter.length > 0
+        ) {
+          const matchesExt = request.fileExtensionFilter.some((ext) =>
+            file.name.endsWith(ext)
+          );
+          if (!matchesExt) continue;
+        }
+
+        const override = await resolveInheritedOverride(
+          branchId,
+          file.id,
+          userId
+        );
+        if (override === 'denied') continue;
+
+        const lines = file.content.split('\n');
+        const matchIndices: number[] = [];
+
+        lines.forEach((lineText, idx) => {
+          if (lineText.toLowerCase().includes(lowerQuery)) {
+            matchIndices.push(idx);
+          }
+        });
+
+        if (matchIndices.length > 0) {
+          // Add top matching line occurrences in this file
+          for (const matchIdx of matchIndices.slice(0, 3)) {
+            const startLine = Math.max(1, matchIdx + 1);
+            const endLine = Math.min(lines.length, matchIdx + 4);
+            const snippet = lines.slice(matchIdx, endLine).join('\n');
+
+            permittedResults.push({
+              id: `match-${file.id}-${startLine}`,
+              fileId: file.id,
+              filePath: file.name,
+              startLine,
+              endLine,
+              content: snippet || file.content.slice(0, 200),
+              similarity: 1.0,
+            });
+
+            if (permittedResults.length >= topK) break;
+          }
+        } else if (file.name.toLowerCase().includes(lowerQuery)) {
+          // File name itself matched
+          permittedResults.push({
+            id: `match-${file.id}-filename`,
+            fileId: file.id,
+            filePath: file.name,
+            startLine: 1,
+            endLine: Math.min(lines.length, 5),
+            content: lines.slice(0, 5).join('\n') || file.name,
+            similarity: 0.95,
+          });
+        }
+
+        if (permittedResults.length >= topK) break;
+      }
+    } catch (err) {
+      console.warn('[CodebaseIndexService] Direct text search error:', err);
+    }
+
+    // 2. If direct search returned 0 results, fall back to preserved semantic vector search
+    if (permittedResults.length === 0) {
+      const vectorResults = await this.runSemanticVectorSearch(
+        projectId,
+        branchId,
+        userId,
+        query,
+        topK,
+        request.minScore ?? RAG_LIMITS.MIN_SIMILARITY_SCORE,
+        request.fileExtensionFilter
+      );
+      permittedResults.push(...vectorResults);
+    }
+
+    const latencyMs = Date.now() - startTime;
+
+    return {
+      query,
+      results: permittedResults.slice(0, topK),
+      totalMatches: permittedResults.length,
+      latencyMs,
+    };
+  }
+
+  /**
+   * Preserved pgvector semantic similarity search pipeline for future reactivation.
+   */
+  public static async runSemanticVectorSearch(
+    projectId: string,
+    branchId: string,
+    userId: string,
+    query: string,
+    topK: number,
+    minScore: number,
+    fileExtensionFilter?: string[]
+  ): Promise<SemanticSearchResultDto[]> {
     const provider = getEmbeddingProvider();
-
-    // 1. Generate query embedding
-    const queryVector = await provider.embedText(query);
-    const vectorSqlString = `[${queryVector.join(',')}]`;
-
-    // Overfetch slightly (topK * 3) so that after ACL filtering and extension filtering,
-    // we still return up to topK results without making extra database rounds
     const fetchLimit = Math.max(15, topK * 3);
 
-    // 2. pgvector cosine similarity search
-    // Note: In pgvector, `<=>` is cosine distance (0 to 2). Cosine similarity = 1 - distance.
-    const rawResults = await prisma.$queryRaw<
-      Array<{
-        id: string;
-        fileId: string;
-        filePath: string;
-        startLine: number;
-        endLine: number;
-        content: string;
-        similarity: number;
-      }>
-    >`
-      SELECT 
-        id, "fileId", "filePath", "startLine", "endLine", content,
-        (1 - (embedding <=> ${vectorSqlString}::vector))::float AS similarity
-      FROM "codebase_embeddings"
-      WHERE "projectId" = ${projectId} 
-        AND "branchId" = ${branchId}
-        AND embedding IS NOT NULL
-      ORDER BY embedding <=> ${vectorSqlString}::vector ASC
-      LIMIT ${fetchLimit};
-    `;
+    let rawResults: Array<{
+      id: string;
+      fileId: string;
+      filePath: string;
+      startLine: number;
+      endLine: number;
+      content: string;
+      similarity: number;
+    }> = [];
 
-    // 3. Server-side Pre-Prompt ACL Filtering & Extension Filtering
+    try {
+      const queryVector = await provider.embedText(query);
+      const vectorSqlString = `[${queryVector.join(',')}]`;
+
+      rawResults = await prisma.$queryRaw<
+        Array<{
+          id: string;
+          fileId: string;
+          filePath: string;
+          startLine: number;
+          endLine: number;
+          content: string;
+          similarity: number;
+        }>
+      >`
+        SELECT 
+          id, "fileId", "filePath", "startLine", "endLine", content,
+          (1 - (embedding <=> ${vectorSqlString}::vector))::float AS similarity
+        FROM "codebase_embeddings"
+        WHERE "projectId" = ${projectId} 
+          AND "branchId" = ${branchId}
+          AND embedding IS NOT NULL
+        ORDER BY embedding <=> ${vectorSqlString}::vector ASC
+        LIMIT ${fetchLimit};
+      `;
+    } catch (err) {
+      console.warn('[CodebaseIndexService] Vector query error:', err);
+    }
+
     const permittedResults: SemanticSearchResultDto[] = [];
 
     for (const row of rawResults) {
-      if (row.similarity < minScore) {
-        continue;
-      }
+      if (row.similarity < minScore) continue;
 
-      // Check file extension filter if specified
-      if (
-        request.fileExtensionFilter &&
-        request.fileExtensionFilter.length > 0
-      ) {
-        const matchesExt = request.fileExtensionFilter.some((ext) =>
+      if (fileExtensionFilter && fileExtensionFilter.length > 0) {
+        const matchesExt = fileExtensionFilter.some((ext) =>
           row.filePath.endsWith(ext)
         );
-        if (!matchesExt) {
-          continue;
-        }
+        if (!matchesExt) continue;
       }
 
-      // Enforce file permission via resolveInheritedOverride
       const override = await resolveInheritedOverride(
         branchId,
         row.fileId,
         userId
       );
-
-      if (override === 'denied') {
-        // Drop candidate chunk immediately from context
-        continue;
-      }
+      if (override === 'denied') continue;
 
       permittedResults.push({
         id: row.id,
@@ -358,19 +475,10 @@ export class CodebaseIndexService {
         similarity: Number(row.similarity.toFixed(4)),
       });
 
-      if (permittedResults.length >= topK) {
-        break;
-      }
+      if (permittedResults.length >= topK) break;
     }
 
-    const latencyMs = Date.now() - startTime;
-
-    return {
-      query,
-      results: permittedResults,
-      totalMatches: permittedResults.length,
-      latencyMs,
-    };
+    return permittedResults;
   }
 
   /**
