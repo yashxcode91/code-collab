@@ -120,4 +120,44 @@ describe('StudioPreviewPane Component', () => {
     fireEvent.click(mobileBtn);
     expect(mockSetDeviceMode).toHaveBeenCalledWith('mobile');
   });
+
+  it('switches preview destination port and updates iframe src and status pill', () => {
+    mockStatus = 'RUNNING';
+    mockPreviewUrl = 'http://localhost:4000/preview/test-proj-id/5173/?token=abc';
+    mockSandbox = {
+      id: 'sbx-1',
+      projectId: 'test-proj-id',
+      branchId: 'branch-1',
+      containerId: 'c123',
+      containerName: 'cc-sbx-test',
+      internalIp: '172.28.0.2',
+      status: 'RUNNING',
+      ports: [5173, 3000, 8000, 8080],
+      primaryPort: 5173,
+      memoryLimitMb: 512,
+      cpuLimit: 1.0,
+      previewToken: 'abc',
+      previewUrl: '/preview/test-proj-id/5173/',
+      errorMessage: null,
+      lastPingAt: null,
+      startedAt: null,
+      stoppedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    render(<StudioPreviewPane projectId="test-proj-id" />);
+
+    expect(screen.getByText('Live :5173')).toBeDefined();
+    const portSelect = screen.getByLabelText('Select preview port') as HTMLSelectElement;
+    expect(portSelect).toBeDefined();
+    expect(portSelect.value).toBe('5173');
+
+    // Switch to port 3000 (Backend API / Next.js)
+    fireEvent.change(portSelect, { target: { value: '3000' } });
+
+    expect(screen.getByText('Live :3000')).toBeDefined();
+    const iframe = screen.getByTitle('CodeCollab Sandbox Preview');
+    expect(iframe.getAttribute('src')).toBe('http://localhost:4000/preview/test-proj-id/3000/?token=abc');
+  });
 });

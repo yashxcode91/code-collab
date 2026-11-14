@@ -101,6 +101,8 @@ interface StudioTopBarProps {
   onOpenSemanticSearch?: () => void;
   isPreviewOpen?: boolean;
   onTogglePreview?: () => void;
+  isTerminalOpen?: boolean;
+  onToggleTerminal?: () => void;
 }
 
 /**
@@ -148,6 +150,8 @@ export function StudioTopBar({
   onOpenSemanticSearch,
   isPreviewOpen = false,
   onTogglePreview,
+  isTerminalOpen = false,
+  onToggleTerminal,
 }: StudioTopBarProps) {
   const queryClient = useQueryClient();
   const isOwner = project.currentUserRole === 'owner';
@@ -1076,6 +1080,23 @@ export function StudioTopBar({
               >
                 <Eye className="h-3.5 w-3.5 text-orange-500" aria-hidden="true" />
                 <span className="hidden lg:inline">Preview</span>
+              </button>
+            )}
+
+            {onToggleTerminal && (
+              <button
+                type="button"
+                onClick={onToggleTerminal}
+                className={cn(
+                  'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors',
+                  isTerminalOpen
+                    ? 'bg-sky-500/20 text-sky-400 font-semibold'
+                    : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground',
+                )}
+                title="Interactive Container Terminal"
+              >
+                <Terminal className="h-3.5 w-3.5 text-sky-400" aria-hidden="true" />
+                <span className="hidden lg:inline">Terminal</span>
               </button>
             )}
 

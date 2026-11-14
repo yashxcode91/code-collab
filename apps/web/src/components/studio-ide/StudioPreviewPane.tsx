@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Check,
   Copy,
@@ -20,6 +20,15 @@ export interface StudioPreviewPaneProps {
   onClose?: () => void;
   className?: string;
 }
+
+const PORT_LABELS: Record<number, string> = {
+  5173: 'Vite',
+  3000: 'Node / Web',
+  8000: 'Python API',
+  8080: 'Proxy / Java',
+};
+
+const DEFAULT_PORTS = [5173, 3000, 8000, 8080];
 
 export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
   projectId,
@@ -51,11 +60,35 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
   const [copied, setCopied] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedPort, setSelectedPort] = useState<number>(sandbox?.primaryPort || 5173);
+
+  // Sync selectedPort when sandbox primaryPort updates
+  useEffect(() => {
+    if (sandbox?.primaryPort) {
+      setSelectedPort((prev) => (prev ? prev : sandbox.primaryPort));
+    }
+  }, [sandbox?.primaryPort]);
+
+  const availablePorts: number[] = Array.from(
+    new Set([
+      ...(sandbox?.ports && sandbox.ports.length > 0 ? sandbox.ports : []),
+      sandbox?.primaryPort || 5173,
+      ...DEFAULT_PORTS,
+    ])
+  ).sort((a, b) => a - b);
+
+  // Compute dynamic preview URL reflecting selected port
+  const effectivePreviewUrl = previewUrl
+    ? previewUrl.replace(
+        new RegExp(`/preview/${projectId}/(\\d+)`),
+        `/preview/${projectId}/${selectedPort}`
+      )
+    : null;
 
   const handleCopyUrl = async () => {
-    if (!previewUrl) return;
+    if (!effectivePreviewUrl) return;
     try {
-      await navigator.clipboard.writeText(previewUrl);
+      await navigator.clipboard.writeText(effectivePreviewUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -89,7 +122,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
             {status === 'RUNNING' && (
               <>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" />
-                <span className="text-emerald-400">Live :{sandbox?.primaryPort ?? 5173}</span>
+                <span className="text-emerald-400">Live :{selectedPort}</span>
               </>
             )}
             {status === 'STARTING' && (
@@ -113,17 +146,35 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
           </div>
         </div>
 
-        {/* Center: Address Bar */}
-        <div className="flex-1 max-w-md mx-2 flex items-center bg-[#161b22] border border-zinc-700/60 rounded px-2.5 py-1 text-xs font-mono text-zinc-300">
-          <span className="text-zinc-500 mr-1 select-none">http://</span>
+        {/* Center: Address Bar with Port Selector */}
+        <div className="flex-1 max-w-md mx-2 flex items-center bg-[#161b22] border border-zinc-700/60 rounded px-2 py-1 text-xs font-mono text-zinc-300 gap-1.5">
+          <span className="text-zinc-500 select-none">http://</span>
           <span className="truncate flex-1">
-            {previewUrl ? `localhost:4000/preview/${projectId.slice(0, 8)}...` : 'sandbox:offline'}
+            {effectivePreviewUrl
+              ? `localhost:4000/preview/${projectId.slice(0, 8)}.../${selectedPort}`
+              : 'sandbox:offline'}
           </span>
-          {previewUrl && (
+
+          {/* Port Selector Dropdown */}
+          <select
+            aria-label="Select preview port"
+            value={selectedPort}
+            onChange={(e) => setSelectedPort(Number(e.target.value))}
+            className="bg-zinc-800 hover:bg-zinc-750 text-orange-400 font-mono text-[11px] font-medium border border-zinc-700/80 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
+            title="Switch destination port"
+          >
+            {availablePorts.map((p) => (
+              <option key={p} value={p}>
+                :{p} {PORT_LABELS[p] ? `(${PORT_LABELS[p]})` : ''}
+              </option>
+            ))}
+          </select>
+
+          {effectivePreviewUrl && (
             <button
               onClick={handleCopyUrl}
               title="Copy preview URL"
-              className="ml-2 text-zinc-400 hover:text-orange-400 transition-colors"
+              className="ml-1 text-zinc-400 hover:text-orange-400 transition-colors"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
@@ -180,9 +231,9 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
           </button>
 
           {/* External Tab Popout */}
-          {previewUrl && (
+          {effectivePreviewUrl && (
             <a
-              href={previewUrl}
+              href={effectivePreviewUrl}
               target="_blank"
               rel="noreferrer noopener"
               className="p-1.5 text-zinc-400 hover:text-orange-400 transition-colors"
@@ -307,7 +358,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
         )}
 
         {/* Running Live Preview Iframe with Device Framing */}
-        {(status === 'RUNNING' || (status === 'STARTING' && previewUrl)) && (
+        {(status === 'RUNNING' || (status === 'STARTING' && effectivePreviewUrl)) && (
           <div
             className={`h-full transition-all duration-300 ease-out flex flex-col bg-white rounded-lg shadow-2xl overflow-hidden ${
               deviceMode === 'desktop'
@@ -326,7 +377,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
 
             <iframe
               key={iframeKey}
-              src={previewUrl || 'about:blank'}
+              src={effectivePreviewUrl || 'about:blank'}
               title="CodeCollab Sandbox Preview"
               className="w-full h-full border-none bg-white"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"

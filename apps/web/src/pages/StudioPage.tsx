@@ -23,6 +23,7 @@ import { StudioEditorPane } from '@/components/studio-ide/StudioEditorPane';
 import { StudioExecutionConsole } from '@/components/studio-ide/StudioExecutionConsole';
 import { StudioInspectorDrawer } from '@/components/studio-ide/StudioInspectorDrawer';
 import { StudioPreviewPane } from '@/components/studio-ide/StudioPreviewPane';
+import { StudioTerminalPane } from '@/components/studio-ide/StudioTerminalPane';
 import { StudioSnapshotDiffModal } from '@/components/studio-ide/StudioSnapshotDiffModal';
 import { SemanticSearchModal } from '@/components/studio-ide/SemanticSearchModal';
 import {
@@ -84,6 +85,7 @@ export function StudioPage() {
   const [languageOverride, setLanguageOverride] =
     useState<SupportedLanguage | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const autoOpenedBranchRef = useRef<string | null>(null);
 
   // Ephemeral Zustand IDE state
@@ -1067,6 +1069,8 @@ export function StudioPage() {
         onOpenSemanticSearch={() => setIsSemanticSearchOpen(true)}
         isPreviewOpen={isPreviewOpen}
         onTogglePreview={() => setIsPreviewOpen((v) => !v)}
+        isTerminalOpen={isTerminalOpen}
+        onToggleTerminal={() => setIsTerminalOpen((v) => !v)}
       />
 
       {/* Split-Pane Studio Body with balanced framing below attached top bar */}
@@ -1197,6 +1201,16 @@ export function StudioPage() {
               onClose={() => setConsoleOpen(false)}
               onDebugWithAi={handleDebugWithAi}
             />
+
+            {isTerminalOpen && (
+              <div className="h-64 border-t border-zinc-800 z-20 shrink-0">
+                <StudioTerminalPane
+                  projectId={projectId}
+                  branchId={activeBranch?.id}
+                  onClose={() => setIsTerminalOpen(false)}
+                />
+              </div>
+            )}
           </div>
 
           {isPreviewOpen && (
