@@ -7,6 +7,7 @@ import type {
   BranchSnapshotDetailDto,
   BranchSnapshotSummaryDto,
   ChatMessageDto,
+  CodebaseIndexStatusDto,
   CreateBranchInput,
   CreateChatMessageInput,
   CreateExecutionRunInput,
@@ -26,6 +27,8 @@ import type {
   ProjectMemberDto,
   RestoreSnapshotInput,
   RestoreSnapshotResultDto,
+  SemanticSearchRequestDto,
+  SemanticSearchResponseDto,
   SetFileAccessInput,
   SnapshotDiffResponse,
   UpdateBranchInput,
@@ -111,6 +114,8 @@ export const queryKeys = {
         'conversations',
         conversationId,
       ] as const,
+    codebaseIndexStatus: (projectId: string, branchId: string) =>
+      ['projects', projectId, 'branches', branchId, 'ai', 'index-status'] as const,
   },
 } as const;
 
@@ -659,5 +664,45 @@ export async function deleteAiConversation(
   await apiRequest<void>(
     `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/ai/conversations/${encodeURIComponent(conversationId)}`,
     { method: 'DELETE' },
+  );
+}
+
+/** Fetches codebase indexing status on a specific branch. */
+export async function fetchCodebaseIndexStatus(
+  projectId: string,
+  branchId: string,
+): Promise<CodebaseIndexStatusDto> {
+  return apiRequest<CodebaseIndexStatusDto>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/ai/index/status`,
+  );
+}
+
+/** Triggers codebase indexing on a specific branch. */
+export async function triggerCodebaseIndex(
+  projectId: string,
+  branchId: string,
+  forceReindex = false,
+): Promise<{ taskId: string; alreadyRunning: boolean }> {
+  return apiRequest<{ taskId: string; alreadyRunning: boolean }>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/ai/index`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ forceReindex }),
+    },
+  );
+}
+
+/** Executes semantic search across indexed codebase. */
+export async function searchCodebaseSemantic(
+  projectId: string,
+  branchId: string,
+  payload: SemanticSearchRequestDto,
+): Promise<SemanticSearchResponseDto> {
+  return apiRequest<SemanticSearchResponseDto>(
+    `/api/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}/ai/search`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
   );
 }

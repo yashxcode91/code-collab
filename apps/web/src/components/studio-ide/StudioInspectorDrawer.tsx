@@ -121,7 +121,9 @@ interface StudioInspectorDrawerProps {
     activeFileId: string | null;
     activeFileName?: string | null;
     activeSelection?: { startLine: number; endLine: number; text: string } | null;
+    activeFileContent?: string | null;
     onApplyCode?: (code: string) => Promise<void> | void;
+    onSelectCitation?: (fileId: string, startLine: number, endLine: number) => void;
   };
   onChangeTab: (tab: InspectorTab) => void;
   onSelectAclTarget: (nodeId: string | null) => void;
@@ -747,7 +749,9 @@ export function StudioInspectorDrawer({
               activeFileId={aiState?.activeFileId ?? activeFileId}
               activeFileName={aiState?.activeFileName ?? activeFile?.name}
               activeSelection={aiState?.activeSelection}
+              activeFileContent={aiState?.activeFileContent}
               onApplyCode={aiState?.onApplyCode}
+              onSelectCitation={aiState?.onSelectCitation}
             />
           )}
 

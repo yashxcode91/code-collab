@@ -18,6 +18,7 @@ import {
   Play,
   Plus,
   Save,
+  Search,
   Shield,
   ShieldCheck,
   SlidersHorizontal,
@@ -95,6 +96,7 @@ interface StudioTopBarProps {
   onSaveActiveFile: () => void;
   onToggleLockActiveFile: () => void;
   onSetRightPanelTab: (tab: InspectorTab) => void;
+  onOpenSemanticSearch?: () => void;
 }
 
 /**
@@ -139,6 +141,7 @@ export function StudioTopBar({
   onSaveActiveFile,
   onToggleLockActiveFile,
   onSetRightPanelTab,
+  onOpenSemanticSearch,
 }: StudioTopBarProps) {
   const queryClient = useQueryClient();
   const isOwner = project.currentUserRole === 'owner';
@@ -997,6 +1000,21 @@ export function StudioTopBar({
                     {chatUnreadCount}
                   </span>
                 )}
+              </button>
+            )}
+
+            {onOpenSemanticSearch && (
+              <button
+                type="button"
+                onClick={onOpenSemanticSearch}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors border border-border/40"
+                title="Semantic Code Search (Cmd+Shift+F)"
+              >
+                <Search className="h-3.5 w-3.5 text-purple-400" aria-hidden="true" />
+                <span className="hidden xl:inline">Search</span>
+                <kbd className="hidden 2xl:inline-block rounded bg-muted/60 px-1 py-0.2 font-mono text-[9px] text-muted-foreground">
+                  ⌘⇧F
+                </kbd>
               </button>
             )}
 

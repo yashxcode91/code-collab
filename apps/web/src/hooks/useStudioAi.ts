@@ -4,12 +4,15 @@ import type {
   AiActionKind,
   AiPromptContext,
   AiStreamChunkDto,
+  SemanticSearchResultDto,
 } from '@codecollab/shared';
 import {
   deleteAiConversation,
   fetchAiConversationDetail,
   fetchAiConversations,
+  fetchCodebaseIndexStatus,
   queryKeys,
+  triggerCodebaseIndex,
 } from '@/lib/queries';
 
 export interface UseStudioAiOptions {
@@ -30,6 +33,7 @@ export interface StudioAiMessageItem {
   suggestedCode?: string | null;
   fileName?: string | null;
   lineRange?: string | null;
+  citations?: SemanticSearchResultDto[];
   createdAt: string;
   isStreaming?: boolean;
 }
@@ -50,8 +54,34 @@ export function useStudioAi({
   const [streamingActionKind, setStreamingActionKind] = useState<AiActionKind>('chat');
   const [streamingSuggestedCode, setStreamingSuggestedCode] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [ragMode, setRagMode] = useState<boolean>(true);
+  const [streamingCitations, setStreamingCitations] = useState<SemanticSearchResultDto[] | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Codebase RAG indexing status
+  const indexStatusQuery = useQuery({
+    queryKey:
+      projectId && branchId
+        ? queryKeys.projects.codebaseIndexStatus(projectId, branchId)
+        : ['disabled-ai-index-status'],
+    queryFn: () => fetchCodebaseIndexStatus(projectId!, branchId!),
+    enabled: Boolean(projectId && branchId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'PENDING' || status === 'PROCESSING' ? 3000 : false;
+    },
+  });
+
+  const triggerIndexMutation = useMutation({
+    mutationFn: (forceReindex?: boolean) =>
+      triggerCodebaseIndex(projectId!, branchId!, forceReindex),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.projects.codebaseIndexStatus(projectId!, branchId!),
+      });
+    },
+  });
 
   // 1. Fetch conversations list for this project & branch
   const conversationsQuery = useQuery({
@@ -188,6 +218,7 @@ export function useStudioAi({
               },
             }
           : {}),
+        ragMode,
         ...extraContext,
       };
 
@@ -229,6 +260,7 @@ export function useStudioAi({
         let buffer = '';
         let fullAccumulated = '';
         let resolvedConvId = activeConversationId;
+        let currentCitations: SemanticSearchResultDto[] | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -253,6 +285,9 @@ export function useStudioAi({
               } else if (chunk.type === 'token') {
                 fullAccumulated += chunk.token;
                 setStreamingContent(fullAccumulated);
+              } else if (chunk.type === 'citations') {
+                currentCitations = chunk.citations;
+                setStreamingCitations(chunk.citations);
               } else if (chunk.type === 'action') {
                 if (chunk.suggestedCode) {
                   setStreamingSuggestedCode(chunk.suggestedCode);
@@ -271,12 +306,14 @@ export function useStudioAi({
                     chunk.message.codeContext?.lineStart && chunk.message.codeContext?.lineEnd
                       ? `L${chunk.message.codeContext.lineStart}-${chunk.message.codeContext.lineEnd}`
                       : undefined,
+                  citations: currentCitations ?? undefined,
                   createdAt: chunk.message.createdAt,
                 };
 
                 setLocalMessages((prev) => [...prev, assistantItem]);
                 setStreamingContent('');
                 setStreamingSuggestedCode(null);
+                setStreamingCitations(null);
                 setIsStreaming(false);
 
                 // Invalidate conversation list so updated timestamp/title/message count sync
@@ -397,5 +434,15 @@ export function useStudioAi({
     deleteConversation: (id: string) => deleteMutation.mutate(id),
     isDeleting: deleteMutation.isPending,
     applySuggestedCode,
+    ragMode,
+    setRagMode,
+    streamingCitations,
+    indexStatus: indexStatusQuery.data,
+    isIndexing:
+      indexStatusQuery.data?.status === 'PENDING' ||
+      indexStatusQuery.data?.status === 'PROCESSING' ||
+      triggerIndexMutation.isPending,
+    triggerIndex: (forceReindex?: boolean) =>
+      triggerIndexMutation.mutateAsync(forceReindex),
   };
 }
