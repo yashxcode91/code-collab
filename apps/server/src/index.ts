@@ -8,6 +8,7 @@ import { closeExecutionQueue } from './modules/execution/execution.queue';
 import { createRealtimeServer } from './realtime/socketServer';
 import { yjsRoomManager } from './realtime/yjsRoomManager';
 import { handlePreviewWebSocketUpgrade } from './modules/sandbox/previewWebSocket';
+import { handleTerminalWebSocketUpgrade } from './modules/terminal/terminalWebSocket';
 
 const PORT = process.env.PORT || 4000;
 
@@ -15,9 +16,14 @@ const PORT = process.env.PORT || 4000;
 const httpServer = http.createServer(app);
 const io = createRealtimeServer(httpServer, yjsRoomManager);
 
-// Route Vite HMR and preview WebSocket upgrades directly to isolated sandbox containers
+// Route Vite HMR, preview WebSockets, and interactive container terminal upgrades
 httpServer.on('upgrade', (req, socket, head) => {
-  handlePreviewWebSocketUpgrade(req, socket, head);
+  if (handlePreviewWebSocketUpgrade(req, socket, head)) {
+    return;
+  }
+  if (handleTerminalWebSocketUpgrade(req, socket, head)) {
+    return;
+  }
 });
 
 httpServer.listen(PORT, () => {
