@@ -15,6 +15,7 @@ import {
   AiPromptRequest,
   AiStreamChunkDto,
   buildFileRoomKey,
+  SemanticSearchResultDto,
 } from '@codecollab/shared';
 import { yjsRoomManager } from '../../realtime/yjsRoomManager';
 import { AppError } from '../../utils/AppError';
@@ -30,6 +31,7 @@ import {
   AiPromptPayload,
   getAiProvider,
 } from './ai.provider';
+import { CodebaseIndexService } from './codebaseIndex.service';
 
 // =====================================================================
 // Enum Mappers & DTO Serializers
@@ -515,12 +517,50 @@ export const streamAiPrompt = async (params: StreamAiPromptParams): Promise<void
       content: m.content,
     }));
 
-    // 4. Stream completion tokens from provider adapter
+    // 4. If RAG mode is active, query pgvector for cross-file semantic citations
+    let ragCitations: SemanticSearchResultDto[] | undefined;
+    let ragContext: string | undefined;
+
+    if (input.context?.ragMode) {
+      try {
+        const ragSearch = await CodebaseIndexService.semanticSearch(
+          projectId,
+          branchId,
+          userId,
+          {
+            query: input.prompt,
+            topK: 5,
+            minScore: 0.25,
+          }
+        );
+
+        if (ragSearch.results.length > 0) {
+          ragCitations = ragSearch.results;
+          writeSseChunk(res, {
+            type: 'citations',
+            citations: ragCitations,
+          });
+
+          ragContext = ragCitations
+            .map(
+              (c, idx) =>
+                `[Citation ${idx + 1}: ${c.filePath} (lines ${c.startLine}-${c.endLine}, relevance ${(c.similarity * 100).toFixed(0)}%)]\n${c.content}`
+            )
+            .join('\n\n');
+        }
+      } catch (ragErr) {
+        console.warn('[AI Service] RAG semantic search warning:', ragErr);
+      }
+    }
+
+    // 5. Stream completion tokens from provider adapter
     const payload: AiPromptPayload = {
       prompt: input.prompt,
       actionKind: input.actionKind,
       ...assembledContext,
       history,
+      ragCitations,
+      ragContext,
     };
 
     const result: AiCompletionResult = await provider.streamCompletion(

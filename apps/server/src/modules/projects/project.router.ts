@@ -3,6 +3,7 @@ import {
   AddProjectMemberSchema,
   AI_LIMITS,
   AiPromptRequestSchema,
+  CodebaseIndexRequestSchema,
   CreateBranchSchema,
   CreateChatMessageSchema,
   CreateExecutionRunSchema,
@@ -11,6 +12,7 @@ import {
   CreateSnapshotSchema,
   MergeBranchSchema,
   RestoreSnapshotSchema,
+  SemanticSearchRequestSchema,
   SetFileAccessSchema,
   SNAPSHOT_LIMITS,
   UpdateBranchSchema,
@@ -25,8 +27,11 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import {
   deleteAiConversationController,
   getAiConversationDetailController,
+  getBranchIndexStatusController,
   listAiConversationsController,
+  semanticSearchController,
   streamAiPromptController,
+  triggerBranchIndexingController,
 } from '../ai/ai.controller';
 import {
   createProjectChatMessageController,
@@ -315,4 +320,24 @@ projectRouter.delete(
   '/:projectId/branches/:branchId/ai/conversations/:conversationId',
   aiPromptLimiter,
   asyncHandler(deleteAiConversationController)
+);
+
+projectRouter.post(
+  '/:projectId/branches/:branchId/ai/index',
+  aiPromptLimiter,
+  validateBody(CodebaseIndexRequestSchema),
+  asyncHandler(triggerBranchIndexingController)
+);
+
+projectRouter.get(
+  '/:projectId/branches/:branchId/ai/index/status',
+  aiReadLimiter,
+  asyncHandler(getBranchIndexStatusController)
+);
+
+projectRouter.post(
+  '/:projectId/branches/:branchId/ai/search',
+  aiReadLimiter,
+  validateBody(SemanticSearchRequestSchema),
+  asyncHandler(semanticSearchController)
 );

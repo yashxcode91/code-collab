@@ -1,10 +1,15 @@
 import { Request, Response } from 'express';
 import {
+  assertBranchInProject,
+  assertProjectAccess,
+} from '../projects/project.auth';
+import {
   deleteAiConversation,
   getAiConversationDetail,
   listAiConversations,
   streamAiPrompt,
 } from './ai.service';
+import { CodebaseIndexService } from './codebaseIndex.service';
 
 /**
  * Streams real-time AI responses over Server-Sent Events (SSE).
@@ -103,4 +108,82 @@ export const deleteAiConversationController = async (
   );
 
   res.status(204).send();
+};
+
+/**
+ * Triggers asynchronous multi-file codebase indexing for semantic vector RAG.
+ */
+export const triggerBranchIndexingController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { projectId, branchId } = req.params as {
+    projectId: string;
+    branchId: string;
+  };
+  const userId = req.user!.id;
+  const forceReindex = Boolean(req.body?.forceReindex);
+
+  await assertProjectAccess(projectId, userId);
+  await assertBranchInProject(projectId, branchId);
+
+  const result = await CodebaseIndexService.triggerBranchIndexing(
+    projectId,
+    branchId,
+    userId,
+    forceReindex
+  );
+
+  res.status(result.alreadyRunning ? 200 : 202).json(result);
+};
+
+/**
+ * Retrieves the status and progress of codebase indexing for a branch.
+ */
+export const getBranchIndexStatusController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { projectId, branchId } = req.params as {
+    projectId: string;
+    branchId: string;
+  };
+  const userId = req.user!.id;
+
+  await assertProjectAccess(projectId, userId);
+  await assertBranchInProject(projectId, branchId);
+
+  const status = await CodebaseIndexService.getBranchIndexStatus(
+    projectId,
+    branchId
+  );
+
+  res.json(status);
+};
+
+/**
+ * Executes a semantic vector similarity search across a branch's indexed files.
+ * Enforces server-side pre-prompt ACL filtering.
+ */
+export const semanticSearchController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { projectId, branchId } = req.params as {
+    projectId: string;
+    branchId: string;
+  };
+  const userId = req.user!.id;
+
+  await assertProjectAccess(projectId, userId);
+  await assertBranchInProject(projectId, branchId);
+
+  const result = await CodebaseIndexService.semanticSearch(
+    projectId,
+    branchId,
+    userId,
+    req.body
+  );
+
+  res.json(result);
 };
