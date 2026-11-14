@@ -37,3 +37,7 @@ export * from './schemas/agent';
 export * from './types/sandbox';
 export * from './schemas/sandbox';
 
+// Export Day 10 Interactive Terminal contracts and Zod schemas
+export * from './types/terminal';
+export * from './schemas/terminal';
+
