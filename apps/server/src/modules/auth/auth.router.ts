@@ -10,6 +10,7 @@ import {
   meController,
   oauthCallbackController,
   oauthStartController,
+  refreshTokenController,
   registerController,
 } from './auth.controller';
 
@@ -75,6 +76,13 @@ authRouter.post(
 );
 
 authRouter.post('/logout', asyncHandler(logoutController));
+
+// Silent session rotation & refresh endpoint
+authRouter.post(
+  '/refresh',
+  loginIpLimiter,
+  asyncHandler(refreshTokenController)
+);
 
 // Session verification endpoint called by AuthProvider on frontend load
 authRouter.get('/me', requireAuth, asyncHandler(meController));

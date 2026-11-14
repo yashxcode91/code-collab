@@ -5,6 +5,7 @@ import { getAllowedOrigin } from '../../middleware/csrf.middleware';
 import {
   OAuthProviderKey,
   signAccessToken,
+  signRefreshToken,
   signOAuthStateToken,
   verifyOAuthStateToken,
 } from '../../utils/jwt';
@@ -396,7 +397,7 @@ const fetchGitHubProfile = async (
  */
 const resolveOAuthUser = async (
   profile: NormalizedOAuthProfile
-): Promise<{ user: User; token: string }> => {
+): Promise<{ user: User; token: string; refreshToken: string }> => {
   const dbUser = await prisma.$transaction(async (tx) => {
     // Case 1: Returning OAuth user — look up by stable (provider, providerAccountId) tuple
     const existingAccount = await tx.account.findUnique({
@@ -462,7 +463,8 @@ const resolveOAuthUser = async (
   });
 
   const token = signAccessToken({ sub: dbUser.id, role: dbUser.role });
-  return { user: toPublicUser(dbUser), token };
+  const { refreshToken } = signRefreshToken(dbUser.id);
+  return { user: toPublicUser(dbUser), token, refreshToken };
 };
 
 export interface OAuthCallbackInput {
@@ -479,7 +481,7 @@ export interface OAuthCallbackInput {
  */
 export const completeOAuthCallback = async (
   input: OAuthCallbackInput
-): Promise<{ user: User; token: string }> => {
+): Promise<{ user: User; token: string; refreshToken: string }> => {
   const config = getProviderConfig(input.provider);
   if (!config) {
     throw new OAuthFlowError(

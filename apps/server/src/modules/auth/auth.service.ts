@@ -6,7 +6,11 @@ import {
 } from '@codecollab/database';
 import { LoginInput, RegisterInput, User } from '@codecollab/shared';
 import { AppError } from '../../utils/AppError';
-import { signAccessToken } from '../../utils/jwt';
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from '../../utils/jwt';
 
 const BCRYPT_SALT_ROUNDS = 12;
 
@@ -29,10 +33,10 @@ export const toPublicUser = (dbUser: DbUser): User => ({
   updatedAt: dbUser.updatedAt.toISOString(),
 });
 
-/** Registers a local password user (`bcrypt` cost 12) and signs an initial session JWT. */
+/** Registers a local password user (`bcrypt` cost 12) and signs an initial session JWT & refresh token. */
 export const registerUser = async (
   input: RegisterInput
-): Promise<{ user: User; token: string }> => {
+): Promise<{ user: User; token: string; refreshToken: string }> => {
   // 1. Friendly uniqueness pre-checks before hashing password
   const existingEmail = await prisma.user.findUnique({
     where: { email: input.email },
@@ -70,7 +74,8 @@ export const registerUser = async (
     });
 
     const token = signAccessToken({ sub: dbUser.id, role: dbUser.role });
-    return { user: toPublicUser(dbUser), token };
+    const { refreshToken } = signRefreshToken(dbUser.id);
+    return { user: toPublicUser(dbUser), token, refreshToken };
   } catch (err) {
     // Handle concurrent race condition where two identical signups arrive together
     if (
@@ -111,7 +116,7 @@ export const registerUser = async (
  */
 export const loginUser = async (
   input: LoginInput
-): Promise<{ user: User; token: string }> => {
+): Promise<{ user: User; token: string; refreshToken: string }> => {
   // Choose unique index (`email` vs `username`) dynamically based on `@` presence
   const dbUser = input.identifier.includes('@')
     ? await prisma.user.findUnique({ where: { email: input.identifier } })
@@ -140,7 +145,48 @@ export const loginUser = async (
   }
 
   const token = signAccessToken({ sub: dbUser.id, role: dbUser.role });
-  return { user: toPublicUser(dbUser), token };
+  const { refreshToken } = signRefreshToken(dbUser.id);
+  return { user: toPublicUser(dbUser), token, refreshToken };
+};
+
+/**
+ * Validates a long-lived refresh token and issues a fresh rotated token pair.
+ * Ensures the user account is still valid in the database.
+ */
+export const rotateRefreshToken = async (
+  rawToken: string
+): Promise<{ user: User; accessToken: string; refreshToken: string }> => {
+  let payload;
+  try {
+    payload = verifyRefreshToken(rawToken);
+  } catch {
+    throw new AppError(
+      401,
+      'INVALID_REFRESH_TOKEN',
+      'Refresh token is invalid or expired'
+    );
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: payload.sub },
+  });
+
+  if (!dbUser) {
+    throw new AppError(
+      401,
+      'USER_NOT_FOUND',
+      'The user session is no longer active'
+    );
+  }
+
+  const accessToken = signAccessToken({ sub: dbUser.id, role: dbUser.role });
+  const { refreshToken: newRefreshToken } = signRefreshToken(dbUser.id);
+
+  return {
+    user: toPublicUser(dbUser),
+    accessToken,
+    refreshToken: newRefreshToken,
+  };
 };
 
 /** Fetches a user by ID for session rehydration (`GET /api/auth/me` & `requireAuth`). */

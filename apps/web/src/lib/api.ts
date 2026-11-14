@@ -23,17 +23,47 @@ export class ApiClientError extends Error {
   }
 }
 
+// In-flight refresh promise singleton to prevent duplicate concurrent refresh calls
+let activeRefreshPromise: Promise<boolean> | null = null;
+
+async function requestTokenRefresh(): Promise<boolean> {
+  if (activeRefreshPromise) {
+    return activeRefreshPromise;
+  }
+
+  activeRefreshPromise = (async () => {
+    try {
+      const res = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise;
+}
+
 /**
  * Typed `fetch()` wrapper around our backend `ApiResponse<T>` envelope:
  * - Always attaches `credentials: 'include'` so HttpOnly auth cookies flow automatically.
  * - Unwraps `{ success: true, data }` on success or throws `ApiClientError` with parsed
  *   field-level validation messages on failure.
+ * - Automatically performs silent token refresh & request retry on 401s so sessions never drop mid-work.
  */
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
+  isRetry = false,
 ): Promise<T> {
-  // Always send credentials so the browser includes our HttpOnly JWT cookie
+  // Always send credentials so the browser includes our HttpOnly JWT cookies
   const res = await fetch(path, {
     ...options,
     credentials: 'include',
@@ -42,6 +72,21 @@ export async function apiRequest<T>(
       ...options.headers,
     },
   });
+
+  // If 401 Unauthorized occurs on a non-auth endpoint, attempt a silent token refresh & retry once
+  if (
+    res.status === 401 &&
+    !isRetry &&
+    !path.startsWith('/api/auth/login') &&
+    !path.startsWith('/api/auth/register') &&
+    !path.startsWith('/api/auth/refresh') &&
+    !path.startsWith('/api/auth/logout')
+  ) {
+    const refreshed = await requestTokenRefresh();
+    if (refreshed) {
+      return apiRequest<T>(path, options, true);
+    }
+  }
 
   if (res.status === 204) {
     return undefined as T;
@@ -94,4 +139,3 @@ export async function apiRequest<T>(
 
   return body.data as T;
 }
-

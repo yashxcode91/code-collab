@@ -1,11 +1,14 @@
+import crypto from 'node:crypto';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import type { CookieOptions } from 'express';
 import type { UserRole as DbUserRole } from '@codecollab/database';
 
 // Cookie names & security floors shared between auth routes and auth middleware
 export const AUTH_COOKIE_NAME = 'codecollab_token';
+export const REFRESH_COOKIE_NAME = 'codecollab_refresh_token';
 export const OAUTH_STATE_COOKIE_NAME = 'codecollab_oauth_state';
 const DEFAULT_JWT_EXPIRES_IN = '15m';
+export const DEFAULT_REFRESH_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 const MIN_JWT_SECRET_LENGTH = 32;
 
@@ -13,6 +16,13 @@ const MIN_JWT_SECRET_LENGTH = 32;
 export interface AccessTokenPayload {
   sub: string; // Authenticated User UUID
   role: DbUserRole;
+}
+
+/** Claims embedded inside our long-lived refresh token (`codecollab_refresh_token`). */
+export interface RefreshTokenPayload {
+  sub: string; // Authenticated User UUID
+  purpose: 'refresh_token';
+  jti: string; // Unique token ID for replay prevention / rotation
 }
 
 export type OAuthProviderKey = 'google' | 'github';
@@ -116,6 +126,71 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
   return {
     sub: decoded.sub,
     role: decoded.role,
+  };
+};
+
+/**
+ * Cookie options for the long-lived refresh token.
+ * Note: Path is restricted to `/api/auth` so the browser only sends it to auth routes.
+ */
+export const getRefreshCookieOptions = (): CookieOptions => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  path: '/api/auth',
+});
+
+export const getRefreshCookieMaxAgeMs = (): number =>
+  DEFAULT_REFRESH_EXPIRES_IN_SECONDS * 1000;
+
+/** Signs an HS256 long-lived refresh token (30 days) for session continuity. */
+export const signRefreshToken = (
+  userId: string
+): { refreshToken: string; jti: string } => {
+  const { secret } = getJwtConfig();
+  const jti = crypto.randomUUID();
+  const refreshSecret = `${secret}:refresh`;
+
+  const refreshToken = jwt.sign(
+    {
+      sub: userId,
+      purpose: 'refresh_token',
+      jti,
+    },
+    refreshSecret,
+    {
+      algorithm: 'HS256',
+      expiresIn: DEFAULT_REFRESH_EXPIRES_IN_SECONDS,
+    }
+  );
+
+  return { refreshToken, jti };
+};
+
+/** Verifies signature, purpose, and structure of a refresh token. */
+export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
+  const { secret } = getJwtConfig();
+  const refreshSecret = `${secret}:refresh`;
+
+  const decoded = jwt.verify(token, refreshSecret, {
+    algorithms: ['HS256'],
+  }) as JwtPayload;
+
+  if (
+    typeof decoded !== 'object' ||
+    decoded === null ||
+    typeof decoded.sub !== 'string' ||
+    decoded.sub.length === 0 ||
+    decoded.purpose !== 'refresh_token' ||
+    typeof decoded.jti !== 'string'
+  ) {
+    throw new jwt.JsonWebTokenError('Malformed refresh token');
+  }
+
+  return {
+    sub: decoded.sub,
+    purpose: 'refresh_token',
+    jti: decoded.jti,
   };
 };
 

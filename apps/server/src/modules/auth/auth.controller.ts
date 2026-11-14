@@ -13,12 +13,15 @@ import {
   AUTH_COOKIE_NAME,
   OAUTH_STATE_COOKIE_NAME,
   OAuthProviderKey,
+  REFRESH_COOKIE_NAME,
   getAuthCookieMaxAgeMs,
   getAuthCookieOptions,
   getOAuthStateCookieMaxAgeMs,
   getOAuthStateCookieOptions,
+  getRefreshCookieMaxAgeMs,
+  getRefreshCookieOptions,
 } from '../../utils/jwt';
-import { loginUser, registerUser } from './auth.service';
+import { loginUser, registerUser, rotateRefreshToken } from './auth.service';
 import {
   OAuthFlowError,
   completeOAuthCallback,
@@ -32,12 +35,18 @@ import {
 export const registerController: RequestHandler = async (req, res) => {
   // req.body is already validated & normalized (trim/lowercase) by validateBody(RegisterSchema)
   const input = req.body as RegisterInput;
-  const { user, token } = await registerUser(input);
+  const { user, token, refreshToken } = await registerUser(input);
 
-  // Store JWT only in an HttpOnly cookie so JavaScript/XSS cannot read the token
+  // Store JWT access token in an HttpOnly cookie
   res.cookie(AUTH_COOKIE_NAME, token, {
     ...getAuthCookieOptions(),
     maxAge: getAuthCookieMaxAgeMs(),
+  });
+
+  // Store long-lived refresh token in a restricted /api/auth HttpOnly cookie
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+    ...getRefreshCookieOptions(),
+    maxAge: getRefreshCookieMaxAgeMs(),
   });
 
   const response: ApiResponse<AuthResponse> = {
@@ -47,15 +56,21 @@ export const registerController: RequestHandler = async (req, res) => {
   res.status(201).json(response);
 };
 
-/** Authenticates credentials and sets the HttpOnly JWT session cookie. */
+/** Authenticates credentials and sets the HttpOnly JWT session and refresh cookies. */
 export const loginController: RequestHandler = async (req, res) => {
   const input = req.body as LoginInput;
-  const { user, token } = await loginUser(input);
+  const { user, token, refreshToken } = await loginUser(input);
 
-  // Refresh the browser's session cookie with matching expiration maxAge
+  // Set the browser's session cookie with matching expiration maxAge
   res.cookie(AUTH_COOKIE_NAME, token, {
     ...getAuthCookieOptions(),
     maxAge: getAuthCookieMaxAgeMs(),
+  });
+
+  // Set the long-lived refresh token cookie (30 days)
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+    ...getRefreshCookieOptions(),
+    maxAge: getRefreshCookieMaxAgeMs(),
   });
 
   const response: ApiResponse<AuthResponse> = {
@@ -65,7 +80,41 @@ export const loginController: RequestHandler = async (req, res) => {
   res.status(200).json(response);
 };
 
-/** Clears the HttpOnly auth cookie and evicts active WebSocket sessions bound to that token. */
+/** Rotates the long-lived refresh token and issues a fresh short-lived access token. */
+export const refreshTokenController: RequestHandler = async (req, res) => {
+  const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  if (!rawRefreshToken || typeof rawRefreshToken !== 'string') {
+    throw new AppError(
+      401,
+      'REFRESH_TOKEN_REQUIRED',
+      'No refresh token provided in session'
+    );
+  }
+
+  const { user, accessToken, refreshToken } = await rotateRefreshToken(
+    rawRefreshToken
+  );
+
+  // Set fresh rotated access token cookie
+  res.cookie(AUTH_COOKIE_NAME, accessToken, {
+    ...getAuthCookieOptions(),
+    maxAge: getAuthCookieMaxAgeMs(),
+  });
+
+  // Rotate and set new refresh token cookie
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+    ...getRefreshCookieOptions(),
+    maxAge: getRefreshCookieMaxAgeMs(),
+  });
+
+  const response: ApiResponse<AuthResponse> = {
+    success: true,
+    data: { user },
+  };
+  res.status(200).json(response);
+};
+
+/** Clears the HttpOnly auth cookies and evicts active WebSocket sessions bound to that token. */
 export const logoutController: RequestHandler = async (req, res) => {
   const token =
     typeof req.cookies?.[AUTH_COOKIE_NAME] === 'string'
@@ -76,8 +125,9 @@ export const logoutController: RequestHandler = async (req, res) => {
     await disconnectSocketsByTokenHash(tokenHash);
   }
 
-  // Passing exact same { httpOnly, sameSite, path, secure } ensures browsers delete the cookie
+  // Passing exact same { httpOnly, sameSite, path, secure } ensures browsers delete both cookies
   res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieOptions());
+  res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieOptions());
 
   const response: ApiResponse<{ message: string }> = {
     success: true,
@@ -157,7 +207,7 @@ export const oauthCallbackController =
 
     try {
       // 3. Verify `state`, exchange authorization `code` for verified profile, and upsert/link User
-      const { token } = await completeOAuthCallback({
+      const { token, refreshToken } = await completeOAuthCallback({
         provider,
         code: asSingleQueryString(req.query.code),
         queryState: asSingleQueryString(req.query.state),
@@ -165,10 +215,15 @@ export const oauthCallbackController =
         stateToken,
       });
 
-      // 4. Issue normal session HttpOnly JWT cookie and return user to Workspace Dashboard
+      // 4. Issue normal session HttpOnly JWT cookie and long-lived refresh cookie
       res.cookie(AUTH_COOKIE_NAME, token, {
         ...getAuthCookieOptions(),
         maxAge: getAuthCookieMaxAgeMs(),
+      });
+
+      res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+        ...getRefreshCookieOptions(),
+        maxAge: getRefreshCookieMaxAgeMs(),
       });
 
       res.redirect(302, `${clientOrigin}/`);
