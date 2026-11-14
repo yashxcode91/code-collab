@@ -22,6 +22,7 @@ import { disposeStudioModels } from '@/components/studio-ide/monacoWorkerSetup';
 import { StudioEditorPane } from '@/components/studio-ide/StudioEditorPane';
 import { StudioExecutionConsole } from '@/components/studio-ide/StudioExecutionConsole';
 import { StudioInspectorDrawer } from '@/components/studio-ide/StudioInspectorDrawer';
+import { StudioPreviewPane } from '@/components/studio-ide/StudioPreviewPane';
 import { StudioSnapshotDiffModal } from '@/components/studio-ide/StudioSnapshotDiffModal';
 import { SemanticSearchModal } from '@/components/studio-ide/SemanticSearchModal';
 import {
@@ -82,6 +83,7 @@ export function StudioPage() {
   const [isSemanticSearchOpen, setIsSemanticSearchOpen] = useState(false);
   const [languageOverride, setLanguageOverride] =
     useState<SupportedLanguage | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const autoOpenedBranchRef = useRef<string | null>(null);
 
   // Ephemeral Zustand IDE state
@@ -1063,6 +1065,8 @@ export function StudioPage() {
         onToggleLockActiveFile={handleToggleLockActiveFile}
         onSetRightPanelTab={setRightPanelTab}
         onOpenSemanticSearch={() => setIsSemanticSearchOpen(true)}
+        isPreviewOpen={isPreviewOpen}
+        onTogglePreview={() => setIsPreviewOpen((v) => !v)}
       />
 
       {/* Split-Pane Studio Body with balanced framing below attached top bar */}
@@ -1194,6 +1198,16 @@ export function StudioPage() {
               onDebugWithAi={handleDebugWithAi}
             />
           </div>
+
+          {isPreviewOpen && (
+            <div className="w-1/2 min-w-[360px] max-w-[850px] h-full flex flex-col shrink-0 z-10 rounded-xl overflow-hidden shadow-2xl border border-zinc-800">
+              <StudioPreviewPane
+                projectId={projectId}
+                branchId={activeBranch?.id}
+                onClose={() => setIsPreviewOpen(false)}
+              />
+            </div>
+          )}
 
           <StudioInspectorDrawer
             project={project}

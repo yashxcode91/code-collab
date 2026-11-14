@@ -5,6 +5,7 @@ import {
   Bot,
   Check,
   ChevronDown,
+  Eye,
   GitBranch,
   GitMerge,
   History,
@@ -98,6 +99,8 @@ interface StudioTopBarProps {
   onToggleLockActiveFile: () => void;
   onSetRightPanelTab: (tab: InspectorTab) => void;
   onOpenSemanticSearch?: () => void;
+  isPreviewOpen?: boolean;
+  onTogglePreview?: () => void;
 }
 
 /**
@@ -143,6 +146,8 @@ export function StudioTopBar({
   onToggleLockActiveFile,
   onSetRightPanelTab,
   onOpenSemanticSearch,
+  isPreviewOpen = false,
+  onTogglePreview,
 }: StudioTopBarProps) {
   const queryClient = useQueryClient();
   const isOwner = project.currentUserRole === 'owner';
@@ -1056,6 +1061,23 @@ export function StudioTopBar({
               <Bot className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
               <span className="hidden lg:inline">Agent</span>
             </button>
+
+            {onTogglePreview && (
+              <button
+                type="button"
+                onClick={onTogglePreview}
+                className={cn(
+                  'inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors',
+                  isPreviewOpen
+                    ? 'bg-orange-500/20 text-orange-500 font-semibold'
+                    : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground',
+                )}
+                title="Live Sandbox Preview"
+              >
+                <Eye className="h-3.5 w-3.5 text-orange-500" aria-hidden="true" />
+                <span className="hidden lg:inline">Preview</span>
+              </button>
+            )}
 
             <button
               type="button"
