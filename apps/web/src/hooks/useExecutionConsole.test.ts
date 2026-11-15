@@ -201,6 +201,7 @@ describe('useExecutionConsole', () => {
 
     await waitFor(() => {
       expect(result.current.activeRun?.id).toBe('run-secret');
+      expect(result.current.segments.length).toBeGreaterThan(0);
     });
 
     act(() => {

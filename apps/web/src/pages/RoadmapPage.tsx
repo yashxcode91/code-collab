@@ -1171,11 +1171,11 @@ export function RoadmapPage() {
                   </div>
 
                   {/* Dual Action Voting: Upvote (Green) & Downvote (Red) */}
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex items-center justify-center gap-3 pt-2">
                     <button
                       type="button"
                       onClick={() => handleVote(feature.id, 'up')}
-                      className={`flex-1 flex h-8.5 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                      className={`flex-1 max-w-[124px] flex h-10 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-all border ${
                         userVoteDirection === 'up'
                           ? 'bg-emerald-600 border-emerald-500 text-white shadow-sm shadow-emerald-600/30'
                           : 'glass-control border-border/60 text-muted-foreground hover:text-emerald-400 hover:border-emerald-500/40 hover:bg-emerald-500/10'
@@ -1183,14 +1183,14 @@ export function RoadmapPage() {
                       title={userVoteDirection === 'up' ? 'Remove Upvote' : 'Upvote Feature'}
                       aria-label={userVoteDirection === 'up' ? 'Remove Upvote' : 'Upvote Feature'}
                     >
-                      <ThumbsUp className="h-3.5 w-3.5" />
+                      <ThumbsUp className="h-4 w-4" />
                       <span>Upvote</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleVote(feature.id, 'down')}
-                      className={`flex-1 flex h-8.5 items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                      className={`flex-1 max-w-[124px] flex h-10 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition-all border ${
                         userVoteDirection === 'down'
                           ? 'bg-rose-600 border-rose-500 text-white shadow-sm shadow-rose-600/30'
                           : 'glass-control border-border/60 text-muted-foreground hover:text-rose-400 hover:border-rose-500/40 hover:bg-rose-500/10'
@@ -1198,7 +1198,7 @@ export function RoadmapPage() {
                       title={userVoteDirection === 'down' ? 'Remove Downvote' : 'Downvote Feature'}
                       aria-label={userVoteDirection === 'down' ? 'Remove Downvote' : 'Downvote Feature'}
                     >
-                      <ThumbsDown className="h-3.5 w-3.5" />
+                      <ThumbsDown className="h-4 w-4" />
                       <span>Downvote</span>
                     </button>
                   </div>
@@ -1297,14 +1297,14 @@ export function RoadmapPage() {
                 <button
                   type="submit"
                   disabled={createProposalMutation.isPending}
-                  className="btn-studio-primary inline-flex h-8.5 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold disabled:opacity-50"
+                  className="btn-studio-primary inline-flex h-10 items-center justify-center gap-2 rounded-xl px-5 text-xs font-semibold disabled:opacity-50 transition-all shadow-sm"
                 >
                   <span>
                     {createProposalMutation.isPending
                       ? 'Submitting…'
                       : 'Submit Proposal'}
                   </span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
             </form>
@@ -1326,9 +1326,9 @@ export function RoadmapPage() {
           <div className="flex items-center gap-3">
             <Link
               to="/"
-              className="btn-studio-primary inline-flex h-8.5 items-center gap-2 rounded-xl px-3.5 text-xs font-semibold"
+              className="btn-studio-primary inline-flex h-10 items-center justify-center gap-2 rounded-xl px-5 text-xs font-semibold transition-all shadow-sm"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <ArrowLeft className="h-4 w-4" />
               <span>Back to Studio</span>
             </Link>
           </div>
