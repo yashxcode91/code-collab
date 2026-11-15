@@ -9,7 +9,7 @@ test.describe('Roadmap & Architecture Portal (E2E)', () => {
 
   test('renders hero header and page identity correctly', async ({ page }) => {
     // Check page title and identity
-    await expect(page).toHaveTitle(/Roadmap & Architecture|CodeCollab/i);
+    await expect(page).toHaveTitle(/Roadmap & Architecture|Devnolith|CodeCollab/i);
 
     // Verify Hero heading
     const heroHeading = page.locator('h1', {
@@ -22,6 +22,30 @@ test.describe('Roadmap & Architecture Portal (E2E)', () => {
       hasText: /Explore what's coming next/i,
     });
     await expect(heroDescription).toBeVisible();
+  });
+
+  test('renders top navigation bar with centered section links and back to studio', async ({ page }) => {
+    // Check top navigation bar links
+    const roadmapLink = page.getByRole('link', { name: 'Roadmap' }).first();
+    const techStackLink = page.getByRole('link', { name: 'Tech Stack' }).first();
+    const principlesLink = page.getByRole('link', { name: 'Principles' }).first();
+    const votingLink = page.getByRole('link', { name: 'Voting' }).first();
+
+    await expect(roadmapLink).toBeVisible();
+    await expect(techStackLink).toBeVisible();
+    await expect(principlesLink).toBeVisible();
+    await expect(votingLink).toBeVisible();
+
+    // Verify href anchors
+    await expect(roadmapLink).toHaveAttribute('href', '#roadmap');
+    await expect(techStackLink).toHaveAttribute('href', '#tech-stack');
+    await expect(principlesLink).toHaveAttribute('href', '#principles');
+    await expect(votingLink).toHaveAttribute('href', '#feedback');
+
+    // Verify Studio back button
+    const studioReturn = page.getByRole('link', { name: 'Studio' }).first();
+    await expect(studioReturn).toBeVisible();
+    await expect(studioReturn).toHaveAttribute('href', '/');
   });
 
   test('allows filtering roadmap horizons via carousel tabs', async ({ page }) => {

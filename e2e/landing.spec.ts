@@ -11,7 +11,7 @@ test.describe('Public Marketing Website / Landing Page (E2E)', () => {
     page,
   }) => {
     // Brand identity
-    await expect(page.locator('text=CodeCollab').first()).toBeVisible();
+    await expect(page.locator('text=Devnolith').first()).toBeVisible();
 
     // Section links
     const nav = page.locator('nav[aria-label="Main Navigation"]');
@@ -51,7 +51,7 @@ test.describe('Public Marketing Website / Landing Page (E2E)', () => {
     ).toBeVisible();
 
     // High-Fidelity Studio Window Preview
-    await expect(page.locator('text=codecollab-studio · distributed-kv-store')).toBeVisible();
+    await expect(page.locator('text=devnolith-studio · distributed-kv-store')).toBeVisible();
     await expect(page.locator('text=src/server.ts').first()).toBeVisible();
     await expect(page.locator('text=setupCollabMesh').first()).toBeVisible();
     await expect(page.locator('text=Yash (Editing)').first()).toBeVisible();
@@ -156,7 +156,7 @@ test.describe('Public Marketing Website / Landing Page (E2E)', () => {
   test('toggles FAQ accordion questions and reveals detailed answers', async ({ page }) => {
     // FAQ question 1 is open by default
     await expect(
-      page.locator('text=CodeCollab is a full-stack, collaborative cloud development platform'),
+      page.locator('text=Devnolith is a full-stack, collaborative cloud development platform'),
     ).toBeVisible();
 
     // Click on Question 3: "How does real-time collaboration prevent merge conflicts?"
@@ -167,7 +167,7 @@ test.describe('Public Marketing Website / Landing Page (E2E)', () => {
 
     // Verify CRDT answer is revealed
     await expect(
-      page.locator('text=CodeCollab uses Yjs, a high-performance Conflict-free Replicated Data Type'),
+      page.locator('text=Devnolith uses Yjs, a high-performance Conflict-free Replicated Data Type'),
     ).toBeVisible();
   });
 
