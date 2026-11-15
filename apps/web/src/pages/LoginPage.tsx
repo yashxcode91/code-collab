@@ -123,7 +123,7 @@ export function LoginPage() {
               Welcome back
             </h1>
             <p className="text-sm text-muted-foreground">
-              Sign in to your CodeCollab workspace to continue building.
+              Sign in to your Devnolith workspace to continue building.
             </p>
           </div>
         </div>
@@ -206,7 +206,7 @@ export function LoginPage() {
 
         {/* Registration Link */}
         <p className="text-center text-sm text-muted-foreground">
-          New to CodeCollab?{' '}
+          New to Devnolith?{' '}
           <Link
             to="/register"
             className="font-medium text-primary hover:underline underline-offset-4"

@@ -97,7 +97,7 @@ export function AuthCenteredLayout({ children }: AuthCenteredLayoutProps) {
         {/* 6. Subtle Footer */}
         <footer className="relative z-20 px-6 pb-5 text-center sm:px-10 sm:pb-6">
           <p className="text-xs text-muted-foreground/80">
-            © {new Date().getFullYear()} CodeCollab · Real-time engineering workspace
+            © {new Date().getFullYear()} Devnolith · Real-time engineering workspace
           </p>
         </footer>
       </CursorCodeTrail>

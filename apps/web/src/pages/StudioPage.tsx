@@ -484,7 +484,7 @@ export function StudioPage() {
     try {
       await snapshots.createSnapshot({
         title: `Pre-AI Patch: ${aiDiffReview.fileName}`,
-        description: `Automatic safety checkpoint before applying CodeCollab AI suggestion`,
+        description: `Automatic safety checkpoint before applying Devnolith AI suggestion`,
       });
     } catch {
       // Best effort safety snapshot

@@ -89,7 +89,7 @@ describe('StudioPreviewPane Component', () => {
     render(<StudioPreviewPane projectId="test-proj-id" />);
 
     expect(screen.getByText('Live :5173')).toBeDefined();
-    const iframe = screen.getByTitle('CodeCollab Sandbox Preview');
+    const iframe = screen.getByTitle('Devnolith Sandbox Preview');
     expect(iframe).toBeDefined();
     expect(iframe.getAttribute('src')).toBe(mockPreviewUrl);
   });
@@ -157,7 +157,7 @@ describe('StudioPreviewPane Component', () => {
     fireEvent.change(portSelect, { target: { value: '3000' } });
 
     expect(screen.getByText('Live :3000')).toBeDefined();
-    const iframe = screen.getByTitle('CodeCollab Sandbox Preview');
+    const iframe = screen.getByTitle('Devnolith Sandbox Preview');
     expect(iframe.getAttribute('src')).toBe('http://localhost:4000/preview/test-proj-id/3000/?token=abc');
   });
 

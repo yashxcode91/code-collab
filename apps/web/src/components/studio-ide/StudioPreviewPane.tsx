@@ -405,7 +405,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
             <iframe
               key={iframeKey}
               src={effectivePreviewUrl || 'about:blank'}
-              title="CodeCollab Sandbox Preview"
+              title="Devnolith Sandbox Preview"
               className="w-full h-full border-none bg-white"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
             />

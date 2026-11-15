@@ -408,7 +408,7 @@ export function StudioTopBar({
 
             <Link
               to="/"
-              aria-label="CodeCollab Dashboard"
+              aria-label="Devnolith Dashboard"
               className="hidden items-center px-1 sm:inline-flex"
             >
               <BrandMark size="sm" />

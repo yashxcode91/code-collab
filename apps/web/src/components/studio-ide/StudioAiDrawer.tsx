@@ -749,7 +749,7 @@ export function StudioAiDrawer({
               <Sparkles className="h-6 w-6" />
             </div>
             <h4 className="text-sm font-semibold tracking-tight text-foreground">
-              CodeCollab AI Assistant
+              Devnolith AI Assistant
             </h4>
             <p className="mt-1 text-xs text-muted-foreground max-w-[240px]">
               Ask coding questions, explain logic, debug runtime crashes, or generate tests for your active files.
