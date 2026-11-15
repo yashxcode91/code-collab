@@ -103,12 +103,22 @@ export const isSecureCookie = (): boolean => {
  * Shared cookie attributes used for both res.cookie() and res.clearCookie().
  * Keeping options identical prevents browsers from ignoring cookie deletion.
  */
-export const getAuthCookieOptions = (): CookieOptions => ({
-  httpOnly: true,
-  secure: isSecureCookie(),
-  sameSite: 'lax',
-  path: '/',
-});
+export const getAuthCookieOptions = (): CookieOptions => {
+  const secure = isSecureCookie();
+  const origin = process.env.CLIENT_URL || process.env.FRONTEND_ORIGIN || '';
+  const isCrossOrigin =
+    secure &&
+    origin.length > 0 &&
+    !origin.includes('localhost') &&
+    !origin.includes('127.0.0.1');
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: isCrossOrigin ? 'none' : 'lax',
+    path: '/',
+  };
+};
 
 /** Signs an HS256 access JWT for an authenticated user session. */
 export const signAccessToken = (payload: AccessTokenPayload): string => {
@@ -208,12 +218,22 @@ export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
 };
 
 // OAuth state cookies are restricted strictly to `/api/auth` routes so they aren't sent everywhere
-export const getOAuthStateCookieOptions = (): CookieOptions => ({
-  httpOnly: true,
-  secure: isSecureCookie(),
-  sameSite: 'lax',
-  path: '/api/auth',
-});
+export const getOAuthStateCookieOptions = (): CookieOptions => {
+  const secure = isSecureCookie();
+  const origin = process.env.CLIENT_URL || process.env.FRONTEND_ORIGIN || '';
+  const isCrossOrigin =
+    secure &&
+    origin.length > 0 &&
+    !origin.includes('localhost') &&
+    !origin.includes('127.0.0.1');
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: isCrossOrigin ? 'none' : 'lax',
+    path: '/api/auth',
+  };
+};
 
 export const getOAuthStateCookieMaxAgeMs = (): number =>
   OAUTH_STATE_TTL_SECONDS * 1000;

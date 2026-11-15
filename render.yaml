@@ -26,7 +26,8 @@ services:
           name: devnolith-postgres
           property: connectionString
       - key: REDIS_URL
-        fromDatabase:
+        fromService:
+          type: keyvalue
           name: devnolith-redis
           property: connectionString
       - key: JWT_ACCESS_SECRET
@@ -69,7 +70,8 @@ services:
           name: devnolith-postgres
           property: connectionString
       - key: REDIS_URL
-        fromDatabase:
+        fromService:
+          type: keyvalue
           name: devnolith-redis
           property: connectionString
       - key: EXECUTION_PUBSUB_SECRET
@@ -100,9 +102,19 @@ services:
           name: devnolith-api-server
           property: host
 
+  # -------------------------------------------------------------
+  # 4. Managed Key Value Store (Redis / Valkey Broker)
+  # -------------------------------------------------------------
+  - type: keyvalue
+    name: devnolith-redis
+    plan: standard
+    region: oregon
+    maxmemoryPolicy: noeviction
+    ipAllowList: [] # internal access only
+
 databases:
   # -------------------------------------------------------------
-  # 4. Managed PostgreSQL 16 with pgvector Extension
+  # 5. Managed PostgreSQL 16 with pgvector Extension
   # -------------------------------------------------------------
   - name: devnolith-postgres
     databaseName: devnolith_prod
@@ -110,11 +122,3 @@ databases:
     plan: standard
     region: oregon
     postgresMajorVersion: 16
-
-  # -------------------------------------------------------------
-  # 5. Managed Redis 7 Broker
-  # -------------------------------------------------------------
-  - name: devnolith-redis
-    plan: standard
-    region: oregon
-    maxmemoryPolicy: noeviction

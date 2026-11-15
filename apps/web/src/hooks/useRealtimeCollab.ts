@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import * as Y from 'yjs';
+import { getApiBaseUrl } from '@/lib/api';
 import {
   buildFileRoomKey,
   COLLAB_LIMITS,
@@ -275,7 +276,8 @@ export function useRealtimeCollab({
 
     setConnectionStatus('connecting');
 
-    const socket: TypedClientSocket = io({
+    const apiBase = getApiBaseUrl();
+    const socket: TypedClientSocket = io(apiBase || undefined, {
       path: '/socket.io',
       withCredentials: true,
       transports: ['websocket', 'polling'],

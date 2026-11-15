@@ -16,6 +16,7 @@ import {
   OAUTH_PROVIDER_STORAGE_KEY,
   useAuth,
 } from '@/context/AuthContext';
+import { getApiBaseUrl } from '@/lib/api';
 
 type RegisterFormState = RegisterInput & { confirmPassword: string };
 type RegisterFieldErrors = Partial<Record<keyof RegisterFormState, string>>;
@@ -61,7 +62,8 @@ export function RegisterPage() {
       // Ignore storage access errors in restricted/private environments
     }
     // Full browser redirect required so OAuth cookie + 302 consent flow works cleanly
-    window.location.assign(`/api/auth/${provider}`);
+    const apiBase = getApiBaseUrl();
+    window.location.assign(`${apiBase}/api/auth/${provider}`);
   };
 
   const updateField = <K extends keyof RegisterFormState>(key: K, value: string) => {

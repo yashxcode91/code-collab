@@ -26,6 +26,21 @@ export class ApiClientError extends Error {
 // In-flight refresh promise singleton to prevent duplicate concurrent refresh calls
 let activeRefreshPromise: Promise<boolean> | null = null;
 
+/**
+ * Resolves the backend API base origin:
+ * - Empty string in local dev / Docker compose (same origin via reverse proxy)
+ * - `https://<host>` when VITE_API_URL is injected at build time (e.g. Render)
+ */
+export function getApiBaseUrl(): string {
+  const envUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL;
+  if (!envUrl) return '';
+  const trimmed = envUrl.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed.replace(/\/$/, '');
+  }
+  return `https://${trimmed}`.replace(/\/$/, '');
+}
+
 async function requestTokenRefresh(): Promise<boolean> {
   if (activeRefreshPromise) {
     return activeRefreshPromise;
@@ -33,7 +48,7 @@ async function requestTokenRefresh(): Promise<boolean> {
 
   activeRefreshPromise = (async () => {
     try {
-      const res = await fetch('/api/auth/refresh', {
+      const res = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -63,8 +78,13 @@ export async function apiRequest<T>(
   options: RequestInit = {},
   isRetry = false,
 ): Promise<T> {
+  const fullUrl =
+    path.startsWith('http://') || path.startsWith('https://')
+      ? path
+      : `${getApiBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`;
+
   // Always send credentials so the browser includes our HttpOnly JWT cookies
-  const res = await fetch(path, {
+  const res = await fetch(fullUrl, {
     ...options,
     credentials: 'include',
     headers: {

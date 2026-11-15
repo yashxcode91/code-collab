@@ -16,6 +16,7 @@ import {
   OAUTH_PROVIDER_STORAGE_KEY,
   useAuth,
 } from '@/context/AuthContext';
+import { getApiBaseUrl } from '@/lib/api';
 
 type LoginFieldErrors = Partial<Record<keyof LoginInput, string>>;
 
@@ -60,7 +61,8 @@ export function LoginPage() {
       // Ignore storage access errors in restricted/private environments
     }
     // Full-page navigation (not fetch) because `/api/auth/:provider` sets a cookie and 302-redirects to Google/GitHub
-    window.location.assign(`/api/auth/${provider}`);
+    const apiBase = getApiBaseUrl();
+    window.location.assign(`${apiBase}/api/auth/${provider}`);
   };
 
   // Clear field-specific validation feedback as soon as the user starts typing again
