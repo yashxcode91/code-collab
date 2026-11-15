@@ -361,7 +361,7 @@ const ROADMAP_ITEMS: RoadmapItem[] = [
     categoryLabel: 'Future — Exploring',
     status: 'Exploring',
     summary:
-      'Deploy any web project from CodeCollab Studio to a globally distributed edge CDN with a custom domain and automated SSL certificates.',
+      'Deploy any web project from Devnolith Studio to a globally distributed edge CDN with a custom domain and automated SSL certificates.',
     details: [
       'Instant container-to-static edge conversion with automated build detection',
       'Automated Let\'s Encrypt SSL provisioning and custom domain DNS routing',
@@ -776,67 +776,80 @@ export function RoadmapPage() {
       <StudioBackdrop />
 
       {/* ==================================================================== */}
-      {/* TOP NAVIGATION BAR */}
+      {/* TOP NAVIGATION BAR (Wide like workplace page + vibrant radiant glass) */}
       {/* ==================================================================== */}
-      <header className="sticky top-4 z-40 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="glass-mirror flex items-center justify-between rounded-2xl px-4 py-3">
-          {/* Left: Brand + Back to Studio */}
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="group inline-flex items-center gap-2 rounded-xl px-2.5 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-1" />
-              <span>Studio</span>
-            </Link>
-            <div className="h-4 w-px bg-border/60" />
-            <BrandLogo size="sm" />
-          </div>
+      <header className="sticky top-4 z-40 mx-auto w-full max-w-7xl xl:max-w-[1400px] 2xl:max-w-[1536px] px-4 sm:px-6 lg:px-8">
+        <div className="relative">
+          {/* Subtle Ambient Backlight Glow under top bar */}
+          <div
+            className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-primary/25 via-amber-500/15 to-primary/25 blur-md opacity-40 dark:opacity-60 -z-10"
+            aria-hidden="true"
+          />
 
-          {/* Center: In-Page Quick Section Anchors */}
-          <nav aria-label="Roadmap sections" className="hidden items-center gap-1 md:flex">
-            <a
-              href="#roadmap"
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
-            >
-              Roadmap
-            </a>
-            <a
-              href="#tech-stack"
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
-            >
-              Tech Stack
-            </a>
-            <a
-              href="#principles"
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
-            >
-              Principles
-            </a>
-            <a
-              href="#feedback"
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
-            >
-              Voting
-            </a>
-          </nav>
+          <div className="glass-mirror relative flex items-center justify-between rounded-2xl border border-border/80 px-4 py-2.5 sm:px-5 shadow-2xl backdrop-blur-2xl">
+            {/* Left: Brand + Back to Studio */}
+            <div className="flex items-center gap-3 z-20">
+              <Link
+                to="/"
+                className="glass-control group inline-flex items-center gap-2 rounded-xl px-3 py-1.5 font-mono text-xs font-semibold text-foreground transition-all hover:border-primary/50 hover:bg-foreground/[0.08] active:scale-95 shadow-sm"
+                title="Return to Studio"
+              >
+                <ArrowLeft className="h-3.5 w-3.5 text-primary transition-transform group-hover:-translate-x-1" />
+                <span>Studio</span>
+              </Link>
+              <div className="h-4 w-px bg-border/60" />
+              <BrandLogo size="sm" />
+            </div>
 
-          {/* Right: Theme Toggle + User Pill */}
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            {user && (
-              <span className="glass-control hidden rounded-xl px-2.5 py-1 font-mono text-xs text-foreground sm:inline-flex">
-                @{user.username}
-              </span>
-            )}
+            {/* Center: In-Page Quick Section Anchors in Segmented Pill Box (True Absolute Center) */}
+            <nav
+              aria-label="Roadmap sections"
+              className="glass-control hidden items-center rounded-2xl p-1.5 md:flex border border-border/70 shadow-inner gap-1 sm:gap-1.5 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
+            >
+              <a
+                href="#roadmap"
+                className="rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-[13px] font-semibold text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
+              >
+                Roadmap
+              </a>
+              <a
+                href="#tech-stack"
+                className="rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-[13px] font-semibold text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
+              >
+                Tech Stack
+              </a>
+              <a
+                href="#principles"
+                className="rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-[13px] font-semibold text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
+              >
+                Principles
+              </a>
+              <a
+                href="#feedback"
+                className="rounded-xl px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-[13px] font-semibold text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
+              >
+                Voting
+              </a>
+            </nav>
+
+            {/* Right: Theme Toggle + User Pill */}
+            <div className="flex items-center gap-2.5 z-20">
+              <ThemeToggle />
+              {user && (
+                <span className="glass-control hidden items-center gap-2 rounded-xl px-3 py-1.5 font-mono text-xs text-foreground sm:inline-flex shadow-sm">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>@{user.username}</span>
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       {/* ==================================================================== */}
-      {/* MAIN CONTENT CONTAINER */}
+      {/* MAIN CONTENT CONTAINER (Wide like workplace page) */}
       {/* ==================================================================== */}
-      <main className="relative z-10 mx-auto w-full max-w-7xl space-y-12 sm:space-y-14 px-4 pb-16 pt-5 sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto w-full max-w-7xl xl:max-w-[1400px] 2xl:max-w-[1536px] space-y-12 sm:space-y-14 px-4 pb-16 pt-5 sm:px-6 lg:px-8">
         {/* ================================================================== */}
         {/* HERO SECTION */}
         {/* ================================================================== */}
@@ -855,7 +868,7 @@ export function RoadmapPage() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
                 </span>
-                Devora / CodeCollab Engine v1.0.0
+                Devnolith Engine v1.0.0
               </span>
               <span className="glass-control rounded-full px-3.5 py-1.5 font-mono text-xs text-primary">
                 Production-Ready
@@ -1008,7 +1021,7 @@ export function RoadmapPage() {
               Production Stack & Libraries
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
-              Accurately cataloged framework dependencies, database engines, and runtime systems powering CodeCollab.
+              Accurately cataloged framework dependencies, database engines, and runtime systems powering Devnolith.
             </p>
           </div>
 
@@ -1061,7 +1074,7 @@ export function RoadmapPage() {
               Core Architectural Pillars
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
-              The foundational design choices and non-negotiable guarantees governing every line of CodeCollab code.
+              The foundational design choices and non-negotiable guarantees governing every line of Devnolith code.
             </p>
           </div>
 
@@ -1212,7 +1225,7 @@ export function RoadmapPage() {
                   Propose a Feature or Improvement
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Submit a new capability directly to the CodeCollab engineering backlog.
+                  Submit a new capability directly to the Devnolith engineering backlog.
                 </p>
               </div>
               <span className="font-mono text-[10px] text-muted-foreground">

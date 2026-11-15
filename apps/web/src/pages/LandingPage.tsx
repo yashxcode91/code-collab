@@ -194,7 +194,7 @@ const PRICING_TIERS = [
     frequency: 'free during preview',
     status: 'Current Active Phase',
     description:
-      'Full access to all platform features while CodeCollab is in active developer preview. No credit card required.',
+      'Full access to all platform features while Devnolith is in active developer preview. No credit card required.',
     isPopular: true,
     features: [
       'Unlimited public & private workspaces',
@@ -250,9 +250,9 @@ const PRICING_TIERS = [
 
 const FAQ_ITEMS = [
   {
-    question: 'What is CodeCollab?',
+    question: 'What is Devnolith?',
     answer:
-      'CodeCollab is a full-stack, collaborative cloud development platform. It integrates a browser-based Monaco editor, real-time multi-user CRDT synchronization, isolated Docker execution sandboxes, live web preview, and an AI engineering assistant into a single cohesive workspace.',
+      'Devnolith is a full-stack, collaborative cloud development platform. It integrates a browser-based Monaco editor, real-time multi-user CRDT synchronization, isolated Docker execution sandboxes, live web preview, and an AI engineering assistant into a single cohesive workspace.',
   },
   {
     question: 'Does code run on my local machine or in the cloud?',
@@ -262,7 +262,7 @@ const FAQ_ITEMS = [
   {
     question: 'How does real-time collaboration prevent merge conflicts?',
     answer:
-      'CodeCollab uses Yjs, a high-performance Conflict-free Replicated Data Type (CRDT) framework. Edits are modeled as mathematical operations that converge deterministically across all connected clients without requiring locking or manual conflict resolution.',
+      'Devnolith uses Yjs, a high-performance Conflict-free Replicated Data Type (CRDT) framework. Edits are modeled as mathematical operations that converge deterministically across all connected clients without requiring locking or manual conflict resolution.',
   },
   {
     question: 'Which programming languages are supported?',
@@ -277,17 +277,17 @@ const FAQ_ITEMS = [
   {
     question: 'What AI capabilities are currently available?',
     answer:
-      'CodeCollab features Google Gemini 2.0 streaming integration for code explanations, debugging diagnostics, and refactoring assistance. It also includes an AST code chunker and high-dimensional pgvector cosine similarity search for semantic codebase discovery.',
+      'Devnolith features Google Gemini 2.0 streaming integration for code explanations, debugging diagnostics, and refactoring assistance. It also includes an AST code chunker and high-dimensional pgvector cosine similarity search for semantic codebase discovery.',
   },
   {
     question: 'Is GitHub integration supported?',
     answer:
-      'CodeCollab currently supports local workspace branches, version history, and snapshot checkpoints. Direct bi-directional GitHub commit and PR synchronization is currently cataloged on our roadmap for upcoming release milestones.',
+      'Devnolith currently supports local workspace branches, version history, and snapshot checkpoints. Direct bi-directional GitHub commit and PR synchronization is currently cataloged on our roadmap for upcoming release milestones.',
   },
   {
-    question: 'Is CodeCollab free to use?',
+    question: 'Is Devnolith free to use?',
     answer:
-      'Yes! CodeCollab is 100% free during the Developer Preview phase. All workspaces, real-time collaboration, container execution runs, and AI capabilities are openly accessible to developers.',
+      'Yes! Devnolith is 100% free during the Developer Preview phase. All workspaces, real-time collaboration, container execution runs, and AI capabilities are openly accessible to developers.',
   },
 ];
 
@@ -311,114 +311,118 @@ export function LandingPage() {
       <StudioBackdrop />
 
       {/* ================================================================== */}
-      {/* SECTION A — NAVIGATION HEADER */}
+      {/* SECTION A — NAVIGATION HEADER (Floating radiant crystal glass bar) */}
       {/* ================================================================== */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl transition-all">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Logo & Product Name */}
-          <Link
-            to="/"
-            className="flex items-center gap-2.5 transition-transform duration-150 active:scale-95"
-            aria-label="CodeCollab Home"
-          >
-            <BrandLogo size="md" />
-          </Link>
+      <header className="sticky top-4 z-50 mx-auto w-full max-w-7xl xl:max-w-[1400px] 2xl:max-w-[1536px] px-4 sm:px-6 lg:px-8">
+        <div className="relative">
+          {/* Subtle Ambient Backlight Glow under top bar */}
+          <div
+            className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-primary/25 via-amber-500/15 to-primary/25 blur-md opacity-40 dark:opacity-60 -z-10"
+            aria-hidden="true"
+          />
 
-          {/* Desktop Nav Links */}
-          <nav
-            className="hidden md:flex items-center gap-6 text-xs font-medium text-muted-foreground"
-            aria-label="Main Navigation"
-          >
-            <a
-              href="#features"
-              className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md px-1 py-0.5"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md px-1 py-0.5"
-            >
-              How It Works
-            </a>
-            <a
-              href="#architecture"
-              className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md px-1 py-0.5"
-            >
-              Architecture
-            </a>
-            <Link
-              to="/roadmap"
-              className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md px-1 py-0.5 flex items-center gap-1"
-            >
-              <span>Roadmap</span>
-              <span className="rounded-full bg-primary/10 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-primary">
-                Live
-              </span>
-            </Link>
-            <a
-              href="#pricing"
-              className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md px-1 py-0.5"
-            >
-              Pricing
-            </a>
-            <a
-              href="#faq"
-              className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded-md px-1 py-0.5"
-            >
-              FAQ
-            </a>
-          </nav>
+          <div className="glass-mirror relative flex items-center justify-between rounded-2xl border border-border/80 px-4 py-2.5 sm:px-5 shadow-2xl backdrop-blur-2xl">
+            {/* Logo & Product Name */}
+            <div className="flex items-center z-20">
+              <BrandLogo size="md" />
+            </div>
 
-          {/* Right Action Controls */}
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-
-            {user ? (
-              <Link
-                to="/dashboard"
-                className="btn-studio-primary inline-flex h-9 items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold shadow-sm transition-all"
+            {/* Desktop Nav Links in Segmented Pill Box (True Absolute Center on Large Screens) */}
+            <nav
+              className="glass-control hidden md:flex items-center rounded-2xl p-1.5 border border-border/70 shadow-inner text-xs font-semibold gap-0.5 lg:gap-1 lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 z-10"
+              aria-label="Main Navigation"
+            >
+              <a
+                href="#features"
+                className="rounded-xl px-3 py-1.5 lg:px-3.5 text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
               >
-                <span>Open Studio</span>
-                <span className="hidden font-mono text-[11px] opacity-80 sm:inline">
-                  (@{user.username})
+                Features
+              </a>
+              <a
+                href="#how-it-works"
+                className="rounded-xl px-3 py-1.5 lg:px-3.5 text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
+              >
+                How It Works
+              </a>
+              <a
+                href="#architecture"
+                className="rounded-xl px-3 py-1.5 lg:px-3.5 text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
+              >
+                Architecture
+              </a>
+              <Link
+                to="/roadmap"
+                className="rounded-xl px-3 py-1.5 lg:px-3.5 text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground flex items-center gap-1.5 active:scale-95"
+              >
+                <span>Roadmap</span>
+                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 font-mono text-[9px] font-bold text-primary">
+                  Live
                 </span>
-                <ArrowRight className="h-3.5 w-3.5" />
               </Link>
-            ) : (
-              <div className="flex items-center gap-2">
+              <a
+                href="#pricing"
+                className="rounded-xl px-3 py-1.5 lg:px-3.5 text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
+              >
+                Pricing
+              </a>
+              <a
+                href="#faq"
+                className="rounded-xl px-3 py-1.5 lg:px-3.5 text-muted-foreground transition-all hover:bg-foreground/[0.08] hover:text-foreground active:scale-95"
+              >
+                FAQ
+              </a>
+            </nav>
+
+            {/* Right Action Controls */}
+            <div className="flex items-center gap-2.5 z-20">
+              <ThemeToggle />
+
+              {user ? (
                 <Link
-                  to="/login"
-                  className="glass-control hidden h-9 items-center justify-center rounded-xl px-3.5 text-xs font-medium text-foreground transition-all hover:bg-foreground/[0.08] sm:inline-flex"
+                  to="/dashboard"
+                  className="btn-studio-primary inline-flex h-9 items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold shadow-md shadow-primary/25 hover:shadow-primary/40 transition-all active:scale-95"
                 >
-                  Sign in
-                </Link>
-                <Link
-                  to="/register"
-                  className="btn-studio-primary inline-flex h-9 items-center justify-center gap-1.5 rounded-xl px-4 text-xs font-semibold shadow-sm transition-all"
-                >
-                  <span>Get Started</span>
+                  <span>Open Studio</span>
+                  <span className="hidden font-mono text-[11px] opacity-80 sm:inline">
+                    (@{user.username})
+                  </span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/login"
+                    className="glass-control hidden h-9 items-center justify-center rounded-xl px-3.5 text-xs font-semibold text-foreground transition-all hover:bg-foreground/[0.08] sm:inline-flex shadow-sm"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="btn-studio-primary inline-flex h-9 items-center justify-center gap-1.5 rounded-xl px-4 text-xs font-semibold shadow-md shadow-primary/25 hover:shadow-primary/40 transition-all active:scale-95"
+                  >
+                    <span>Get Started</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              )}
 
-            {/* Mobile Hamburger Toggle */}
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="glass-control inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:text-foreground md:hidden"
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </button>
+              {/* Mobile Hamburger Toggle */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="glass-control inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:text-foreground md:hidden"
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileMenuOpen}
+              >
+                {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="border-b border-border/60 bg-background/95 px-4 py-5 backdrop-blur-2xl md:hidden">
+          <div className="mt-2 glass-mirror rounded-2xl border border-border/80 px-4 py-5 shadow-2xl backdrop-blur-2xl md:hidden">
             <nav className="flex flex-col gap-3 font-medium text-sm">
               <a
                 href="#features"
@@ -502,7 +506,7 @@ export function LandingPage() {
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
               </span>
               <span className="font-mono text-[11px] font-medium text-muted-foreground">
-                CodeCollab 2.0 · Collaborative Cloud IDE
+                Devnolith 1.0 · Collaborative Cloud IDE
               </span>
             </div>
 
@@ -564,7 +568,7 @@ export function LandingPage() {
                     <span className="h-3 w-3 rounded-full bg-amber-500/80" />
                     <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
                     <span className="ml-2 hidden text-muted-foreground sm:inline">
-                      codecollab-studio · distributed-kv-store
+                      devnolith-studio · distributed-kv-store
                     </span>
                   </div>
 
@@ -635,7 +639,7 @@ export function LandingPage() {
                         <span className="text-emerald-300">'socket.io'</span>;{'\n'}
                         <span className="text-purple-400">import</span> &#123; setupCollabMesh &#125;{' '}
                         <span className="text-purple-400">from</span>{' '}
-                        <span className="text-emerald-300">'@codecollab/yjs'</span>;{'\n\n'}
+                        <span className="text-emerald-300">'@devnolith/yjs'</span>;{'\n\n'}
                         <span className="text-blue-400">const</span> server ={' '}
                         <span className="text-amber-300">createServer</span>();{'\n'}
                         <span className="text-blue-400">const</span> io ={' '}
@@ -657,7 +661,7 @@ export function LandingPage() {
                         server.<span className="text-amber-300">listen</span>(4000, () =&gt; &#123;
                         {'\n'}
                         {'  '}console.<span className="text-amber-300">log</span>(
-                        <span className="text-emerald-300">'CodeCollab mesh listening :4000'</span>
+                        <span className="text-emerald-300">'Devnolith mesh listening :4000'</span>
                         );{'\n'}
                         &#125;);
                       </code>
@@ -743,7 +747,7 @@ export function LandingPage() {
                 Everything You Need to Build, Test & Ship
               </h2>
               <p className="mt-3 text-sm text-muted-foreground sm:text-base leading-relaxed">
-                CodeCollab combines the capabilities of a modern desktop editor with the scalability
+                Devnolith combines the capabilities of a modern desktop editor with the scalability
                 of cloud execution and real-time collaboration.
               </p>
             </div>
@@ -801,7 +805,7 @@ export function LandingPage() {
                 From Idea to Execution in Four Simple Steps
               </h2>
               <p className="mt-3 text-sm text-muted-foreground sm:text-base leading-relaxed">
-                CodeCollab eliminates setup friction so you can focus strictly on writing and reviewing code.
+                Devnolith eliminates setup friction so you can focus strictly on writing and reviewing code.
               </p>
             </div>
 
@@ -848,7 +852,7 @@ export function LandingPage() {
                 Explore the Developer Experience
               </h2>
               <p className="mt-3 text-sm text-muted-foreground sm:text-base leading-relaxed">
-                Inspect the actual surfaces that power the CodeCollab cloud environment.
+                Inspect the actual surfaces that power the Devnolith cloud environment.
               </p>
             </div>
 
@@ -1034,7 +1038,7 @@ export function LandingPage() {
                 Engineered for Security, Isolation & Scale
               </h2>
               <p className="mt-3 text-sm text-muted-foreground sm:text-base leading-relaxed">
-                CodeCollab is architected with strict sandboxing and zero-trust verification across
+                Devnolith is architected with strict sandboxing and zero-trust verification across
                 all network boundaries.
               </p>
             </div>
@@ -1195,7 +1199,7 @@ export function LandingPage() {
                 Transparent &amp; Free During Developer Preview
               </h2>
               <p className="mt-3 text-sm text-muted-foreground sm:text-base leading-relaxed">
-                CodeCollab is currently 100% free while in active development. Below is the proposed
+                Devnolith is currently 100% free while in active development. Below is the proposed
                 future tier structure for subsequent cloud deployments.
               </p>
             </div>
@@ -1286,7 +1290,7 @@ export function LandingPage() {
                 Got Questions? We Have Answers.
               </h2>
               <p className="mt-3 text-sm text-muted-foreground sm:text-base leading-relaxed">
-                Accurate, technical explanations of how CodeCollab operates under the hood.
+                Accurate, technical explanations of how Devnolith operates under the hood.
               </p>
             </div>
 
@@ -1479,7 +1483,7 @@ export function LandingPage() {
 
           <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border/50 pt-8 sm:flex-row font-mono text-[11px]">
             <div>
-              &copy; {new Date().getFullYear()} CodeCollab. All rights reserved. Open engineering preview.
+              &copy; {new Date().getFullYear()} Devnolith. All rights reserved. Open engineering preview.
             </div>
             <div className="flex items-center gap-4 text-muted-foreground">
               <span>Status: All Systems Operational</span>
