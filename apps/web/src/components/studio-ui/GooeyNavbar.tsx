@@ -1,7 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useId, useState } from 'react';
+import { motion } from 'motion/react';
 import {
-  ChevronDown,
   Loader2,
   LogOut,
   Plus,
@@ -37,7 +36,7 @@ interface GooeyNavbarProps {
   isSyncing: boolean;
   onLogout: () => void;
   isLoggingOut: boolean;
-  projectCount: number;
+  projectCount?: number;
 }
 
 /**
@@ -50,8 +49,6 @@ interface GooeyNavbarProps {
  * - Inside the filtered wrapper, pills use **100% opaque `bg-primary`** while the outer wrapper
  *   applies `opacity-20 dark:opacity-30`. (Rendering low-alpha fills *inside* the matrix would
  *   cause `22 * alpha - 9 < 0`, collapsing them to invisible.)
- * - The Workspace Hub dropdown menu renders cleanly **outside** the SVG filter so it keeps
- *   crisp crystal `.glass-mirror` refraction with zero muddying from opaque goo blobs.
  */
 export function GooeyNavbar({
   user,
@@ -64,37 +61,13 @@ export function GooeyNavbar({
   isSyncing,
   onLogout,
   isLoggingOut,
-  projectCount,
 }: GooeyNavbarProps) {
   const filterId = useId().replace(/:/g, '');
-  const [hubOpen, setHubOpen] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const hubRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setAvatarFailed(false);
   }, [user?.avatarUrl]);
-
-  // Dismiss Workspace Hub dropdown on Escape or outside click
-  useEffect(() => {
-    if (!hubOpen) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (hubRef.current && !hubRef.current.contains(event.target as Node)) {
-        setHubOpen(false);
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setHubOpen(false);
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [hubOpen]);
 
   // Enforce HTTP/HTTPS scheme on external OAuth avatars (blocks javascript:/data: injection)
   const safeAvatarUrl =
@@ -146,103 +119,6 @@ export function GooeyNavbar({
             </button>
 
             <BrandLogo size="sm" />
-
-            {/* Workspace Hub Quick-Summary Dropdown Trigger */}
-            <div ref={hubRef} className="relative hidden lg:block">
-              <button
-                type="button"
-                onClick={() => setHubOpen((prev) => !prev)}
-                aria-expanded={hubOpen}
-                aria-haspopup="menu"
-                className="glass-control inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 font-mono text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <span>Hub</span>
-                <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-xs font-bold text-primary">
-                  {projectCount}
-                </span>
-                <ChevronDown
-                  className={`h-3.5 w-3.5 transition-transform duration-150 ${hubOpen ? 'rotate-180' : ''}`}
-                  aria-hidden="true"
-                />
-              </button>
-
-              {/* Liquid tether neck rendered just above dropdown (never behind dropdown glass!) */}
-              <AnimatePresence>
-                {hubOpen && (
-                  <>
-                    <motion.div
-                      initial={{ opacity: 0, scaleY: 0.4 }}
-                      animate={{ opacity: 1, scaleY: 1 }}
-                      exit={{ opacity: 0, scaleY: 0.4 }}
-                      style={{ filter: `url(#${filterId})` }}
-                      className="pointer-events-none absolute left-6 top-full z-20 h-3 w-12 opacity-20 dark:opacity-30"
-                      aria-hidden="true"
-                    >
-                      <div className="mx-auto h-3 w-6 rounded-b-full bg-primary" />
-                    </motion.div>
-
-                    <motion.div
-                      role="menu"
-                      initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                      transition={{
-                        type: 'spring',
-                        stiffness: 380,
-                        damping: 26,
-                      }}
-                      className="glass-mirror absolute left-0 top-[calc(100%+10px)] z-30 w-64 rounded-2xl p-3"
-                    >
-                      <div className="relative z-10 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-foreground">
-                            Workspace Hub
-                          </span>
-                          {/* Monochrome live beacon pill (no cliché emerald green) */}
-                          <span className="glass-control inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-xs text-foreground">
-                            <span className="relative flex h-1.5 w-1.5">
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground opacity-75 dark:bg-white" />
-                              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground shadow-[0_0_6px_rgba(255,255,255,0.65)] dark:bg-white" />
-                            </span>
-                            Live
-                          </span>
-                        </div>
-
-                        <p className="text-xs leading-relaxed text-muted-foreground">
-                          {projectCount === 0
-                            ? 'Create your first collaborative repository or pick a starter preset.'
-                            : `${projectCount} active workspace${projectCount === 1 ? '' : 's'} synced with PostgreSQL & Redis.`}
-                        </p>
-
-                        <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
-                          {NAV_TABS.map((tab) => (
-                            <button
-                              key={tab.id}
-                              type="button"
-                              role="menuitem"
-                              onClick={() => {
-                                onSelectTab(tab.id);
-                                setHubOpen(false);
-                              }}
-                              className={`flex items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs transition-colors ${
-                                activeTab === tab.id
-                                  ? 'bg-primary/15 font-medium text-primary'
-                                  : 'text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground'
-                              }`}
-                            >
-                              <span>{tab.label}</span>
-                              {activeTab === tab.id && (
-                                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
           </div>
 
           {/* Center: Gooey Sliding Section Navigation Pills (Desktop) */}
