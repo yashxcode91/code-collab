@@ -11,6 +11,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /build
 
+# Install OpenSSL for native Prisma query engine generation
+RUN apk add --no-cache openssl
+
 # Enable Corepack and pin exact pnpm version matching workspace
 RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
 
@@ -35,8 +38,12 @@ RUN pnpm --filter @codecollab/server run build
 # Deploy pruned production output bundle
 RUN pnpm --filter @codecollab/server --prod deploy /prod/server
 
-# Ensure generated prisma client runtime is available in production node_modules
-RUN cp -r /build/node_modules/.pnpm/@prisma+client* /prod/server/node_modules/ 2>/dev/null || true
+# Copy the generated Prisma Client runtime and query engine into deployed bundle
+RUN cp -rf /build/node_modules/.pnpm/@prisma+client* /prod/server/node_modules/.pnpm/
+RUN cp -rf /build/node_modules/.prisma /prod/server/node_modules/ 2>/dev/null || true
+RUN cp -rf /build/node_modules/@prisma /prod/server/node_modules/ 2>/dev/null || true
+RUN cp -rf /build/node_modules/.pnpm/typescript* /prod/server/node_modules/.pnpm/ 2>/dev/null || true
+RUN cp -rf /build/node_modules/typescript /prod/server/node_modules/ 2>/dev/null || true
 
 # -------------------------------------------------------------
 # Stage 2: Hardened Production Runner
@@ -48,8 +55,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Install minimal healthcheck tool
-RUN apk add --no-cache wget ca-certificates
+# Install minimal healthcheck tool and OpenSSL for Prisma engine
+RUN apk add --no-cache wget ca-certificates openssl
 
 # Copy deployed production files from builder
 COPY --from=builder /prod/server /app
@@ -63,7 +70,7 @@ USER node
 EXPOSE 4000
 
 # Automated container healthcheck against the production health route
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=25s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/api/health || exit 1
 
 CMD ["node", "dist/index.js"]

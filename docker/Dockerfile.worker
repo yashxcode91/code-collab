@@ -11,6 +11,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /build
 
+# Install OpenSSL for native Prisma query engine generation
+RUN apk add --no-cache openssl
+
 RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -28,7 +31,10 @@ RUN pnpm --filter @codecollab/database run build
 RUN pnpm --filter @codecollab/worker run build
 RUN pnpm --filter @codecollab/worker --prod deploy /prod/worker
 
-RUN cp -r /build/node_modules/.pnpm/@prisma+client* /prod/worker/node_modules/ 2>/dev/null || true
+# Copy the generated Prisma Client runtime and query engine into deployed bundle
+RUN cp -rf /build/node_modules/.pnpm/@prisma+client* /prod/worker/node_modules/.pnpm/
+RUN cp -rf /build/node_modules/.prisma /prod/worker/node_modules/ 2>/dev/null || true
+RUN cp -rf /build/node_modules/@prisma /prod/worker/node_modules/ 2>/dev/null || true
 
 # -------------------------------------------------------------
 # Stage 2: Hardened Production Worker
@@ -39,8 +45,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install Docker CLI to communicate with the host Docker daemon socket
-RUN apk add --no-cache docker-cli ca-certificates
+# Install Docker CLI to communicate with host Docker daemon and OpenSSL for Prisma
+RUN apk add --no-cache docker-cli ca-certificates openssl
 
 COPY --from=builder /prod/worker /app
 

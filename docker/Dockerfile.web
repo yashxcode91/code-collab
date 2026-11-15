@@ -26,7 +26,8 @@ RUN pnpm install --frozen-lockfile
 # Build shared types & packages
 RUN pnpm --filter @codecollab/shared run build
 
-# Build optimized Vite production bundle
+# Build optimized Vite production bundle with increased memory ceiling for Rollup
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN pnpm --filter @codecollab/web run build
 
 # -------------------------------------------------------------

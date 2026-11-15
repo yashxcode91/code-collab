@@ -63,10 +63,10 @@ const parseExpiresInSeconds = (rawValue: string | undefined): number => {
 };
 
 const getJwtConfig = (): { secret: string; expiresInSeconds: number } => {
-  const secret = process.env.JWT_SECRET?.trim();
+  const secret = (process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET)?.trim();
   if (!secret || secret.length < MIN_JWT_SECRET_LENGTH) {
     throw new Error(
-      `JWT_SECRET environment variable must be set and at least ${MIN_JWT_SECRET_LENGTH} characters long`
+      `JWT_SECRET or JWT_ACCESS_SECRET environment variable must be set and at least ${MIN_JWT_SECRET_LENGTH} characters long`
     );
   }
 

@@ -13,6 +13,7 @@ datasource db {
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x", "darwin-arm64", "debian-openssl-3.0.x"]
 }
 
 // Global platform role (user vs site admin)

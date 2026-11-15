@@ -11,7 +11,8 @@
     "test": "pnpm --filter \"*\" test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:load": "pnpm --filter server exec tsx ../../scripts/load-test-realtime.ts"
+    "test:load": "pnpm --filter server exec tsx ../../scripts/load-test-realtime.ts",
+    "db:migrate:prod": "pnpm --filter @codecollab/database migrate:deploy"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",

@@ -10,7 +10,7 @@ const DEFAULT_DEV_CLIENT_URL = 'http://localhost:5173';
  */
 export const getAllowedOrigin = (): string => {
   const isProduction = process.env.NODE_ENV === 'production';
-  const rawClientUrl = process.env.CLIENT_URL;
+  const rawClientUrl = process.env.CLIENT_URL ?? process.env.FRONTEND_ORIGIN;
 
   // Allow localhost:5173 convenience fallback in dev, but require explicit CLIENT_URL in production
   if (rawClientUrl === undefined) {
@@ -35,14 +35,16 @@ export const getAllowedOrigin = (): string => {
     );
   }
 
-  // Reject non-web schemes (e.g. ftp:, javascript:) and force HTTPS in production
+  // Reject non-web schemes (e.g. ftp:, javascript:) and force HTTPS in production (except localhost)
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error(
       `CLIENT_URL must use http or https protocol: "${rawClientUrl}"`
     );
   }
 
-  if (isProduction && parsed.protocol !== 'https:') {
+  const isLocalhost =
+    parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  if (isProduction && !isLocalhost && parsed.protocol !== 'https:') {
     throw new Error(
       `CLIENT_URL must use https in production: "${rawClientUrl}"`
     );
