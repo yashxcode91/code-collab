@@ -840,36 +840,33 @@ export function RoadmapPage() {
         {/* ================================================================== */}
         {/* HERO SECTION */}
         {/* ================================================================== */}
-        <section className="glass-mirror relative overflow-hidden rounded-2xl p-6 sm:p-8 lg:p-10">
+        <section className="glass-mirror relative overflow-hidden rounded-3xl py-12 px-6 sm:py-16 sm:px-10 lg:py-20 lg:px-12">
           {/* Subtle Ambient Radial Highlight */}
           <div
             className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary/15 blur-3xl"
             aria-hidden="true"
           />
 
-          <div className="relative z-10 max-w-3xl space-y-4">
+          <div className="relative z-10 max-w-3xl space-y-6 sm:space-y-7">
             {/* Architectural Status Pills */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="glass-control inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-xs font-medium text-foreground">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="glass-control inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 font-mono text-xs font-medium text-foreground">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
                 </span>
-                Devora / CodeCollab Engine v0.12.0
+                Devora / CodeCollab Engine v1.0.0
               </span>
-              <span className="glass-control rounded-full px-3 py-1 font-mono text-xs text-muted-foreground">
-                Solar Tangerine Design System
-              </span>
-              <span className="glass-control rounded-full px-3 py-1 font-mono text-xs text-primary">
+              <span className="glass-control rounded-full px-3.5 py-1.5 font-mono text-xs text-primary">
                 Production-Ready
               </span>
             </div>
 
             {/* Required Hero Heading & Description */}
-            <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
               The Future of Collaborative Development
             </h1>
-            <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+            <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
               Explore what's coming next, the technologies we're building with, and the architecture powering the next generation of developer collaboration.
             </p>
           </div>
