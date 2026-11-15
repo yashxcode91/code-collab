@@ -1,0 +1,110 @@
+# =====================================================================
+# Devnolith Studio - Render Infrastructure-as-Code Blueprint
+# Day 14: Cloud Production Launch on Render
+# =====================================================================
+
+services:
+  # -------------------------------------------------------------
+  # 1. API Server & Real-Time Gateway (Web Service)
+  # -------------------------------------------------------------
+  - type: web
+    name: devnolith-api-server
+    runtime: docker
+    dockerfilePath: docker/Dockerfile.server
+    dockerContext: .
+    plan: standard
+    region: oregon
+    numInstances: 1
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: devnolith-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: devnolith-redis
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CSRF_SECRET
+        generateValue: true
+      - key: EXECUTION_PUBSUB_SECRET
+        generateValue: true
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # -------------------------------------------------------------
+  # 2. Background Execution Runner (Background Worker)
+  # -------------------------------------------------------------
+  - type: worker
+    name: devnolith-execution-worker
+    runtime: docker
+    dockerfilePath: docker/Dockerfile.worker
+    dockerContext: .
+    plan: standard
+    region: oregon
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: devnolith-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: devnolith-redis
+          property: connectionString
+      - key: EXECUTION_PUBSUB_SECRET
+        fromService:
+          type: web
+          name: devnolith-api-server
+          envVarKey: EXECUTION_PUBSUB_SECRET
+
+  # -------------------------------------------------------------
+  # 3. Frontend Web Application (Static Site)
+  # -------------------------------------------------------------
+  - type: web
+    name: devnolith-web
+    runtime: static
+    buildCommand: pnpm --filter @codecollab/web build
+    staticPublishPath: apps/web/dist
+    pullRequestPreviewsEnabled: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: devnolith-api-server
+          property: host
+
+databases:
+  # -------------------------------------------------------------
+  # 4. Managed PostgreSQL 16 with pgvector Extension
+  # -------------------------------------------------------------
+  - name: devnolith-postgres
+    databaseName: devnolith_prod
+    user: devnolith
+    plan: standard
+    region: oregon
+    postgresMajorVersion: 16
+
+  # -------------------------------------------------------------
+  # 5. Managed Redis 7 Broker
+  # -------------------------------------------------------------
+  - name: devnolith-redis
+    plan: standard
+    region: oregon
+    maxmemoryPolicy: noeviction

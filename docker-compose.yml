@@ -1,0 +1,11 @@
+# =====================================================================
+# Devnolith Studio - Root Production Orchestration Compose File
+# Convenience wrapper delegating to docker/compose.prod.yml
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down
+# =====================================================================
+
+include:
+  - path: docker/compose.prod.yml

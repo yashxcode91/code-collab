@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =====================================================================
-# CodeCollab Day 12 Production Readiness & Verification Script
+# Devnolith Studio Day 14 Production Readiness & Verification Script
 # Validates configuration, build artifacts, Docker configs, and secrets
 # =====================================================================
 
@@ -13,7 +13,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 echo -e "${BLUE}=====================================================${NC}"
-echo -e "${BLUE}  CodeCollab Day 12 Production Verification Suite    ${NC}"
+echo -e "${BLUE}  Devnolith Studio Day 14 Production Suite           ${NC}"
 echo -e "${BLUE}=====================================================${NC}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -42,6 +42,10 @@ FILES=(
   "docker/nginx/nginx.conf"
   "docker/nginx/spa.conf"
   "docker/compose.prod.yml"
+  "docker-compose.yml"
+  "render.yaml"
+  "railway.json"
+  "scripts/deploy-cloud.sh"
   ".env.production.example"
 )
 
@@ -101,7 +105,7 @@ done
 echo -e "\n${BLUE}=====================================================${NC}"
 if [ $ERRORS -eq 0 ]; then
   echo -e "${GREEN}🎉 ALL PRODUCTION VERIFICATION CHECKS PASSED!${NC}"
-  echo -e "CodeCollab Day 12 Production Stack is 100% ready for deployment."
+  echo -e "Devnolith Studio Day 14 Production Stack is 100% ready for deployment."
   exit 0
 else
   echo -e "${RED}❌ $ERRORS production verification check(s) failed.${NC}"
