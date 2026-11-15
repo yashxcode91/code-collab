@@ -175,8 +175,8 @@ export class PreviewGatewayService {
     const portEntry = portsList.find((p) => p.containerPort === targetPort);
     const hostPort = portEntry?.hostPort;
 
-    // Prefer loopback hostPort if allocated (cross-platform macOS/Linux support)
-    const targetHost = hostPort ? '127.0.0.1' : (sandbox.internalIp || '127.0.0.1');
+    // Prefer loopback hostPort if allocated (cross-platform macOS/Linux support), then internal bridge IP/containerName
+    const targetHost = hostPort ? '127.0.0.1' : (sandbox.internalIp || sandbox.containerName || '127.0.0.1');
     const finalPort = hostPort || targetPort;
 
     return {

@@ -525,6 +525,9 @@ const spawnContainerPhase = (params: {
  * Executes a single isolated run inside hardened, disposable Docker containers.
  * Compiled languages split compilation (rw `/build`) from runtime (strict `:ro` everywhere).
  */
+const getRunnerTempRoot = (): string =>
+  process.env.RUNNER_TEMP_DIR || os.tmpdir();
+
 export const executeInDockerSandbox = async (
   params: RunExecutionParams
 ): Promise<ExecutionRunResult> => {
@@ -536,10 +539,12 @@ export const executeInDockerSandbox = async (
   );
 
   const startedAtMs = Date.now();
+  const baseTmpDir = getRunnerTempRoot();
+  await fs.mkdir(baseTmpDir, { recursive: true, mode: 0o777 }).catch(() => undefined);
   const tempRoot = await fs.mkdtemp(
-    path.join(os.tmpdir(), `codecollab-run-${params.runId.slice(0, 8)}-`)
+    path.join(baseTmpDir, `codecollab-run-${params.runId.slice(0, 8)}-`)
   );
-  await fs.chmod(tempRoot, 0o700);
+  await fs.chmod(tempRoot, 0o755);
   const srcDir = path.join(tempRoot, 'src');
   const buildDir = path.join(tempRoot, 'build');
   const collector = new BoundedOutputCollector(params.onStreamChunk);
@@ -903,7 +908,7 @@ export const reconcileOrphanedDockerResources = async (
   }
 
   try {
-    const tmpRoot = os.tmpdir();
+    const tmpRoot = getRunnerTempRoot();
     const entries = await fs.readdir(tmpRoot, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;

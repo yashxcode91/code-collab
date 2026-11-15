@@ -124,7 +124,9 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
     const host =
       (import.meta as any).env?.VITE_WS_HOST ||
       (typeof window !== 'undefined'
-        ? `${window.location.hostname}:4000`
+        ? (window.location.port === '5173'
+            ? `${window.location.hostname}:4000`
+            : window.location.host)
         : 'localhost:4000');
 
     const tokenQuery = sandbox?.previewToken

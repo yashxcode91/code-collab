@@ -178,7 +178,9 @@ export function usePreviewSandbox({
   const backendBaseUrl =
     (import.meta as any).env?.VITE_SERVER_URL ||
     (typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.hostname}:4000`
+      ? (window.location.port === '5173'
+          ? `${window.location.protocol}//${window.location.hostname}:4000`
+          : window.location.origin)
       : 'http://localhost:4000');
 
   const previewUrl = sandbox

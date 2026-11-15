@@ -55,8 +55,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Install minimal healthcheck tool and OpenSSL for Prisma engine
-RUN apk add --no-cache wget ca-certificates openssl
+# Install minimal healthcheck tool, OpenSSL for Prisma engine, and Docker CLI
+RUN apk add --no-cache wget ca-certificates openssl docker-cli && addgroup node root
 
 # Copy deployed production files from builder
 COPY --from=builder /prod/server /app

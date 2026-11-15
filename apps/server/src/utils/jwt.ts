@@ -86,13 +86,26 @@ export const getAuthCookieMaxAgeMs = (): number => {
   return expiresInSeconds * 1000;
 };
 
+export const isSecureCookie = (): boolean => {
+  const origin = process.env.CLIENT_URL || process.env.FRONTEND_ORIGIN || '';
+  if (origin.startsWith('https://')) return true;
+  if (
+    process.env.NODE_ENV === 'production' &&
+    !origin.includes('localhost') &&
+    !origin.includes('127.0.0.1')
+  ) {
+    return true;
+  }
+  return false;
+};
+
 /**
  * Shared cookie attributes used for both res.cookie() and res.clearCookie().
  * Keeping options identical prevents browsers from ignoring cookie deletion.
  */
 export const getAuthCookieOptions = (): CookieOptions => ({
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: isSecureCookie(),
   sameSite: 'lax',
   path: '/',
 });
@@ -135,7 +148,7 @@ export const verifyAccessToken = (token: string): AccessTokenPayload => {
  */
 export const getRefreshCookieOptions = (): CookieOptions => ({
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: isSecureCookie(),
   sameSite: 'lax',
   path: '/api/auth',
 });
@@ -197,7 +210,7 @@ export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
 // OAuth state cookies are restricted strictly to `/api/auth` routes so they aren't sent everywhere
 export const getOAuthStateCookieOptions = (): CookieOptions => ({
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: isSecureCookie(),
   sameSite: 'lax',
   path: '/api/auth',
 });

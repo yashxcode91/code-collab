@@ -128,14 +128,18 @@ export class SandboxManagerService {
       },
     });
 
+    const baseSandboxDir =
+      process.env.SANDBOX_WORKSPACE_DIR ||
+      path.join(os.tmpdir(), 'codecollab-sandboxes');
     const hostWorkspaceDir = path.join(
-      os.tmpdir(),
-      'codecollab-sandboxes',
+      baseSandboxDir,
       projectId,
       branchId
     );
 
-    await fs.mkdir(hostWorkspaceDir, { recursive: true });
+    await fs.mkdir(baseSandboxDir, { recursive: true, mode: 0o777 }).catch(() => undefined);
+    await fs.mkdir(hostWorkspaceDir, { recursive: true, mode: 0o777 });
+    await fs.chmod(hostWorkspaceDir, 0o777).catch(() => undefined);
 
     // Build map of ID -> file row for path reconstruction
     const byId = new Map<string, typeof files[number]>();
@@ -169,8 +173,10 @@ export class SandboxManagerService {
         continue;
       }
 
-      await fs.mkdir(path.dirname(targetFilePath), { recursive: true });
+      await fs.mkdir(path.dirname(targetFilePath), { recursive: true, mode: 0o777 });
+      await fs.chmod(path.dirname(targetFilePath), 0o777).catch(() => undefined);
       await fs.writeFile(targetFilePath, file.content, 'utf8');
+      await fs.chmod(targetFilePath, 0o666).catch(() => undefined);
     }
 
     // If no index.html exists, create a default landing page
@@ -253,6 +259,7 @@ export class SandboxManagerService {
         defaultIndexHtml,
         'utf8'
       );
+      await fs.chmod(path.join(hostWorkspaceDir, 'index.html'), 0o666).catch(() => undefined);
     }
 
     // Write the built-in fast static HTTP server helper
@@ -333,6 +340,7 @@ server.listen(PORT, '0.0.0.0', () => {
       serverScript,
       'utf8'
     );
+    await fs.chmod(path.join(hostWorkspaceDir, '_codecollab_serve.js'), 0o666).catch(() => undefined);
 
     return hostWorkspaceDir;
   }

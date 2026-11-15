@@ -19,6 +19,7 @@ services:
     ports:
       - "${GATEWAY_HTTP_PORT:-80}:80"
       - "${GATEWAY_HTTPS_PORT:-443}:443"
+      - "5173:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -74,6 +75,9 @@ services:
         required: false
     expose:
       - "4000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/devnolith-sandboxes:/tmp/devnolith-sandboxes
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -86,11 +90,14 @@ services:
       CSRF_SECRET: ${CSRF_SECRET:-devnolith_default_csrf_secret_min_32_chars_ok}
       EXECUTION_PUBSUB_SECRET: ${EXECUTION_PUBSUB_SECRET:-devnolith_default_pubsub_secret_min_32_chars_ok}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost}
+      SANDBOX_WORKSPACE_DIR: /tmp/devnolith-sandboxes
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URI: ${GITHUB_REDIRECT_URI:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,6 +111,7 @@ services:
       start_period: 25s
     networks:
       - devnolith-prod-network
+      - codecollab-sandbox
     deploy:
       resources:
         limits:
@@ -126,12 +134,14 @@ services:
         required: false
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/devnolith-runners:/tmp/devnolith-runners
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-devnolith_prod_secure_password_postgres}@postgres:5432/${POSTGRES_DB:-devnolith_prod}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD:-devnolith_prod_secure_password_redis}@redis:6379
       EXECUTION_PUBSUB_SECRET: ${EXECUTION_PUBSUB_SECRET:-devnolith_default_pubsub_secret_min_32_chars_ok}
       ALLOW_MISSING_RUNNER_IMAGES: "true"
+      RUNNER_TEMP_DIR: /tmp/devnolith-runners
     depends_on:
       postgres:
         condition: service_healthy
@@ -219,4 +229,7 @@ volumes:
 networks:
   devnolith-prod-network:
     name: devnolith_prod_network
+    driver: bridge
+  codecollab-sandbox:
+    name: codecollab-sandbox
     driver: bridge
