@@ -41,6 +41,14 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
 
   # -------------------------------------------------------------
   # 2. Background Execution Runner (Background Worker)
@@ -69,6 +77,8 @@ services:
           type: web
           name: devnolith-api-server
           envVarKey: EXECUTION_PUBSUB_SECRET
+      - key: ALLOW_MISSING_RUNNER_IMAGES
+        value: "true"
 
   # -------------------------------------------------------------
   # 3. Frontend Web Application (Static Site)
@@ -76,7 +86,7 @@ services:
   - type: web
     name: devnolith-web
     runtime: static
-    buildCommand: pnpm --filter @codecollab/web build
+    buildCommand: corepack enable && corepack prepare pnpm@12.18.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @codecollab/shared run build && pnpm --filter @codecollab/web build
     staticPublishPath: apps/web/dist
     pullRequestPreviewsEnabled: true
     routes:
