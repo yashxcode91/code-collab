@@ -8,9 +8,13 @@
     "dev": "pnpm --filter \"./apps/*\" --parallel dev",
     "build": "pnpm --filter \"./packages/*\" --if-present run build && pnpm --filter \"./apps/*\" --if-present run build",
     "lint": "pnpm --filter \"*\" lint",
-    "test": "pnpm --filter \"*\" test"
+    "test": "pnpm --filter \"*\" test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:load": "pnpm --filter server exec tsx ../../scripts/load-test-realtime.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "typescript": "^5.7.3"
   }
 }
