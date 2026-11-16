@@ -97,7 +97,7 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
         fontSize: 12.5,
         lineHeight: 1.35,
         cursorBlink: true,
-        cursorStyle: 'bar',
+        cursorStyle: 'block',
         scrollback: 2000,
         convertEol: true,
       });
@@ -107,6 +107,9 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
 
       term.open(containerRef.current);
       fitAddon.fit();
+      if (typeof term.focus === 'function') {
+        term.focus();
+      }
 
       terminalRef.current = term;
       fitAddonRef.current = fitAddon;
@@ -147,6 +150,9 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
           rows: term.rows,
         };
         ws.send(JSON.stringify(resizeMsg));
+        if (typeof term.focus === 'function') {
+          term.focus();
+        }
       }
     };
 
@@ -326,7 +332,10 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
       </div>
 
       {/* Terminal Viewport / Offline Guard */}
-      <div className="relative flex-1 min-h-0 w-full overflow-hidden p-2">
+      <div
+        className="relative flex-1 min-h-0 w-full overflow-hidden p-2 cursor-text"
+        onClick={() => terminalRef.current?.focus()}
+      >
         {!isSandboxRunning ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-400">
             <AlertCircle className="w-8 h-8 text-amber-400 mb-2 opacity-80" />

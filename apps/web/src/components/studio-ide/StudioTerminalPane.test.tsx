@@ -42,6 +42,7 @@ vi.mock('@xterm/xterm', () => {
     write = vi.fn();
     clear = vi.fn();
     reset = vi.fn();
+    focus = vi.fn();
     onData = vi.fn(() => ({ dispose: vi.fn() }));
     dispose = vi.fn();
   }

@@ -1,5 +1,8 @@
+import http from 'node:http';
+import fs from 'node:fs';
+import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import type { Writable, Readable } from 'node:stream';
+import { PassThrough, type Writable, type Readable, type Duplex } from 'node:stream';
 import { prisma } from '@codecollab/database';
 import { AppError } from '../../utils/AppError';
 import { assertProjectAccess } from '../projects/project.auth';
@@ -19,10 +22,174 @@ export interface TerminalProcess {
 }
 
 export interface TerminalSpawner {
-  spawn(containerName: string, cols: number, rows: number): TerminalProcess;
+  spawn(containerName: string, cols: number, rows: number): TerminalProcess | Promise<TerminalProcess>;
   resize?(containerName: string, cols: number, rows: number): Promise<void>;
 }
 
+/**
+ * Native Docker Engine API spawner utilizing /var/run/docker.sock.
+ * Allocates a true Linux pseudo-terminal (PTY) inside the container with Tty: true.
+ * This guarantees proper terminal echo, shell prompt (PS1), Enter key handling (CR/NL),
+ * arrow keys, color support, tab completion, and window resizing.
+ */
+export class DockerSocketTerminalSpawner implements TerminalSpawner {
+  private execIds = new Map<string, string>();
+
+  async spawn(containerName: string, cols: number, rows: number): Promise<TerminalProcess> {
+    const postData = JSON.stringify({
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true,
+      Cmd: ['/bin/sh'],
+      Env: [
+        'TERM=xterm-256color',
+        `COLUMNS=${cols}`,
+        `LINES=${rows}`,
+        'HOME=/workspace',
+        'USER=runner',
+      ],
+      WorkingDir: '/workspace',
+      User: '10001',
+    });
+
+    const execId = await new Promise<string>((resolve, reject) => {
+      const req = http.request(
+        {
+          socketPath: '/var/run/docker.sock',
+          path: `/containers/${encodeURIComponent(containerName)}/exec`,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData),
+          },
+        },
+        (res) => {
+          let body = '';
+          res.on('data', (c) => (body += c));
+          res.on('end', () => {
+            if (res.statusCode && res.statusCode >= 300) {
+              return reject(new Error(`Docker exec create failed (${res.statusCode}): ${body}`));
+            }
+            try {
+              const parsed = JSON.parse(body);
+              if (parsed.Id) {
+                resolve(parsed.Id);
+              } else {
+                reject(new Error(`Docker exec create returned no Id: ${body}`));
+              }
+            } catch (err) {
+              reject(err);
+            }
+          });
+        }
+      );
+      req.on('error', reject);
+      req.write(postData);
+      req.end();
+    });
+
+    this.execIds.set(containerName, execId);
+
+    const startData = JSON.stringify({
+      Detach: false,
+      Tty: true,
+    });
+
+    return new Promise<TerminalProcess>((resolve, reject) => {
+      const req = http.request({
+        socketPath: '/var/run/docker.sock',
+        path: `/exec/${execId}/start`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(startData),
+          Connection: 'Upgrade',
+          Upgrade: 'tcp',
+        },
+      });
+
+      req.on('upgrade', (_res, socket: Duplex, head: Buffer) => {
+        const emitter = new EventEmitter();
+        const dummyStderr = new PassThrough();
+
+        const proc: TerminalProcess = {
+          stdin: socket,
+          stdout: socket,
+          stderr: dummyStderr,
+          kill: () => {
+            socket.destroy();
+            return true;
+          },
+          on: (event: 'exit' | 'error', listener: any) => {
+            emitter.on(event, listener);
+            return proc;
+          },
+        };
+
+        if (head && head.length > 0) {
+          socket.unshift(head);
+        }
+
+        socket.on('close', () => {
+          this.execIds.delete(containerName);
+          emitter.emit('exit', 0, null);
+        });
+
+        socket.on('error', (err) => {
+          this.execIds.delete(containerName);
+          emitter.emit('error', err);
+        });
+
+        // Trigger initial resize once stream is attached
+        void this.resize(containerName, cols, rows);
+
+        resolve(proc);
+      });
+
+      req.on('response', (res) => {
+        let body = '';
+        res.on('data', (c) => (body += c));
+        res.on('end', () => {
+          reject(new Error(`Docker exec start failed with HTTP ${res.statusCode}: ${body}`));
+        });
+      });
+
+      req.on('error', reject);
+      req.write(startData);
+      req.end();
+    });
+  }
+
+  async resize(containerName: string, cols: number, rows: number): Promise<void> {
+    const execId = this.execIds.get(containerName);
+    if (!execId) return;
+
+    try {
+      await new Promise<void>((resolve) => {
+        const req = http.request(
+          {
+            socketPath: '/var/run/docker.sock',
+            path: `/exec/${execId}/resize?h=${rows}&w=${cols}`,
+            method: 'POST',
+            headers: {
+              'Content-Length': '0',
+            },
+          },
+          () => resolve()
+        );
+        req.on('error', () => resolve());
+        req.end();
+      });
+    } catch {
+      // Ignore resize errors
+    }
+  }
+}
+
+/**
+ * Docker CLI fallback spawner for environments without direct socket access.
+ */
 export class DockerTerminalSpawner implements TerminalSpawner {
   spawn(containerName: string, cols: number, rows: number): TerminalProcess {
     const args = [
@@ -38,6 +205,7 @@ export class DockerTerminalSpawner implements TerminalSpawner {
       `LINES=${rows}`,
       containerName,
       '/bin/sh',
+      '-i',
     ];
 
     const child = spawn('docker', args, {
@@ -48,7 +216,42 @@ export class DockerTerminalSpawner implements TerminalSpawner {
   }
 
   async resize(_containerName: string, _cols: number, _rows: number): Promise<void> {
-    // Note: Docker CLI stdin stream can be resized via window change or env
+    // Docker CLI stdin stream can be resized via window change or env
+  }
+}
+
+/**
+ * Automatically chooses DockerSocketTerminalSpawner when /var/run/docker.sock is available,
+ * otherwise falling back cleanly to DockerTerminalSpawner.
+ */
+export class AutoDetectTerminalSpawner implements TerminalSpawner {
+  private socketSpawner = new DockerSocketTerminalSpawner();
+  private cliSpawner = new DockerTerminalSpawner();
+
+  private canUseSocket(): boolean {
+    try {
+      return fs.existsSync('/var/run/docker.sock');
+    } catch {
+      return false;
+    }
+  }
+
+  async spawn(containerName: string, cols: number, rows: number): Promise<TerminalProcess> {
+    if (this.canUseSocket()) {
+      try {
+        return await this.socketSpawner.spawn(containerName, cols, rows);
+      } catch (err) {
+        console.warn('[TerminalService] Docker socket exec failed, falling back to CLI:', err);
+        return this.cliSpawner.spawn(containerName, cols, rows);
+      }
+    }
+    return this.cliSpawner.spawn(containerName, cols, rows);
+  }
+
+  async resize(containerName: string, cols: number, rows: number): Promise<void> {
+    if (this.canUseSocket()) {
+      await this.socketSpawner.resize(containerName, cols, rows);
+    }
   }
 }
 
@@ -66,7 +269,7 @@ export class TerminalService {
   private spawner: TerminalSpawner;
 
   constructor(spawner?: TerminalSpawner) {
-    this.spawner = spawner || new DockerTerminalSpawner();
+    this.spawner = spawner || new AutoDetectTerminalSpawner();
   }
 
   setSpawner(spawner: TerminalSpawner): void {
@@ -102,7 +305,7 @@ export class TerminalService {
     const rows = Math.max(5, Math.min(options.rows || 24, 200));
 
     // 3. Spawn interactive shell inside container
-    const proc = this.spawner.spawn(sandbox.containerName, cols, rows);
+    const proc = await this.spawner.spawn(sandbox.containerName, cols, rows);
     const sessionId = `term_${projectId}_${Date.now()}`;
 
     const session: TerminalSession = {
@@ -170,7 +373,11 @@ export class TerminalService {
     switch (msg.type) {
       case 'input':
         if (session.process.stdin.writable) {
-          session.process.stdin.write(msg.data);
+          // If fallback child_process pipe without PTY, map CR to LF so sh executes
+          const payload = (session.process as any).pid
+            ? msg.data.replace(/\r/g, '\n')
+            : msg.data;
+          session.process.stdin.write(payload);
         }
         break;
 
