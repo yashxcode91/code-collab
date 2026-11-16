@@ -299,7 +299,7 @@ export class GeminiAiProvider implements AiProviderAdapter {
   private readonly apiKey: string;
   private readonly model: string;
 
-  constructor(apiKey: string, model: string = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite') {
+  constructor(apiKey: string, model: string = process.env.GEMINI_MODEL || 'gemini-1.5-flash') {
     this.apiKey = apiKey;
     this.model = model;
     this.name = model;
