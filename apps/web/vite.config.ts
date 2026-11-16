@@ -38,12 +38,16 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1200,
+    chunkSizeWarningLimit: 2000,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('node_modules/monaco-editor/esm/vs/basic-languages')) {
+            return 'monaco-languages';
+          }
           if (id.includes('node_modules/monaco-editor')) {
-            return 'monaco-vendor';
+            return 'monaco-core';
           }
           if (
             id.includes('node_modules/react') ||

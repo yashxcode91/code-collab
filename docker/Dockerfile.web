@@ -27,7 +27,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @codecollab/shared run build
 
 # Build optimized Vite production bundle
-ENV NODE_OPTIONS="--max-old-space-size=1536"
+ENV NODE_OPTIONS="--max-old-space-size=2560"
 RUN pnpm --filter @codecollab/web exec vite build
 
 # -------------------------------------------------------------
