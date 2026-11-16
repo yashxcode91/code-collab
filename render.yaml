@@ -1,18 +1,18 @@
 # =====================================================================
 # Devnolith Studio - Render Infrastructure-as-Code Blueprint
-# Day 14: Cloud Production Launch on Render
+# Day 14: Cloud Production Launch on Render (100% Free Tier)
 # =====================================================================
 
 services:
   # -------------------------------------------------------------
-  # 1. API Server & Real-Time Gateway (Web Service)
+  # 1. API Server, WebSocket Gateway & In-Process Worker (Free Tier)
   # -------------------------------------------------------------
   - type: web
     name: devnolith-api-server
     runtime: docker
     dockerfilePath: docker/Dockerfile.server
     dockerContext: .
-    plan: standard
+    plan: free
     region: oregon
     numInstances: 1
     healthCheckPath: /api/health
@@ -21,6 +21,8 @@ services:
         value: production
       - key: PORT
         value: 4000
+      - key: EMBEDDED_WORKER
+        value: "true"
       - key: DATABASE_URL
         fromDatabase:
           name: devnolith-postgres
@@ -52,38 +54,7 @@ services:
         sync: false
 
   # -------------------------------------------------------------
-  # 2. Background Execution Runner (Background Worker)
-  # -------------------------------------------------------------
-  - type: worker
-    name: devnolith-execution-worker
-    runtime: docker
-    dockerfilePath: docker/Dockerfile.worker
-    dockerContext: .
-    plan: standard
-    region: oregon
-    numInstances: 1
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: devnolith-postgres
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: devnolith-redis
-          property: connectionString
-      - key: EXECUTION_PUBSUB_SECRET
-        fromService:
-          type: web
-          name: devnolith-api-server
-          envVarKey: EXECUTION_PUBSUB_SECRET
-      - key: ALLOW_MISSING_RUNNER_IMAGES
-        value: "true"
-
-  # -------------------------------------------------------------
-  # 3. Frontend Web Application (Static Site)
+  # 2. Frontend Web Application (Static Site - 100% Free CDN)
   # -------------------------------------------------------------
   - type: web
     name: devnolith-web
@@ -103,22 +74,22 @@ services:
           property: host
 
   # -------------------------------------------------------------
-  # 4. Managed Key Value Store (Redis / Valkey Broker)
+  # 3. Managed Key Value Store (Redis / Valkey Broker - Free Tier)
   # -------------------------------------------------------------
   - type: keyvalue
     name: devnolith-redis
-    plan: standard
+    plan: free
     region: oregon
     maxmemoryPolicy: noeviction
     ipAllowList: [] # internal access only
 
 databases:
   # -------------------------------------------------------------
-  # 5. Managed PostgreSQL 16 with pgvector Extension
+  # 4. Managed PostgreSQL 16 (PostgreSQL - Free Tier)
   # -------------------------------------------------------------
   - name: devnolith-postgres
     databaseName: devnolith_prod
     user: devnolith
-    plan: standard
+    plan: free
     region: oregon
     postgresMajorVersion: 16

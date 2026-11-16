@@ -5,6 +5,7 @@ import { prisma } from '@codecollab/database';
 import { app } from './app';
 import { redis } from './lib/redis';
 import { closeExecutionQueue } from './modules/execution/execution.queue';
+import { startEmbeddedWorker } from './modules/execution/embeddedWorker';
 import { createRealtimeServer } from './realtime/socketServer';
 import { yjsRoomManager } from './realtime/yjsRoomManager';
 import { handlePreviewWebSocketUpgrade } from './modules/sandbox/previewWebSocket';
@@ -26,6 +27,8 @@ httpServer.on('upgrade', (req, socket, head) => {
   }
 });
 
+const embeddedWorker = startEmbeddedWorker();
+
 httpServer.listen(PORT, () => {
   console.log(`🚀 CodeCollab API server running at http://localhost:${PORT}`);
   console.log(`🩺 Health check available at http://localhost:${PORT}/api/health`);
@@ -40,6 +43,9 @@ const shutdown = async (signal: string) => {
   console.log(`\n${signal} received — flushing Yjs documents and closing connections...`);
 
   try {
+    if (embeddedWorker) {
+      await embeddedWorker.close();
+    }
     await io.close();
     await yjsRoomManager.closeAll();
     await closeExecutionQueue();
