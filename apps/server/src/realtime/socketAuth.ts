@@ -4,7 +4,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@codecollab/shared';
-import { getAllowedOrigin } from '../middleware/csrf.middleware';
+import { isAllowedOrigin } from '../middleware/csrf.middleware';
 import { AUTH_COOKIE_NAME, verifyAccessToken } from '../utils/jwt';
 import { getUserById } from '../modules/auth/auth.service';
 
@@ -37,11 +37,10 @@ export const socketAuthMiddleware = async (
   next: (err?: Error) => void
 ): Promise<void> => {
   try {
-    const allowedOrigin = getAllowedOrigin();
     const requestOrigin = socket.handshake.headers.origin;
 
     // WebSocket upgrades bypass CORS preflight in browsers; strictly require matching Origin
-    if (!requestOrigin || requestOrigin === 'null' || requestOrigin !== allowedOrigin) {
+    if (!requestOrigin || requestOrigin === 'null' || !isAllowedOrigin(requestOrigin)) {
       next(new Error('CORS_ORIGIN_FORBIDDEN'));
       return;
     }

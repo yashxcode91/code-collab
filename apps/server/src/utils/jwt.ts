@@ -88,6 +88,9 @@ export const getAuthCookieMaxAgeMs = (): number => {
 
 export const isSecureCookie = (): boolean => {
   const origin = process.env.CLIENT_URL || process.env.FRONTEND_ORIGIN || '';
+  if (process.env.ALLOW_INSECURE_HTTP === 'true' || process.env.COOKIE_SECURE === 'false') {
+    return false;
+  }
   if (origin.startsWith('https://')) return true;
   if (origin.startsWith('http://')) return false;
   if (

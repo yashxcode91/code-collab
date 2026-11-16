@@ -5,7 +5,7 @@ import { healthRouter } from './modules/health/health.router';
 import { authRouter } from './modules/auth/auth.router';
 import { projectRouter } from './modules/projects/project.router';
 import { feedbackRouter } from './modules/feedback/feedback.router';
-import { csrfProtection, getAllowedOrigin } from './middleware/csrf.middleware';
+import { csrfProtection, getAllowedOrigin, isAllowedOrigin } from './middleware/csrf.middleware';
 import { securityHeaders } from './middleware/securityHeaders.middleware';
 import {
   globalErrorHandler,
@@ -34,7 +34,7 @@ app.use(securityHeaders);
 app.use(
   cors({
     origin: (requestOrigin, callback) => {
-      if (!requestOrigin || requestOrigin === getAllowedOrigin()) {
+      if (!requestOrigin || isAllowedOrigin(requestOrigin)) {
         callback(null, true);
         return;
       }

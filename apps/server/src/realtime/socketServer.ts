@@ -37,7 +37,7 @@ import {
   verifyPubSubStringSignature,
 } from '../lib/redis';
 import { AppError } from '../utils/AppError';
-import { getAllowedOrigin } from '../middleware/csrf.middleware';
+import { isAllowedOrigin } from '../middleware/csrf.middleware';
 import { createProjectChatMessage } from '../modules/chat/chat.service';
 import {
   consumeSlidingWindowLimit,
@@ -719,7 +719,7 @@ export const createRealtimeServer = (
   const io: TypedRealtimeIoServer = new Server(httpServer, {
     cors: {
       origin: (requestOrigin, callback) => {
-        if (requestOrigin && requestOrigin === getAllowedOrigin()) {
+        if (requestOrigin && isAllowedOrigin(requestOrigin)) {
           callback(null, true);
           return;
         }

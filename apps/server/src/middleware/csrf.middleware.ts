@@ -46,7 +46,8 @@ export const getAllowedOrigin = (): string => {
     parsed.hostname === 'localhost' ||
     parsed.hostname === '127.0.0.1' ||
     /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(parsed.hostname);
-  if (isProduction && !isLocalhostOrIp && parsed.protocol !== 'https:') {
+  const allowInsecureHttp = process.env.ALLOW_INSECURE_HTTP === 'true';
+  if (isProduction && !isLocalhostOrIp && !allowInsecureHttp && parsed.protocol !== 'https:') {
     throw new Error(
       `CLIENT_URL must use https in production: "${rawClientUrl}"`
     );
@@ -69,6 +70,61 @@ export const getAllowedOrigin = (): string => {
 };
 
 /**
+ * Evaluates whether an incoming request Origin is permitted under CORS and CSRF rules.
+ * Supports:
+ * - Exact match with canonical CLIENT_URL / FRONTEND_ORIGIN
+ * - Equivalent schemes (http/https) on the same configured domain (e.g. while SSL certs are provisioning)
+ * - Both apex and 'www' subdomains of the configured domain (e.g. devnolith.in <-> www.devnolith.in)
+ * - Direct server IPv4 origin fallback
+ * - Localhost in non-production or test environments
+ */
+export const isAllowedOrigin = (requestOrigin?: string | null): boolean => {
+  if (!requestOrigin || requestOrigin === 'null') return false;
+
+  let canonical: string;
+  try {
+    canonical = getAllowedOrigin();
+  } catch {
+    return false;
+  }
+
+  if (requestOrigin === canonical) return true;
+
+  try {
+    const canonicalUrl = new URL(canonical);
+    const reqUrl = new URL(requestOrigin);
+
+    // Normalize hostnames (lowercase, strip trailing dots)
+    const canonicalHost = canonicalUrl.hostname.toLowerCase();
+    const reqHost = reqUrl.hostname.toLowerCase();
+
+    // 1. Same host with http vs https (e.g. while SSL certs are provisioning or behind edge proxy)
+    if (reqHost === canonicalHost) {
+      return true;
+    }
+
+    // 2. Apex vs www subdomain equivalence (devnolith.in <-> www.devnolith.in)
+    if (reqHost === `www.${canonicalHost}` || canonicalHost === `www.${reqHost}`) {
+      return true;
+    }
+
+    // 3. Direct server IPv4 origin fallback
+    if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(reqHost)) {
+      return true;
+    }
+
+    // 4. Local development fallbacks
+    if (reqHost === 'localhost' || reqHost === '127.0.0.1') {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Defense-in-depth Origin/Referer check for state-changing HTTP methods.
  * Works alongside SameSite cookies (Step 4), strict CORS, and JSON-only parsing.
  */
@@ -79,12 +135,11 @@ export const csrfProtection: RequestHandler = (req, _res, next) => {
     return;
   }
 
-  const allowedOrigin = getAllowedOrigin();
   const originHeader = req.get('origin');
 
   // 1. Prefer `Origin` header (sent automatically by browsers on fetch/POST; reject sandboxed `origin: null`)
   if (originHeader !== undefined) {
-    if (originHeader === 'null' || originHeader !== allowedOrigin) {
+    if (originHeader === 'null' || !isAllowedOrigin(originHeader)) {
       next(
         new AppError(
           403,
@@ -103,7 +158,7 @@ export const csrfProtection: RequestHandler = (req, _res, next) => {
   if (refererHeader !== undefined) {
     try {
       const refererOrigin = new URL(refererHeader).origin;
-      if (refererOrigin !== allowedOrigin) {
+      if (!isAllowedOrigin(refererOrigin)) {
         next(
           new AppError(
             403,
