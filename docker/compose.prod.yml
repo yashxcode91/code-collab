@@ -40,6 +40,7 @@ services:
   # 2. Frontend Web Application: Minified Vite SPA
   # -------------------------------------------------------------
   web:
+    image: ghcr.io/yashxcode91/codecollab-web:latest
     build:
       context: ..
       dockerfile: docker/Dockerfile.web
