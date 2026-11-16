@@ -48,7 +48,7 @@ export function usePreviewSandbox({
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
   const [iframeKey, setIframeKey] = useState<number>(1);
 
-  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef<boolean>(true);
 
   const clearPollTimer = () => {

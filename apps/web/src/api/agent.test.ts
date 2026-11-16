@@ -25,7 +25,7 @@ describe('streamAgentSession SSE stream parser', () => {
       },
     });
 
-    global.fetch = vi.fn().mockResolvedValueOnce({
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       body: mockStream,
     });
@@ -64,7 +64,7 @@ describe('streamAgentSession SSE stream parser', () => {
       },
     });
 
-    global.fetch = vi.fn().mockResolvedValueOnce({
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       body: mockStream,
     });
