@@ -4,6 +4,8 @@ node_modules/
 
 # Production Build Outputs
 dist/
+!apps/web/dist/
+!apps/web/dist/**
 build/
 out/
 .next/

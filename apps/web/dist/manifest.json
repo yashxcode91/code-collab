@@ -1,0 +1,22 @@
+{
+  "short_name": "Devnolith",
+  "name": "Devnolith — Collaborative Cloud IDE",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/devnolith-logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0D0A08",
+  "theme_color": "#0D0A08",
+  "display": "standalone"
+}

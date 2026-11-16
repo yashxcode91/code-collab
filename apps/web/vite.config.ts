@@ -40,7 +40,11 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 2000,
     sourcemap: false,
+    minify: 'esbuild',
+    target: 'esnext',
+    cssMinify: true,
     rollupOptions: {
+      maxParallelFileOps: 2,
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/monaco-editor/esm/vs/basic-languages')) {

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Devnolith — Real-time Collaborative Coding Studio</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0D0A08" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta
+      name="description"
+      content="Devnolith: Real-time collaborative coding workspaces for modern engineering teams."
+    />
+    <!-- Prevent theme flash on page load; Light theme is default unless 'dark' is stored -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('codecollab-theme');
+          if (saved === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          }
+        } catch (_) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-BUNNi2vs.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-vendor-CMaEFw-L.js">
+    <link rel="modulepreload" crossorigin href="/assets/monaco-core-5ToWTVmG.js">
+    <link rel="modulepreload" crossorigin href="/assets/query-vendor-DVWYp-hP.js">
+    <link rel="modulepreload" crossorigin href="/assets/icons-vendor-IbtibA53.js">
+    <link rel="stylesheet" crossorigin href="/assets/monaco-core-C_qj3Lxd.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-CrHDSTVZ.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
