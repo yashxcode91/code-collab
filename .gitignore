@@ -12,9 +12,8 @@ out/
 # Environment Variables & Secrets (NEVER COMMIT)
 .env
 .env.*
-!.env.example
-!.env.production.example
-!.env.*.example
+*.env
+*.env.*
 
 # Logs
 logs/
