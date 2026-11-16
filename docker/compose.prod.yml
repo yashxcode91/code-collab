@@ -67,6 +67,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.server
     container_name: devnolith-prod-server
+    user: root
     restart: always
     env_file:
       - path: ../.env.production

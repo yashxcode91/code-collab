@@ -64,8 +64,8 @@ COPY --from=builder /prod/server /app
 # Ensure non-root node user ownership
 RUN chown -R node:node /app
 
-# Run as unprivileged node user (UID 1000)
-USER node
+# Run with root to manage isolated DooD execution runners and preview sandboxes via /var/run/docker.sock
+# USER node
 
 EXPOSE 4000
 
