@@ -42,9 +42,11 @@ export const getAllowedOrigin = (): string => {
     );
   }
 
-  const isLocalhost =
-    parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-  if (isProduction && !isLocalhost && parsed.protocol !== 'https:') {
+  const isLocalhostOrIp =
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '127.0.0.1' ||
+    /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(parsed.hostname);
+  if (isProduction && !isLocalhostOrIp && parsed.protocol !== 'https:') {
     throw new Error(
       `CLIENT_URL must use https in production: "${rawClientUrl}"`
     );
