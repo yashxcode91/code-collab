@@ -209,17 +209,17 @@ export function StudioAgentDrawer({
             </div>
 
             {/* Exact Announcement Text (Tasteful developer sarcasm & Solar Tangerine highlight) */}
-            <div className="space-y-3 text-xs leading-relaxed text-foreground/90">
-              <p className="text-zinc-200">
+            <div className="space-y-3 text-xs leading-relaxed">
+              <p className="font-medium text-slate-800 dark:text-zinc-200">
                 Due to unexpected financial difficulties faced by our developer Yash, this feature has been temporarily discontinued.
               </p>
 
-              <div className="rounded-lg border-l-2 border-amber-500/50 bg-muted/40 px-3 py-2 font-mono text-[11px] italic text-muted-foreground leading-normal">
+              <div className="rounded-lg border-l-2 border-amber-500/50 bg-amber-500/10 dark:bg-muted/40 px-3 py-2 font-mono text-[11px] italic text-slate-700 dark:text-zinc-300 leading-normal">
                 Apparently, AI doesn't run on motivation.
               </div>
 
-              <div className="pt-0.5 flex items-center gap-1.5 font-mono text-xs font-semibold text-primary">
-                <Sparkles className="h-3.5 w-3.5 text-primary shrink-0 animate-pulse" />
+              <div className="pt-0.5 flex items-center gap-1.5 font-mono text-xs font-semibold text-orange-600 dark:text-primary">
+                <Sparkles className="h-3.5 w-3.5 text-orange-600 dark:text-primary shrink-0 animate-pulse" />
                 <span className="tracking-wide">Premium access coming soon.</span>
               </div>
             </div>
