@@ -94,6 +94,7 @@ import {
 import {
   startSandboxController,
   stopSandboxController,
+  pingSandboxController,
   getSandboxStatusController,
   getSandboxLogsController,
 } from '../sandbox';
@@ -419,6 +420,11 @@ projectRouter.post(
   '/:projectId/sandbox/start',
   validateBody(StartSandboxSchema),
   asyncHandler(startSandboxController)
+);
+
+projectRouter.post(
+  '/:projectId/sandbox/ping',
+  asyncHandler(pingSandboxController)
 );
 
 projectRouter.post(

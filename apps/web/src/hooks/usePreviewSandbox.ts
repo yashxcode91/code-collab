@@ -3,6 +3,7 @@ import type { PreviewSandboxDTO, SandboxStatus } from '@codecollab/shared';
 import {
   getSandboxLogs,
   getSandboxStatus,
+  pingSandbox,
   startSandbox,
   stopSandbox,
 } from '@/api/sandbox';
@@ -100,6 +101,17 @@ export function usePreviewSandbox({
       void start();
     }
   }, [autoStart, sandbox, isStarting]);
+
+  // Keep sandbox alive with heartbeat ping every 60s while mounted and RUNNING
+  useEffect(() => {
+    if (!projectId || !sandbox || sandbox.status !== 'RUNNING') return;
+
+    const intervalId = setInterval(() => {
+      void pingSandbox(projectId, branchId).catch(() => undefined);
+    }, 60_000);
+
+    return () => clearInterval(intervalId);
+  }, [projectId, branchId, sandbox?.status]);
 
   const start = useCallback(
     async (primaryPort = 5173) => {

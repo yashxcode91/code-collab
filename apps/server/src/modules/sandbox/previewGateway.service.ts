@@ -19,6 +19,8 @@ export type PreviewResolution =
   | { state: 'FAILED'; sandbox: any }
   | { state: 'NOT_FOUND' };
 
+const previewTouchThrottleMap = new Map<string, number>();
+
 /**
  * Parses route paths like:
  * - `/preview/proj-123/5173/index.html` -> { projectId: 'proj-123', port: 5173, subPath: '/index.html' }
@@ -71,7 +73,14 @@ export class PreviewGatewayService {
       try {
         const payload = verifyPreviewToken(queryToken);
         if (payload.projectId === projectId) {
-          return true;
+          // Strictly verify that token was generated for the project owner
+          const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { ownerId: true },
+          });
+          if (project && payload.userId === project.ownerId) {
+            return true;
+          }
         }
       } catch {
         // Fall through to other auth mechanisms
@@ -108,18 +117,13 @@ export class PreviewGatewayService {
         const sessionPayload = verifyAccessToken(sessionToken);
         const userId = sessionPayload.sub;
 
-        // Verify project membership
+        // Verify strictly workspace owner
         const project = await prisma.project.findUnique({
           where: { id: projectId },
-          include: {
-            members: {
-              where: { userId },
-              take: 1,
-            },
-          },
+          select: { ownerId: true },
         });
 
-        if (project && (project.ownerId === userId || project.members.length > 0 || project.isPublic)) {
+        if (project && project.ownerId === userId) {
           return true;
         }
       } catch {
@@ -222,6 +226,19 @@ export class PreviewGatewayService {
 
     const { targetHost, targetPort } = resolution;
     const allowedOrigin = getAllowedOrigin();
+
+    // Refresh sandbox activity timestamp (throttled to once every 15s) so active preview users don't get reaped
+    const now = Date.now();
+    const lastTouch = previewTouchThrottleMap.get(parsed.projectId) || 0;
+    if (now - lastTouch > 15_000) {
+      previewTouchThrottleMap.set(parsed.projectId, now);
+      prisma.previewSandbox
+        .updateMany({
+          where: { projectId: parsed.projectId, status: 'RUNNING' },
+          data: { lastPingAt: new Date() },
+        })
+        .catch(() => undefined);
+    }
 
     // Reconstruct upstream target path with query parameters
     const queryString = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';

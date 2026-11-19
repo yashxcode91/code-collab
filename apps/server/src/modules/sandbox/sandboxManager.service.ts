@@ -11,6 +11,7 @@ import {
 } from '@codecollab/shared';
 import { AppError } from '../../utils/AppError';
 import { signPreviewToken } from '../../utils/jwt';
+import { terminalService } from '../terminal/terminal.service';
 
 const execFileAsync = promisify(execFile);
 
@@ -20,6 +21,10 @@ export const SANDBOX_NETWORK_NAME = 'codecollab-sandbox';
 const DEFAULT_PRIMARY_PORT = 5173;
 const DEFAULT_MEMORY_LIMIT_MB = 512;
 const DEFAULT_CPU_LIMIT = 1.0;
+
+/** Idle threshold: containers inactive for 5 minutes are auto-stopped to reclaim RAM */
+export const SANDBOX_IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+export const REAPER_CHECK_INTERVAL_MS = 30 * 1000; // 30 seconds
 
 export interface DockerExecutionResult {
   stdout: string;
@@ -64,9 +69,36 @@ export interface StartSandboxOptions extends Partial<StartSandboxDTO> {
 }
 
 export class SandboxManagerService {
+  private idleReaperInterval: NodeJS.Timeout | null = null;
+  private hasActiveSessionFn: (projectId: string) => boolean;
+
   constructor(
-    private readonly docker: DockerExecutor = new CliDockerExecutor()
-  ) {}
+    private readonly docker: DockerExecutor = new CliDockerExecutor(),
+    hasActiveSessionFn?: (projectId: string) => boolean
+  ) {
+    this.hasActiveSessionFn =
+      hasActiveSessionFn || ((pId) => terminalService.hasActiveSession(pId));
+
+    this.idleReaperInterval = setInterval(() => {
+      this.reapIdleSandboxes().catch((err) => {
+        console.error('[SandboxManager] Error during idle sandbox reap:', err);
+      });
+    }, REAPER_CHECK_INTERVAL_MS);
+
+    if (this.idleReaperInterval.unref) {
+      this.idleReaperInterval.unref();
+    }
+  }
+
+  /**
+   * Stops the background idle reaper (useful in unit testing).
+   */
+  public stopReaper(): void {
+    if (this.idleReaperInterval) {
+      clearInterval(this.idleReaperInterval);
+      this.idleReaperInterval = null;
+    }
+  }
 
   /**
    * Generates a sanitized, collision-resistant Docker container name.
@@ -514,6 +546,79 @@ server.listen(PORT, '0.0.0.0', () => {
     });
 
     return this.mapToDto(updated);
+  }
+
+  /**
+   * Refreshes the lastPingAt heartbeat on a running sandbox to prevent idle reaping.
+   */
+  async touchSandbox(projectId: string, branchId?: string): Promise<void> {
+    const where: any = { projectId, status: 'RUNNING' };
+    if (branchId) {
+      where.branchId = branchId;
+    }
+    await prisma.previewSandbox.updateMany({
+      where,
+      data: { lastPingAt: new Date() },
+    });
+  }
+
+  /**
+   * Scans running sandboxes and gracefully stops any container that has been idle
+   * (no preview traffic, no terminal activity, no heartbeats) for more than 5 minutes.
+   */
+  async reapIdleSandboxes(): Promise<number> {
+    const runningSandboxes = await prisma.previewSandbox.findMany({
+      where: { status: 'RUNNING' },
+    });
+
+    if (runningSandboxes.length === 0) return 0;
+
+    const now = Date.now();
+    let stoppedCount = 0;
+
+    for (const sb of runningSandboxes) {
+      // 1. If an active interactive terminal session is open for this project, keep alive
+      if (this.hasActiveSessionFn(sb.projectId)) {
+        await prisma.previewSandbox.update({
+          where: { id: sb.id },
+          data: { lastPingAt: new Date() },
+        });
+        continue;
+      }
+
+      // 2. Check time elapsed since last activity
+      const lastActivity = sb.lastPingAt || sb.startedAt || sb.createdAt;
+      const idleMs = now - new Date(lastActivity).getTime();
+
+      if (idleMs >= SANDBOX_IDLE_TIMEOUT_MS) {
+        console.log(
+          `[SandboxManager] Auto-stopping idle sandbox container ${sb.containerName} (idle for ${Math.round(idleMs / 1000)}s)`
+        );
+
+        try {
+          // Gracefully stop container and remove to reclaim 100% host RAM
+          await this.docker.exec(['stop', '-t', '2', sb.containerName]);
+          await this.docker.exec(['rm', '-f', sb.containerName]);
+
+          await prisma.previewSandbox.update({
+            where: { id: sb.id },
+            data: {
+              status: 'STOPPED',
+              internalIp: null,
+              stoppedAt: new Date(),
+            },
+          });
+          stoppedCount++;
+        } catch (err: any) {
+          console.warn(
+            `[SandboxManager] Failed to auto-stop idle sandbox container ${sb.containerName}:`,
+            err?.message || err
+          );
+        }
+      }
+    }
+
+    return stoppedCount;
   }
 
   /**

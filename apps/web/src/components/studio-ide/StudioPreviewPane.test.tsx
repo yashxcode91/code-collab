@@ -192,4 +192,18 @@ describe('StudioPreviewPane Component', () => {
     fireEvent.click(exitBtn);
     expect(mockToggleFullscreen).toHaveBeenCalledTimes(2);
   });
+
+  it('renders owner-only restricted notice with developer sarcasm line when isOwner is false', () => {
+    mockStatus = 'STOPPED';
+
+    render(<StudioPreviewPane projectId="test-proj-id" isOwner={false} />);
+
+    expect(screen.getByText('OWNER ONLY')).toBeDefined();
+    expect(screen.getByTestId('preview-owner-restricted')).toBeDefined();
+    expect(
+      screen.getByText(
+        /"Preview privileges are reserved for the workspace owner\. Collaborators, please enjoy the code without the power to run preview\."/
+      )
+    ).toBeDefined();
+  });
 });

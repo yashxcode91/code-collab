@@ -40,6 +40,22 @@ export async function stopSandbox(
 }
 
 /**
+ * Sends a heartbeat to refresh lastPingAt on a running sandbox container.
+ */
+export async function pingSandbox(
+  projectId: string,
+  branchId?: string
+): Promise<void> {
+  await apiRequest<{ success: boolean }>(
+    `/api/projects/${encodeURIComponent(projectId)}/sandbox/ping`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ branchId }),
+    }
+  );
+}
+
+/**
  * Queries live status, ports, and internal routing details.
  */
 export async function getSandboxStatus(

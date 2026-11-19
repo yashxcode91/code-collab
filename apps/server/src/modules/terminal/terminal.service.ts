@@ -285,6 +285,18 @@ export class TerminalService {
     this.spawner = spawner;
   }
 
+  /**
+   * Checks whether an active, open interactive terminal session exists for a given project.
+   */
+  hasActiveSession(projectId: string): boolean {
+    for (const session of this.sessions.values()) {
+      if (session.projectId === projectId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private reapIdleSessions(): void {
     const now = Date.now();
     for (const [sessionId, session] of this.sessions.entries()) {
@@ -427,7 +439,16 @@ export class TerminalService {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    session.lastActivityAt = new Date();
+    const now = new Date();
+    session.lastActivityAt = now;
+
+    // Refresh sandbox heartbeat so active terminal users are never auto-reaped
+    prisma.previewSandbox
+      .updateMany({
+        where: { projectId: session.projectId, status: 'RUNNING' },
+        data: { lastPingAt: now },
+      })
+      .catch(() => undefined);
 
     switch (msg.type) {
       case 'input':

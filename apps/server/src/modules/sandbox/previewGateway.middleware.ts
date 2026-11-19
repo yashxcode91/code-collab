@@ -32,10 +32,10 @@ previewGatewayRouter.all('*', async (req: Request, res: Response, next: NextFunc
   );
 
   if (!isAuthorized) {
-    res.status(401).send(
+    res.status(403).send(
       previewGateway.renderErrorHtml(
-        'Preview Authorization Required',
-        'You must be signed in or provide a valid preview token to inspect this workspace sandbox.'
+        'Workspace Owner Only',
+        'Preview privileges are reserved for the workspace owner. Collaborators, please enjoy the code without the power to run preview.'
       )
     );
     return;

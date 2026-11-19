@@ -8,6 +8,7 @@ import {
   Minimize2,
   Play,
   RotateCw,
+  ShieldAlert,
   Smartphone,
   Square,
   Tablet,
@@ -19,6 +20,7 @@ import { usePreviewSandbox } from '@/hooks/usePreviewSandbox';
 export interface StudioPreviewPaneProps {
   projectId: string;
   branchId?: string;
+  isOwner?: boolean;
   onClose?: () => void;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
@@ -37,6 +39,7 @@ const DEFAULT_PORTS = [5173, 3000, 8000, 8080];
 export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
   projectId,
   branchId,
+  isOwner = true,
   onClose,
   isFullscreen = false,
   onToggleFullscreen,
@@ -125,25 +128,27 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
         {/* Left: Status Pill */}
         <div className="flex items-center gap-1.5 shrink-0">
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium font-mono border bg-zinc-900 border-zinc-800">
-            {status === 'RUNNING' && (
+            {!isOwner ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-amber-400">OWNER ONLY</span>
+              </>
+            ) : status === 'RUNNING' ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" />
                 <span className="text-emerald-400">Live :{selectedPort}</span>
               </>
-            )}
-            {status === 'STARTING' && (
+            ) : status === 'STARTING' ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
                 <span className="text-orange-400">Booting...</span>
               </>
-            )}
-            {status === 'STOPPED' && (
+            ) : status === 'STOPPED' ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-zinc-500" />
                 <span className="text-zinc-400">Offline</span>
               </>
-            )}
-            {status === 'FAILED' && (
+            ) : (
               <>
                 <span className="w-2 h-2 rounded-full bg-rose-500" />
                 <span className="text-rose-400">Failed</span>
@@ -284,8 +289,8 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
           {status === 'RUNNING' || status === 'STARTING' ? (
             <button
               onClick={() => void stop()}
-              disabled={isStopping}
-              className="flex items-center gap-1 px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-medium transition-colors disabled:opacity-50 shrink-0"
+              disabled={!isOwner || isStopping}
+              className="flex items-center gap-1 px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-medium transition-colors disabled:opacity-30 disabled:pointer-events-none shrink-0"
               title="Stop container"
             >
               <Square className="w-3 h-3 fill-current" />
@@ -294,8 +299,8 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
           ) : (
             <button
               onClick={() => void start()}
-              disabled={isStarting}
-              className="flex items-center gap-1 px-2 py-1 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors disabled:opacity-50 shadow-sm shrink-0"
+              disabled={!isOwner || isStarting}
+              className="flex items-center gap-1 px-2 py-1 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors disabled:opacity-30 disabled:pointer-events-none shadow-sm shrink-0"
               title="Start preview sandbox"
             >
               <Play className="w-3 h-3 fill-current" />
@@ -319,8 +324,29 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
 
       {/* 2. Main Stage Viewport Area */}
       <div className="flex-1 relative bg-[#06080c] flex items-center justify-center p-3 overflow-hidden">
+        {/* Owner Only Restriction State */}
+        {!isOwner && (
+          <div
+            className="flex flex-col items-center justify-center text-center max-w-sm p-6 bg-[#0d1117] border border-amber-500/20 rounded-xl shadow-2xl"
+            data-testid="preview-owner-restricted"
+          >
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500 mb-4 shadow-lg">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-[9px] font-mono font-bold tracking-tight text-amber-500 mb-2">
+              RESTRICTED PRIVILEGES
+            </span>
+            <h3 className="text-base font-semibold text-zinc-100 mb-1.5">
+              Workspace Owner Only
+            </h3>
+            <div className="rounded-xl border-l-2 border-amber-500/50 bg-slate-900/90 border border-slate-800/80 px-4 py-3 font-mono text-xs italic text-slate-300 mt-2 leading-relaxed shadow-md">
+              "Preview privileges are reserved for the workspace owner. Collaborators, please enjoy the code without the power to run preview."
+            </div>
+          </div>
+        )}
+
         {/* Offline / Stopped State Canvas */}
-        {status === 'STOPPED' && (
+        {isOwner && status === 'STOPPED' && (
           <div className="flex flex-col items-center justify-center text-center max-w-sm p-6 bg-[#0d1117] border border-zinc-800/80 rounded-xl shadow-2xl">
             <div className="w-12 h-12 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-4">
               <Laptop className="w-6 h-6" />
@@ -348,7 +374,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
         )}
 
         {/* Booting Progress Indicator State */}
-        {status === 'STARTING' && (
+        {isOwner && status === 'STARTING' && (
           <div className="flex flex-col items-center justify-center text-center max-w-sm p-8 bg-[#0d1117] border border-orange-500/30 rounded-xl shadow-2xl">
             <div className="w-10 h-10 border-2 border-orange-500/20 border-t-orange-400 rounded-full animate-spin mb-4" />
             <h3 className="text-sm font-semibold text-zinc-100 mb-1">
@@ -364,7 +390,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
         )}
 
         {/* Failed State */}
-        {status === 'FAILED' && (
+        {isOwner && status === 'FAILED' && (
           <div className="flex flex-col items-center justify-center text-center max-w-sm p-6 bg-[#0d1117] border border-rose-500/40 rounded-xl shadow-2xl">
             <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-3">
               <X className="w-5 h-5" />
@@ -385,7 +411,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
         )}
 
         {/* Running Live Preview Iframe with Device Framing */}
-        {(status === 'RUNNING' || (status === 'STARTING' && effectivePreviewUrl)) && (
+        {isOwner && (status === 'RUNNING' || (status === 'STARTING' && effectivePreviewUrl)) && (
           <div
             className={`h-full transition-all duration-300 ease-out flex flex-col bg-white rounded-lg shadow-2xl overflow-hidden ${
               deviceMode === 'desktop'

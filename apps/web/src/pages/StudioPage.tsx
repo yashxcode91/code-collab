@@ -1339,6 +1339,7 @@ export function StudioPage() {
                 <StudioPreviewPane
                   projectId={projectId}
                   branchId={activeBranch?.id}
+                  isOwner={project?.currentUserRole === 'owner'}
                   isFullscreen={isPreviewFullscreen}
                   onToggleFullscreen={() => setIsPreviewFullscreen((v) => !v)}
                   onClose={() => {
