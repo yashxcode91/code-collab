@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
   AlertCircle,
+  ShieldAlert,
 } from 'lucide-react';
 import type {
   TerminalClientMessage,
@@ -19,6 +20,7 @@ import { usePreviewSandbox } from '@/hooks/usePreviewSandbox';
 export interface StudioTerminalPaneProps {
   projectId: string;
   branchId?: string;
+  isOwner?: boolean;
   onClose?: () => void;
   className?: string;
 }
@@ -28,6 +30,7 @@ export type TerminalStatus = 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'ERRO
 export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
   projectId,
   branchId,
+  isOwner = true,
   onClose,
   className = '',
 }) => {
@@ -53,6 +56,11 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
   const isSandboxRunning = sandboxStatus === 'RUNNING';
 
   const connectTerminal = useCallback(() => {
+    if (!isOwner) {
+      setStatus('DISCONNECTED');
+      return;
+    }
+
     if (!containerRef.current || !isSandboxRunning) {
       if (!isSandboxRunning) {
         setStatus('DISCONNECTED');
@@ -205,9 +213,12 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
     };
   }, [isSandboxRunning, projectId, sandbox?.previewToken]);
 
-  // Connect when sandbox becomes ready
+  // Connect when sandbox becomes ready (owner-only)
   useEffect(() => {
-    const cleanup = connectTerminal();
+    let cleanup: (() => void) | undefined;
+    if (isOwner) {
+      cleanup = connectTerminal();
+    }
     return () => {
       if (cleanup) cleanup();
       if (wsRef.current) {
@@ -217,7 +228,7 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
         wsRef.current = null;
       }
     };
-  }, [connectTerminal]);
+  }, [connectTerminal, isOwner]);
 
   // Handle container resizing
   useEffect(() => {
@@ -274,25 +285,27 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
 
           {/* Status Indicator */}
           <div className="flex items-center gap-1.5 ml-2 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-mono">
-            {status === 'CONNECTED' && (
+            {!isOwner ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span className="text-amber-400">OWNER ONLY</span>
+              </>
+            ) : status === 'CONNECTED' ? (
               <>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-emerald-400">CONNECTED</span>
               </>
-            )}
-            {status === 'CONNECTING' && (
+            ) : status === 'CONNECTING' ? (
               <>
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 <span className="text-amber-400">CONNECTING...</span>
               </>
-            )}
-            {status === 'DISCONNECTED' && (
+            ) : status === 'DISCONNECTED' ? (
               <>
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
                 <span className="text-slate-400">DISCONNECTED</span>
               </>
-            )}
-            {status === 'ERROR' && (
+            ) : (
               <>
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                 <span className="text-rose-400" title={errorMessage || 'Error'}>
@@ -307,15 +320,17 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={handleClear}
+            disabled={!isOwner}
             title="Clear Terminal (Ctrl+L)"
-            className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30 disabled:pointer-events-none"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={handleRestart}
+            disabled={!isOwner}
             title="Restart Terminal Session"
-            className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30 disabled:pointer-events-none"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
@@ -336,7 +351,25 @@ export const StudioTerminalPane: React.FC<StudioTerminalPaneProps> = ({
         className="relative flex-1 min-h-0 w-full overflow-hidden p-2 cursor-text"
         onClick={() => terminalRef.current?.focus()}
       >
-        {!isSandboxRunning ? (
+        {!isOwner ? (
+          <div
+            className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-400"
+            data-testid="terminal-owner-restricted"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-500 mb-3 shadow-lg">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-[9px] font-mono font-bold tracking-tight text-amber-500 mb-2">
+              RESTRICTED PRIVILEGES
+            </span>
+            <h4 className="text-sm font-semibold text-slate-200 mb-1">
+              Workspace Owner Only
+            </h4>
+            <div className="max-w-md rounded-xl border-l-2 border-amber-500/50 bg-slate-900/90 border border-slate-800/80 px-4 py-3 font-mono text-xs italic text-slate-300 mt-2 leading-relaxed shadow-md">
+              "Terminal privileges are reserved for the workspace owner. Collaborators, please enjoy the code without the power to execute it."
+            </div>
+          </div>
+        ) : !isSandboxRunning ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-400">
             <AlertCircle className="w-8 h-8 text-amber-400 mb-2 opacity-80" />
             <h4 className="text-sm font-semibold text-slate-200 mb-1">

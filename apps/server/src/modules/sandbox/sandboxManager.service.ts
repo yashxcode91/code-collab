@@ -441,6 +441,8 @@ server.listen(PORT, '0.0.0.0', () => {
       `${memoryLimitMb}m`,
       '--cpus',
       `${cpuLimit}`,
+      '--pids-limit',
+      '128',
       '--security-opt',
       'no-new-privileges:true',
       '--cap-drop=ALL',

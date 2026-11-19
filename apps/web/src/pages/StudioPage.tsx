@@ -1301,6 +1301,7 @@ export function StudioPage() {
                   <StudioTerminalPane
                     projectId={projectId}
                     branchId={activeBranch?.id}
+                    isOwner={project?.currentUserRole === 'owner'}
                     onClose={() => setIsTerminalOpen(false)}
                   />
                 </div>

@@ -262,18 +262,43 @@ export interface TerminalSession {
   process: TerminalProcess;
   ws: WebSocket;
   createdAt: Date;
+  lastActivityAt: Date;
 }
+
+const MAX_TERMINAL_SESSIONS_PER_PROJECT = 3;
+const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 export class TerminalService {
   private sessions = new Map<string, TerminalSession>();
   private spawner: TerminalSpawner;
+  private idleCheckInterval: NodeJS.Timeout | null = null;
 
   constructor(spawner?: TerminalSpawner) {
     this.spawner = spawner || new AutoDetectTerminalSpawner();
+    this.idleCheckInterval = setInterval(() => this.reapIdleSessions(), 60_000);
+    if (this.idleCheckInterval.unref) {
+      this.idleCheckInterval.unref();
+    }
   }
 
   setSpawner(spawner: TerminalSpawner): void {
     this.spawner = spawner;
+  }
+
+  private reapIdleSessions(): void {
+    const now = Date.now();
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (now - session.lastActivityAt.getTime() > SESSION_IDLE_TIMEOUT_MS) {
+        this.sendToWs(session.ws, {
+          type: 'error',
+          message: 'Terminal session closed due to 30 minutes of inactivity.',
+        });
+        this.closeSession(sessionId);
+        if (session.ws.readyState === session.ws.OPEN) {
+          session.ws.close();
+        }
+      }
+    }
   }
 
   /**
@@ -285,8 +310,19 @@ export class TerminalService {
     ws: WebSocket,
     options: { cols?: number; rows?: number } = {}
   ): Promise<TerminalSession> {
-    // 1. Verify user has write/edit permissions to the project
-    await assertProjectAccess(projectId, userId, 'editor');
+    // 1. Verify user is the workspace owner (terminal execution is strictly owner-only)
+    try {
+      await assertProjectAccess(projectId, userId, 'owner');
+    } catch (err: any) {
+      if (err instanceof AppError && err.code === 'INSUFFICIENT_ROLE') {
+        throw new AppError(
+          403,
+          'INSUFFICIENT_ROLE',
+          'Terminal privileges are reserved for the workspace owner. Collaborators, please enjoy the code without the power to execute it.'
+        );
+      }
+      throw err;
+    }
 
     // 2. Query sandbox status
     const sandbox = await prisma.previewSandbox.findFirst({
@@ -304,9 +340,29 @@ export class TerminalService {
     const cols = Math.max(10, Math.min(options.cols || 80, 500));
     const rows = Math.max(5, Math.min(options.rows || 24, 200));
 
-    // 3. Spawn interactive shell inside container
+    // 3. Enforce maximum concurrent terminal sessions per project (prevent resource exhaustion)
+    const existingSessions = Array.from(this.sessions.values()).filter(
+      (s) => s.projectId === projectId
+    );
+    if (existingSessions.length >= MAX_TERMINAL_SESSIONS_PER_PROJECT) {
+      existingSessions.sort(
+        (a, b) => a.lastActivityAt.getTime() - b.lastActivityAt.getTime()
+      );
+      const oldest = existingSessions[0];
+      this.sendToWs(oldest.ws, {
+        type: 'error',
+        message: 'Session replaced by a newer terminal connection.',
+      });
+      this.closeSession(oldest.sessionId);
+      if (oldest.ws.readyState === oldest.ws.OPEN) {
+        oldest.ws.close();
+      }
+    }
+
+    // 4. Spawn interactive shell inside container
     const proc = await this.spawner.spawn(sandbox.containerName, cols, rows);
     const sessionId = `term_${projectId}_${Date.now()}`;
+    const now = new Date();
 
     const session: TerminalSession = {
       sessionId,
@@ -314,12 +370,13 @@ export class TerminalService {
       containerName: sandbox.containerName,
       process: proc,
       ws,
-      createdAt: new Date(),
+      createdAt: now,
+      lastActivityAt: now,
     };
 
     this.sessions.set(sessionId, session);
 
-    // 4. Pipe process stdout & stderr to WebSocket
+    // 5. Pipe process stdout & stderr to WebSocket
     proc.stdout.on('data', (chunk: Buffer) => {
       this.sendToWs(ws, {
         type: 'output',
@@ -370,8 +427,15 @@ export class TerminalService {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
+    session.lastActivityAt = new Date();
+
     switch (msg.type) {
       case 'input':
+        // Guard against massive buffer flooding (max 32KB per input frame)
+        if (typeof msg.data === 'string' && msg.data.length > 32 * 1024) {
+          return;
+        }
+
         if (session.process.stdin.writable) {
           // If fallback child_process pipe without PTY, map CR to LF so sh executes
           const payload = (session.process as any).pid

@@ -3,9 +3,13 @@ import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { TerminalClientMessageSchema } from '@codecollab/shared';
 import { verifyAccessToken, verifyPreviewToken, AUTH_COOKIE_NAME } from '../../utils/jwt';
+import { isAllowedOrigin } from '../../middleware/csrf.middleware';
 import { terminalService, type TerminalSession } from './terminal.service';
 
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({
+  noServer: true,
+  maxPayload: 64 * 1024, // 64KB max incoming frame payload to prevent DoS buffer flooding
+});
 
 interface AuthResult {
   userId: string;
@@ -102,6 +106,25 @@ export function handleTerminalWebSocketUpgrade(
   }
 
   const projectId = match[1];
+
+  // 1. Cross-Site WebSocket Hijacking (CSWSH) Defense:
+  // Validate Origin / Referer against authorized frontend host
+  const requestOrigin =
+    (req.headers.origin as string | undefined) ||
+    (req.headers.referer as string | undefined);
+
+  if (requestOrigin && requestOrigin !== 'null' && !isAllowedOrigin(requestOrigin)) {
+    clientSocket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+    clientSocket.destroy();
+    return true;
+  }
+
+  if (process.env.NODE_ENV === 'production' && !requestOrigin) {
+    clientSocket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+    clientSocket.destroy();
+    return true;
+  }
+
   const auth = authenticateRequest(req, projectId);
 
   if (!auth) {

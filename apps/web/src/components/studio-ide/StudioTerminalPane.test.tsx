@@ -116,4 +116,17 @@ describe('StudioTerminalPane Component', () => {
     fireEvent.click(closeBtn);
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
+
+  it('renders owner-only restricted notice with developer sarcasm line when isOwner is false', () => {
+    render(<StudioTerminalPane projectId="test-p1" isOwner={false} />);
+
+    expect(screen.getByTestId('terminal-owner-restricted')).toBeDefined();
+    expect(screen.getByText('OWNER ONLY')).toBeDefined();
+    expect(screen.getByText('Workspace Owner Only')).toBeDefined();
+    expect(
+      screen.getByText(
+        /"Terminal privileges are reserved for the workspace owner. Collaborators, please enjoy the code without the power to execute it."/
+      )
+    ).toBeDefined();
+  });
 });
