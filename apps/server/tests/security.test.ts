@@ -108,6 +108,12 @@ describe('Backend Security Infrastructure (CORS, CSRF, Errors)', () => {
       expect(evilOriginRes.status).toBe(403);
       expect(evilOriginRes.body.error.code).toBe('CSRF_INVALID_ORIGIN');
 
+      const attackerIpRes = await request(app)
+        .post('/api/auth/logout')
+        .set('Origin', 'http://198.51.100.1:8080');
+      expect(attackerIpRes.status).toBe(403);
+      expect(attackerIpRes.body.error.code).toBe('CSRF_INVALID_ORIGIN');
+
       const nullOriginRes = await request(app)
         .post('/api/auth/logout')
         .set('Origin', 'null');

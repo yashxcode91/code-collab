@@ -6,6 +6,7 @@ import {
 } from '@codecollab/database';
 import { LoginInput, RegisterInput, User } from '@codecollab/shared';
 import { AppError } from '../../utils/AppError';
+import { redis } from '../../lib/redis';
 import {
   signAccessToken,
   signRefreshToken,
@@ -149,9 +150,39 @@ export const loginUser = async (
   return { user: toPublicUser(dbUser), token, refreshToken };
 };
 
+/** Revokes a refresh token by recording its unique jti in Redis until expiration. */
+export const revokeRefreshToken = async (rawToken: string): Promise<void> => {
+  try {
+    const payload = verifyRefreshToken(rawToken);
+    if (payload.jti && redis.status === 'ready') {
+      await redis.set(
+        `codecollab:revoked_refresh:${payload.jti}`,
+        '1',
+        'EX',
+        30 * 24 * 60 * 60
+      );
+    }
+  } catch {
+    // Ignore invalid tokens on revocation
+  }
+};
+
+/** Checks whether a refresh token jti has been revoked. */
+export const isRefreshTokenRevoked = async (jti: string): Promise<boolean> => {
+  try {
+    if (redis.status === 'ready') {
+      const exists = await redis.exists(`codecollab:revoked_refresh:${jti}`);
+      return exists === 1;
+    }
+  } catch {
+    // If Redis is unreachable, fail open to avoid service outage
+  }
+  return false;
+};
+
 /**
  * Validates a long-lived refresh token and issues a fresh rotated token pair.
- * Ensures the user account is still valid in the database.
+ * Ensures the user account is still valid in the database and revokes the old token.
  */
 export const rotateRefreshToken = async (
   rawToken: string
@@ -167,6 +198,15 @@ export const rotateRefreshToken = async (
     );
   }
 
+  const isRevoked = await isRefreshTokenRevoked(payload.jti);
+  if (isRevoked) {
+    throw new AppError(
+      401,
+      'INVALID_REFRESH_TOKEN',
+      'Refresh token has been revoked'
+    );
+  }
+
   const dbUser = await prisma.user.findUnique({
     where: { id: payload.sub },
   });
@@ -178,6 +218,9 @@ export const rotateRefreshToken = async (
       'The user session is no longer active'
     );
   }
+
+  // Enforce single-use refresh token rotation: invalidate old token
+  await revokeRefreshToken(rawToken);
 
   const accessToken = signAccessToken({ sub: dbUser.id, role: dbUser.role });
   const { refreshToken: newRefreshToken } = signRefreshToken(dbUser.id);

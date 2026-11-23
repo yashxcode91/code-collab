@@ -21,7 +21,12 @@ import {
   getRefreshCookieMaxAgeMs,
   getRefreshCookieOptions,
 } from '../../utils/jwt';
-import { loginUser, registerUser, rotateRefreshToken } from './auth.service';
+import {
+  loginUser,
+  registerUser,
+  revokeRefreshToken,
+  rotateRefreshToken,
+} from './auth.service';
 import {
   OAuthFlowError,
   completeOAuthCallback,
@@ -123,6 +128,11 @@ export const logoutController: RequestHandler = async (req, res) => {
   if (token) {
     const tokenHash = createHash('sha256').update(token, 'utf8').digest('hex');
     await disconnectSocketsByTokenHash(tokenHash);
+  }
+
+  const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  if (typeof rawRefreshToken === 'string') {
+    await revokeRefreshToken(rawRefreshToken).catch(() => undefined);
   }
 
   // Passing exact same { httpOnly, sameSite, path, secure } ensures browsers delete both cookies

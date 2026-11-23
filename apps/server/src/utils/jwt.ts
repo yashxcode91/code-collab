@@ -170,13 +170,16 @@ export const getRefreshCookieOptions = (): CookieOptions => ({
 export const getRefreshCookieMaxAgeMs = (): number =>
   DEFAULT_REFRESH_EXPIRES_IN_SECONDS * 1000;
 
+const getRefreshSecret = (accessSecret: string): string =>
+  process.env.JWT_REFRESH_SECRET?.trim() || `${accessSecret}:refresh`;
+
 /** Signs an HS256 long-lived refresh token (30 days) for session continuity. */
 export const signRefreshToken = (
   userId: string
 ): { refreshToken: string; jti: string } => {
   const { secret } = getJwtConfig();
   const jti = crypto.randomUUID();
-  const refreshSecret = `${secret}:refresh`;
+  const refreshSecret = getRefreshSecret(secret);
 
   const refreshToken = jwt.sign(
     {
@@ -197,7 +200,7 @@ export const signRefreshToken = (
 /** Verifies signature, purpose, and structure of a refresh token. */
 export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
   const { secret } = getJwtConfig();
-  const refreshSecret = `${secret}:refresh`;
+  const refreshSecret = getRefreshSecret(secret);
 
   const decoded = jwt.verify(token, refreshSecret, {
     algorithms: ['HS256'],

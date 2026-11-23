@@ -21,7 +21,19 @@ import { CodebaseIndexService } from '../ai/codebaseIndex.service';
 export const normalizeFilePath = (rawPath: string): string => {
   const normalized = path.posix.normalize(rawPath.replace(/\\/g, '/')).trim();
   // Strip leading slash if present
-  return normalized.replace(/^\/+/, '');
+  const stripped = normalized.replace(/^\/+/, '');
+  if (
+    stripped.startsWith('..') ||
+    stripped.includes('/../') ||
+    stripped === '..'
+  ) {
+    throw new AppError(
+      400,
+      'INVALID_FILE_PATH',
+      `Invalid file path '${rawPath}': path traversal outside workspace is forbidden`
+    );
+  }
+  return stripped;
 };
 
 export const toDtoChangeType = (

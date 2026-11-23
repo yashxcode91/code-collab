@@ -21,6 +21,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export const app: Application = express();
+app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 // 0. Dedicated Preview Gateway Data Plane

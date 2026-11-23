@@ -108,12 +108,7 @@ export const isAllowedOrigin = (requestOrigin?: string | null): boolean => {
       return true;
     }
 
-    // 3. Direct server IPv4 origin fallback
-    if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(reqHost)) {
-      return true;
-    }
-
-    // 4. Local development fallbacks
+    // 3. Local development fallbacks
     if (reqHost === 'localhost' || reqHost === '127.0.0.1') {
       return true;
     }

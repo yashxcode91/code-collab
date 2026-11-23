@@ -433,7 +433,7 @@ export const StudioPreviewPane: React.FC<StudioPreviewPaneProps> = ({
               src={effectivePreviewUrl || 'about:blank'}
               title="Devnolith Sandbox Preview"
               className="w-full h-full border-none bg-white"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              sandbox="allow-scripts allow-forms allow-popups allow-modals"
             />
           </div>
         )}

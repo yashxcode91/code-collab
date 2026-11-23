@@ -1,8 +1,6 @@
 # Dependencies
 node_modules/
 .pnpm-store/
-
-# Production Build Outputs
 dist/
 !apps/web/dist/
 !apps/web/dist/**
@@ -11,7 +9,6 @@ out/
 .next/
 .output/
 
-# Environment Variables & Secrets (NEVER COMMIT)
 .env
 .env.*
 *.env
