@@ -19,8 +19,8 @@ export const DEFAULT_SANDBOX_IMAGE =
   process.env.SANDBOX_RUNNER_IMAGE || 'codecollab-runner-node:v1';
 export const SANDBOX_NETWORK_NAME = 'codecollab-sandbox';
 const DEFAULT_PRIMARY_PORT = 5173;
-const DEFAULT_MEMORY_LIMIT_MB = 512;
-const DEFAULT_CPU_LIMIT = 1.0;
+const DEFAULT_MEMORY_LIMIT_MB = 384;
+const DEFAULT_CPU_LIMIT = 0.5;
 
 /** Idle threshold: containers inactive for 5 minutes are auto-stopped to reclaim RAM */
 export const SANDBOX_IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -88,6 +88,11 @@ export class SandboxManagerService {
     if (this.idleReaperInterval.unref) {
       this.idleReaperInterval.unref();
     }
+
+    // Run an initial sweep on boot to purge any orphan containers left over from previous runs
+    this.reapIdleSandboxes().catch((err) => {
+      console.warn('[SandboxManager] Initial startup reaper sweep notice:', err?.message || err);
+    });
   }
 
   /**
@@ -471,10 +476,22 @@ server.listen(PORT, '0.0.0.0', () => {
       `127.0.0.1::${primaryPort}`,
       '-m',
       `${memoryLimitMb}m`,
+      '--memory-swap',
+      `${memoryLimitMb}m`,
       '--cpus',
       `${cpuLimit}`,
+      '--cpu-shares',
+      '256',
       '--pids-limit',
       '128',
+      '--ulimit',
+      'core=0:0',
+      '--ulimit',
+      'nofile=2048:4096',
+      '--add-host',
+      '169.254.169.254:127.0.0.1',
+      '--tmpfs',
+      '/tmp:rw,noexec,nosuid,size=64m',
       '--security-opt',
       'no-new-privileges:true',
       '--cap-drop=ALL',
@@ -565,16 +582,16 @@ server.listen(PORT, '0.0.0.0', () => {
   /**
    * Scans running sandboxes and gracefully stops any container that has been idle
    * (no preview traffic, no terminal activity, no heartbeats) for more than 5 minutes.
+   * Also sweeps Docker directly to purge any orphaned `cc-sbx-*` containers on the host.
    */
   async reapIdleSandboxes(): Promise<number> {
     const runningSandboxes = await prisma.previewSandbox.findMany({
       where: { status: 'RUNNING' },
     });
 
-    if (runningSandboxes.length === 0) return 0;
-
     const now = Date.now();
     let stoppedCount = 0;
+    const activeContainerNames = new Set<string>();
 
     for (const sb of runningSandboxes) {
       // 1. If an active interactive terminal session is open for this project, keep alive
@@ -583,6 +600,7 @@ server.listen(PORT, '0.0.0.0', () => {
           where: { id: sb.id },
           data: { lastPingAt: new Date() },
         });
+        activeContainerNames.add(sb.containerName);
         continue;
       }
 
@@ -615,7 +633,38 @@ server.listen(PORT, '0.0.0.0', () => {
             err?.message || err
           );
         }
+      } else {
+        activeContainerNames.add(sb.containerName);
       }
+    }
+
+    // 3. Purge orphaned Docker containers (matching `cc-sbx-*` without active RUNNING session)
+    try {
+      const psResult = await this.docker.exec([
+        'ps',
+        '--filter',
+        'name=cc-sbx-',
+        '--format',
+        '{{.Names}}',
+      ]);
+      if (psResult.exitCode === 0 && psResult.stdout) {
+        const runningDockerContainers = psResult.stdout
+          .split('\n')
+          .map((c) => c.trim())
+          .filter((c) => c.startsWith('cc-sbx-'));
+
+        for (const containerName of runningDockerContainers) {
+          if (!activeContainerNames.has(containerName)) {
+            console.log(
+              `[SandboxManager] Purging orphan sandbox container ${containerName} from Docker host`
+            );
+            await this.docker.exec(['rm', '-f', containerName]);
+            stoppedCount++;
+          }
+        }
+      }
+    } catch (err: any) {
+      // In testing environments or when docker ps fails, don't crash the reaper
     }
 
     return stoppedCount;
